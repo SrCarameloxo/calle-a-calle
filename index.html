@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <title>Memoriza Badajoz - v11.0 (Mejorado)</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <style>
+    html, body { height: 100%; margin: 0; }
+    body { display: flex; font-family: system-ui, sans-serif; }
+    aside { width: 300px; padding: 1rem; box-shadow: 2px 0 4px rgba(0,0,0,.15); display: flex; flex-direction: column; gap: 1rem; overflow-y: auto; }
+    #map { flex: 1; }
+
+    button {
+      width: 100%; padding: .45rem; border: none; border-radius: 6px;
+      background: #007BFF; color: #fff; font-size: 1rem; cursor: pointer;
+      box-sizing: border-box; transition: transform 0.05s ease-in-out, background-color 0.2s;
+    }
+    button:not(:disabled):hover { background-color: #0069d9; }
+    button:not(:disabled):active { transform: scale(0.97); }
+    button:disabled { opacity: .4; cursor: default; }
+    
+    #undoPoint { background-color: #c82333; }
+    #undoPoint:not(:disabled):hover { background-color: #a71d2a; }
+
+    #repeatZone { background-color: #28a745; }
+    #repeatZone:not(:disabled):hover { background-color: #218838; }
+    
+    #question { font-weight: 700; margin: .5rem 0; }
+    #fb { margin: .5rem 0; }
+    #score-display { font-size: 1.1rem; font-weight: bold; color: #333; }
+    .hidden { display: none !important; }
+
+    .loader {
+      display: flex; align-items: center; justify-content: center;
+      flex-direction: column; gap: 10px; padding: 10px;
+      background-color: #333; border-radius: 8px;
+    }
+    .loading-text { color: white; font-size: 12pt; font-weight: 600; }
+    .dot { margin-left: 2px; animation: blink 1.5s infinite; }
+    .dot:nth-child(2) { animation-delay: 0.3s; }
+    .dot:nth-child(3) { animation-delay: 0.6s; }
+    .loading-bar-background {
+      --height: 20px; display: flex; align-items: center; box-sizing: border-box;
+      padding: 3px; width: 100%; height: var(--height);
+      background-color: #212121;
+      box-shadow: #0c0c0c -2px 2px 4px 0px inset;
+      border-radius: calc(var(--height) / 2);
+    }
+    .loading-bar {
+      position: relative; display: flex; justify-content: center; flex-direction: column;
+      height: 100%; width: 0%; overflow: hidden;
+      background: #007BFF;
+      border-radius: 10px; transition: width 0.2s ease-out;
+    }
+    .white-bars-container { position: absolute; display: flex; align-items: center; gap: 18px; }
+    .white-bar {
+      background: linear-gradient(-45deg, rgba(255, 255, 255, 1) 0%, rgba(255, 255, 255, 0) 70%);
+      width: 10px; height: 45px; opacity: 0.3; transform: rotate(45deg);
+    }
+    @keyframes blink { 0%, 100% { opacity: 0; } 50% { opacity: 1; } }
+  </style>
+</head>
+<body>
+  <aside>
+    <h1>Memoriza Badajoz</h1>
+    <button id="drawZone">Establecer zona</button>
+    <button id="undoPoint" class="hidden">Retroceder Punto</button>
+    <button id="start" class="hidden" disabled>Start</button>
+    <button id="repeatZone" class="hidden" disabled>Repetir Zona</button>
+    <button id="next" class="hidden" disabled>Siguiente</button>
+    <p id="question"></p>
+    <p id="score-display" class="hidden">Calles acertadas: <span id="score">0 / 0</span></p>
+    <div id="loader-container" class="loader hidden">
+      <div id="loading-text" class="loading-text"></div>
+      <div class="loading-bar-background">
+        <div id="progress-bar" class="loading-bar">
+          <div class="white-bars-container">
+            <div class="white-bar"></div><div class="white-bar"></div><div class="white-bar"></div><div class="white-bar"></div><div class="white-bar"></div><div class="white-bar"></div><div class="white-bar"></div><div class="white-bar"></div><div class="white-bar"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <p id="fb"></p>
+  </aside>
+  <div id="map"></div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script>
+    const COL_ZONE = '#663399', COL_TRACE = '#007a2f', COL_DASH = '#1976d2';
+  let map, drawing=false, zonePoly=null, tempMarkers=[], zonePoints=[], oldZonePoly=null;
+  let playing=false, qIdx=0, target=null, userMk, guide, streetGrp;
+  let streetList = [];
+  let totalQuestions = 0, streetsGuessedCorrectly = 0;
+  let lastGameZonePoints = [];
+
+  const btnDraw = document.getElementById('drawZone');
+  const btnUndo = document.getElementById('undoPoint');
+  const bStart = document.getElementById('start');
+  const btnRepeat = document.getElementById('repeatZone');
+  const bNext = document.getElementById('next');
+  const qEl = document.getElementById('question');
+  const fb = document.getElementById('fb');
+  const scoreDisplay = document.getElementById('score-display');
+  const scoreEl = document.getElementById('score');
+  const loaderContainer = document.getElementById('loader-container');
+  const loadingText = document.getElementById('loading-text');
+  const progressBar = document.getElementById('progress-bar');
+
+  function init(){
+    map = L.map('map',{zoomSnap:0.25});
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager_nolabels/{z}/{x}/{y}{r}.png',{
+      attribution: '© OSM & CARTO', subdomains:'abcd', maxZoom:19
+    }).addTo(map);
+    map.setView([38.88, -6.97], 13);
+  }
+  
+  function setupStartButton() {
+    bStart.onclick = async ()=>{
+      if (oldZonePoly) { map.removeLayer(oldZonePoly); oldZonePoly = null; }
+      if(!zonePoly) return;
+      if(drawing){ 
+        drawing = false; 
+        map.off('click', addVertex); 
+        tempMarkers.forEach(m => map.removeLayer(m));
+        tempMarkers = [];
+      }
+      btnUndo.classList.add('hidden');
+      bStart.disabled = true;
+      await preloadStreets();
+      bStart.textContent = 'Iniciar juego';
+      bStart.onclick = ()=>{
+        playing = true; qIdx = 0; streetsGuessedCorrectly = 0;
+        scoreDisplay.classList.remove('hidden');
+        scoreEl.textContent = `0 / ${totalQuestions}`;
+        bStart.classList.add('hidden');
+        bNext.classList.remove('hidden');
+        map.fitBounds(zonePoly.getBounds(), { padding: [50, 50] });
+        nextQ();
+      };
+      if (totalQuestions > 0) { bStart.disabled = false; }
+    };
+  }
+
+  window.addEventListener('DOMContentLoaded', () => { init(); setupStartButton(); });
+
+  function startDrawing(){
+    drawing = true;
+    fb.textContent = 'Haz click para añadir vértices. Con 3 se habilita Start. Haz click en el primer vértice para cerrar.';
+    btnDraw.classList.add('hidden');
+    btnRepeat.classList.add('hidden');
+    btnUndo.classList.remove('hidden');
+    bStart.classList.remove('hidden');
+    bStart.disabled = true;
+    map.on('click', addVertex);
+  }
+
+  function addVertex(e){
+    const { latlng } = e;
+    if(zonePoints.length >= 3 && latlng.equals(zonePoints[0])){ finishPolygon(); return; }
+    const mk = L.circleMarker(latlng, { radius:5, color:COL_ZONE }).addTo(map);
+    tempMarkers.push(mk);
+    zonePoints.push(latlng);
+    if(zonePoly) map.removeLayer(zonePoly);
+    zonePoly = L.polygon(zonePoints, { color:COL_ZONE, weight:2, fillOpacity:0.1 }).addTo(map);
+    if(zonePoints.length >= 3){ 
+      fb.textContent = 'Zona mínima definida. Puedes cerrar o añadir más puntos.';
+      bStart.disabled = false; 
+    }
+  }
+
+  function finishPolygon(){
+    drawing = false;
+    map.off('click', addVertex);
+    tempMarkers.forEach(m=>map.removeLayer(m));
+    tempMarkers = [];
+    zonePoly.addLatLng(zonePoints[0]);
+    fb.textContent = 'Zona cerrada.';
+    btnUndo.classList.add('hidden');
+    bStart.disabled = false;
+  }
+  
+  function undoLastPoint() {
+      if (!drawing || zonePoints.length === 0) return;
+      zonePoints.pop();
+      const lastMarker = tempMarkers.pop();
+      if (lastMarker) map.removeLayer(lastMarker);
+      if (zonePoly) map.removeLayer(zonePoly);
+      zonePoly = null;
+      if (zonePoints.length >= 2) {
+          zonePoly = L.polygon(zonePoints, { color: COL_ZONE, weight: 2, fillOpacity: 0.1 }).addTo(map);
+      }
+      bStart.disabled = zonePoints.length < 3;
+      fb.textContent = zonePoints.length > 0 ? 'Punto eliminado. Sigue añadiendo.' : 'Haz click para añadir vértices.';
+  }
+
+  btnDraw.addEventListener('click', startDrawing);
+  btnUndo.addEventListener('click', undoLastPoint);
+  
+  btnRepeat.addEventListener('click', async () => {
+    if (lastGameZonePoints.length < 3) return;
+    if (oldZonePoly) map.removeLayer(oldZonePoly);
+    zonePoints = [...lastGameZonePoints];
+    zonePoly = L.polygon(zonePoints, { color: COL_ZONE, weight: 2, fillOpacity: 0.1 }).addTo(map);
+    btnDraw.classList.add('hidden');
+    btnRepeat.classList.add('hidden');
+    bStart.classList.remove('hidden');
+    bStart.disabled = true;
+    bStart.textContent = 'Cargando zona anterior...';
+    await preloadStreets(); 
+    bStart.textContent = 'Iniciar juego';
+    bStart.onclick = () => {
+        playing = true; qIdx = 0; streetsGuessedCorrectly = 0;
+        scoreDisplay.classList.remove('hidden');
+        scoreEl.textContent = `0 / ${totalQuestions}`;
+        bStart.classList.add('hidden');
+        bNext.classList.remove('hidden');
+        map.fitBounds(zonePoly.getBounds(), { padding: [50, 50] });
+        nextQ();
+    };
+    if (totalQuestions > 0) { bStart.disabled = false; }
+  });
+
+  function onMapClick(e){
+    if(!playing) return; 
+    map.off('click', onMapClick);
+    if (userMk) map.removeLayer(userMk);
+    userMk = L.marker(e.latlng).addTo(map);
+    streetGrp = drawStreet(); 
+    if(streetGrp){
+      const streetCheck = getDistanceToStreet(userMk.getLatLng(), streetGrp);
+      const distance = streetCheck.distance;
+      const clickTolerance = 30; // En píxeles
+      if (distance <= clickTolerance) {
+        streetsGuessedCorrectly++;
+        fb.textContent = `¡Correcto! Has acertado.`;
+      } else {
+        fb.textContent = `Casi, pero no has hecho clic sobre el lugar (a ${Math.round(distance)} metros).`;
+      }
+      scoreEl.textContent = `${streetsGuessedCorrectly} / ${totalQuestions}`;
+      if (streetCheck.point) {
+        guide = L.polyline([userMk.getLatLng(), streetCheck.point], { dashArray:'6 4', color:COL_DASH }).addTo(map);
+      }
+    } else {
+      fb.textContent = 'Error: No se pudo dibujar el lugar. Pulsa Siguiente.';
+    }
+    bNext.disabled=false;
+  };
+
+  bNext.onclick = ()=>{ bNext.disabled=true; nextQ(); };
+
+  function clear(){ 
+    [userMk, guide, streetGrp].forEach(layer => {
+        if (layer && map.hasLayer(layer)) map.removeLayer(layer);
+    });
+    userMk = guide = streetGrp = null; 
+  }
+
+  async function geocode(pt){
+    try{
+      // Ahora llamamos a nuestro propio "camarero"
+const res = await fetch(`/api/geocode?latlng=${pt.lat},${pt.lng}`);
+      const js = await res.json(); 
+      if (js.status !== 'OK' || js.results.length === 0) return null;
+      const result = js.results[0];
+      const routeComp = result.address_components.find(c => c.types.includes('route'));
+      if (routeComp) { return { name: routeComp.long_name.toUpperCase(), loc: result.geometry.location }; }
+      const nameFromAddress = result.formatted_address.split(',')[0].toUpperCase();
+      const forbiddenNames = ['BADAJOZ', 'ESPAÑA', '06001', '06002', '06003', '06004', '06005', '06006', '06007', '06008', '06009', '06010', '06011', '06012'];
+      if (nameFromAddress && !forbiddenNames.some(fn => nameFromAddress.includes(fn))) {
+         return { name: nameFromAddress, loc: result.geometry.location };
+      }
+      return null;
+    } catch { return null; }
+  }
+  
+  /**
+   * Separa un nombre de vía, estandarizando su tipo a una forma canónica.
+   * Ejemplo: "C. Soledad" -> { type: 'CALLE', baseName: 'SOLEDAD' }
+   * Ejemplo: "Calle Soledad" -> { type: 'CALLE', baseName: 'SOLEDAD' }
+   */
+  function extractNameParts(name) {
+    // 1. Definimos todos los tipos de vía y sus abreviaturas
+    const streetTypeWords = new Set([
+        'AV', 'AV.', 'AVDA', 'AVENIDA', 'CALLE', 'C', 'C.', 'C/', 'PASEO', 'Pº', 'P°',
+        'PLAZA', 'PL.', 'PZ', 'PUENTE', 'CAMINO', 'CAÑADA', 'CALLEJA', 'CALLEJON',
+        'PARQUE', 'JARDIN', 'POLIGONO', 'URBANIZACION', 'RONDA'
+    ]);
+
+    // 2. Creamos un mapa para convertir sinónimos a una única forma estándar
+    const typeSynonymMap = {
+        'C': 'CALLE', 'C.': 'CALLE', 'C/': 'CALLE',
+        'AV': 'AVENIDA', 'AV.': 'AVENIDA', 'AVDA': 'AVENIDA',
+        'Pº': 'PASEO', 'P°': 'PASEO',
+        'PL': 'PLAZA', 'PL.': 'PLAZA', 'PZ': 'PLAZA'
+    };
+
+    const stopWords = new Set(['DE', 'DEL', 'LA', 'LAS', 'LOS', 'EL', 'Y']);
+
+    const normalized = name.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase();
+    const words = normalized.split(/[^A-Z0-9]+/).filter(Boolean);
+
+    // 3. Buscamos el tipo de vía
+    const foundType = words.find(w => streetTypeWords.has(w)) || null;
+    
+    // 4. Estandarizamos el tipo encontrado usando el mapa de sinónimos
+    let canonicalType = foundType;
+    if (foundType && typeSynonymMap[foundType]) {
+        canonicalType = typeSynonymMap[foundType];
+    }
+
+    const baseWords = words.filter(w => !streetTypeWords.has(w) && !stopWords.has(w));
+    
+    return {
+        type: canonicalType, // Devolvemos el tipo ya estandarizado
+        baseName: baseWords.join(' ')
+    };
+  }
+
+  async function preloadStreets(){
+    fb.textContent = '';
+    fb.classList.add('hidden');
+    loaderContainer.classList.remove('hidden');
+    progressBar.style.width = '0%';
+    const dots = '<span class="dot">.</span><span class="dot">.</span><span class="dot">.</span>';
+    loadingText.innerHTML = `Identificando calles en la zona${dots}`;
+
+    try {
+      const coords = zonePoints.map(p => `${p.lat} ${p.lng}`).join(' ');
+      
+      let query = `[out:json][timeout:15]; way(poly:"${coords}")["name"]; out tags;`;
+      let res = await fetch('https://overpass-api.de/api/interpreter', { method: 'POST', body: query });
+      let js = await res.json();
+      const streetNamesInPoly = new Set(js.elements.map(el => el.tags.name));
+      
+      streetList = [];
+      const seenGoogleNames = new Set();
+      const placeEntries = Array.from(streetNamesInPoly);
+      let processedCount = 0;
+      const center = zonePoly.getBounds().getCenter();
+
+      for (const osmName of placeEntries) {
+        processedCount++;
+        const progress = (processedCount / placeEntries.length) * 100;
+        progressBar.style.width = `${progress}%`;
+        loadingText.innerHTML = `Cargando ${processedCount} de ${placeEntries.length}${dots}`;
+
+        query = `[out:json][timeout:25];
+          way["name"="${osmName}"](around:1500, ${center.lat}, ${center.lng});
+          out body; >; out skel qt;`;
+        
+        res = await fetch('https://overpass-api.de/api/interpreter', { method: 'POST', body: query });
+        js = await res.json();
+        
+        const osmElements = js.elements.filter(el => el.type === 'way');
+        if (osmElements.length === 0) continue;
+        
+        const elementsById = js.elements.reduce((acc, el) => { acc[el.id] = el; return acc; }, {});
+        const geometries = osmElements.map(el => {
+            const nodes = (el.nodes || []).map(id => elementsById[id]).filter(Boolean);
+            const points = nodes.map(n => [n.lat, n.lon]);
+            const isClosed = nodes.length > 2 && nodes[0]?.id === nodes[nodes.length - 1]?.id;
+            return { points, isClosed };
+        }).filter(g => g.points.length > 1);
+        if (geometries.length === 0) continue;
+
+        const samplePoints = [];
+        const MAX_SAMPLES_PER_PLACE = 5;
+        const allPoints = geometries.flatMap(g => g.points);
+        const step = Math.max(1, Math.floor(allPoints.length / MAX_SAMPLES_PER_PLACE));
+        for (let i = 0; i < allPoints.length; i += step) {
+            samplePoints.push({ lat: allPoints[i][0], lng: allPoints[i][1] });
+        }
+
+        const geocodedResults = await Promise.all(samplePoints.map(pt => geocode(pt)));
+        const geocodedNames = geocodedResults.filter(Boolean).map(geo => geo.name);
+        if (geocodedNames.length === 0) continue;
+
+        const nameCounts = geocodedNames.reduce((acc, name) => { acc[name] = (acc[name] || 0) + 1; return acc; }, {});
+        const mostCommonGoogleName = Object.keys(nameCounts).reduce((a, b) => nameCounts[a] > nameCounts[b] ? a : b);
+
+        const osmParts = extractNameParts(osmName);
+        const googleParts = extractNameParts(mostCommonGoogleName);
+
+        const baseNamesMatch = osmParts.baseName && osmParts.baseName === googleParts.baseName;
+        const typesAreCompatible = (osmParts.type === googleParts.type) || !osmParts.type || !googleParts.type;
+
+        if (baseNamesMatch && typesAreCompatible) {
+          if (!seenGoogleNames.has(mostCommonGoogleName)) {
+            seenGoogleNames.add(mostCommonGoogleName);
+            streetList.push({ googleName: mostCommonGoogleName, geometries: geometries });
+          }
+        }
+      }
+      
+      totalQuestions = streetList.length;
+      streetList.sort(() => Math.random() - 0.5);
+
+      if (totalQuestions > 0) {
+        fb.textContent = `Se han encontrado y validado ${totalQuestions} lugares. ¡Listo para jugar!`;
+      } else {
+        fb.textContent = 'No se han encontrado lugares válidos en la zona. Dibuja un polígono más grande.';
+      }
+      scoreEl.textContent = `0 / ${totalQuestions}`;
+
+    } finally {
+      loaderContainer.classList.add('hidden');
+      fb.classList.remove('hidden');
+    }
+  }
+  
+  function drawStreet(){
+    const g = L.layerGroup().addTo(map);
+    if (!target || !Array.isArray(target) || target.length === 0) {
+      fb.textContent = '⚠️ No se encontró la geometría para este lugar.';
+      map.removeLayer(g);
+      return null;
+    }
+    target.forEach(geom => {
+        if (geom.isClosed) {
+            L.polygon(geom.points, { color: COL_TRACE, weight: 4, fillOpacity: 0.2 }).addTo(g);
+        } else {
+            L.polyline(geom.points, { color: COL_TRACE, weight: 8 }).addTo(g);
+        }
+    });
+    return g;
+  }
+
+  function getDistanceToStreet(userPoint, streetLayer) {
+    let minDistance = Infinity;
+    let closestPointOnStreet = null;
+    streetLayer.eachLayer(layer => {
+      let latlngs;
+      if (layer instanceof L.Polygon) { latlngs = layer.getLatLngs()[0]; } 
+      else if (layer instanceof L.Polyline) { latlngs = layer.getLatLngs(); } 
+      else { return; }
+      if(latlngs.length < 2) return;
+      for (let i = 0; i < latlngs.length -1; i++) {
+        const p1=map.latLngToLayerPoint(latlngs[i]), p2=map.latLngToLayerPoint(latlngs[i+1]);
+        const userP=map.latLngToLayerPoint(userPoint);
+        const a=userP.x-p1.x, b=userP.y-p1.y, c=p2.x-p1.x, d=p2.y-p1.y;
+        let dot=a*c+b*d, len_sq=c*c+d*d;
+        let param = len_sq !== 0 ? dot / len_sq : -1;
+        let xx, yy;
+        if(param<0){xx=p1.x;yy=p1.y;}
+        else if(param>1){xx=p2.x;yy=p2.y;}
+        else{xx=p1.x+param*c;yy=p1.y+param*d;}
+        const dx=userP.x-xx, dy=userP.y-yy;
+        const dist = Math.sqrt(dx*dx+dy*dy);
+        if(dist < minDistance){minDistance=dist; closestPointOnStreet=map.layerPointToLatLng([xx,yy]);}
+      }
+    });
+    return { distance: minDistance, point: closestPointOnStreet };
+  }
+
+  function endGame() {
+    playing = false;
+    fb.textContent = `¡Juego terminado! Has acertado ${streetsGuessedCorrectly} de ${totalQuestions}.`;
+    qEl.textContent = 'Pulsa para dibujar una nueva zona o para repetir la anterior.';
+    scoreDisplay.classList.add('hidden');
+    if (zonePoly) {
+        zonePoly.setStyle({ color: '#696969', weight: 2, dashArray: '5, 5', fillOpacity: 0.05 });
+        oldZonePoly = zonePoly;
+    }
+    
+    lastGameZonePoints = [...zonePoints]; 
+    
+    bNext.classList.add('hidden');
+    btnDraw.classList.remove('hidden'); 
+    btnDraw.disabled = false;
+    btnRepeat.classList.remove('hidden'); 
+    btnRepeat.disabled = (lastGameZonePoints.length < 3);
+    bStart.classList.add('hidden');
+    
+    zonePoly = null; 
+    zonePoints = []; 
+    streetList = []; 
+    totalQuestions = 0;
+    setupStartButton();
+    map.off('click', onMapClick);
+  }
+
+  function nextQ(){
+    clear();
+    bNext.disabled = true;
+    if(qIdx >= totalQuestions){
+      endGame();
+      return;
+    }
+    map.on('click', onMapClick);
+    const s = streetList[qIdx];
+    target = s.geometries;
+    qIdx++;
+    qEl.textContent = `Pregunta ${qIdx} / ${totalQuestions}: ¿Dónde está «${s.googleName}»?`;
+    fb.textContent = 'Haz clic en el mapa para responder.';
+  }
+  </script>
+</body>
+</html>

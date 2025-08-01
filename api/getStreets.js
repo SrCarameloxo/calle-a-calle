@@ -1,4 +1,4 @@
-// api/getStreets.js
+// api/getStreets.js CORREGIDO
 import { createClient } from '@vercel/kv';
 
 const kv = createClient({
@@ -21,6 +21,22 @@ async function geocode(pt) {
   }
   return null;
 }
+
+function extractNameParts(name) {
+    const streetTypeWords = new Set(['AV', 'AV.', 'AVDA', 'AVENIDA', 'CALLE', 'C', 'C.', 'C/', 'PASEO', 'Pº', 'P°', 'PLAZA', 'PL.', 'PZ', 'PUENTE', 'CAMINO', 'CAÑADA', 'CALLEJA', 'CALLEJON', 'PARQUE', 'JARDIN', 'POLIGONO', 'URBANIZACION', 'RONDA']);
+    const typeSynonymMap = { 'C': 'CALLE', 'C.': 'CALLE', 'C/': 'CALLE', 'AV': 'AVENIDA', 'AV.': 'AVENIDA', 'AVDA': 'AVENIDA', 'Pº': 'PASEO', 'P°': 'PASEO', 'PL': 'PLAZA', 'PL.': 'PLAZA', 'PZ': 'PLAZA' };
+    const stopWords = new Set(['DE', 'DEL', 'LA', 'LAS', 'LOS', 'EL', 'Y']);
+    const normalized = name.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase();
+    const words = normalized.split(/[^A-Z0-9]+/).filter(Boolean);
+    const foundType = words.find(w => streetTypeWords.has(w)) || null;
+    let canonicalType = foundType;
+    if (foundType && typeSynonymMap[foundType]) {
+        canonicalType = typeSynonymMap[foundType];
+    }
+    const baseWords = words.filter(w => !streetTypeWords.has(w) && !stopWords.has(w));
+    return { type: canonicalType, baseName: baseWords.join(' ') };
+}
+
 
 export default async function handler(request, response) {
   const { zonePoints } = request.body;
@@ -62,13 +78,31 @@ export default async function handler(request, response) {
         }).filter(g => g.points.length > 1);
 
         if (geometries.length > 0) {
-            const samplePoint = geometries[0].points[0];
-            const geocodedResult = await geocode({ lat: samplePoint[0], lng: samplePoint[1] });
-            if (geocodedResult && !seenGoogleNames.has(geocodedResult.name)) {
-                const newStreet = { googleName: geocodedResult.name, geometries: geometries };
-                seenGoogleNames.add(newStreet.googleName);
-                streetList.push(newStreet);
-                await kv.set(cacheKey, newStreet, { ex: 60 * 60 * 24 * 30 });
+            const samplePoints = [];
+            const allPoints = geometries.flatMap(g => g.points);
+            const step = Math.max(1, Math.floor(allPoints.length / 5));
+            for (let i = 0; i < allPoints.length; i += step) {
+                samplePoints.push({ lat: allPoints[i][0], lng: allPoints[i][1] });
+            }
+
+            const geocodedResults = await Promise.all(samplePoints.map(pt => geocode(pt)));
+            const geocodedNames = geocodedResults.filter(Boolean).map(geo => geo.name);
+
+            if (geocodedNames.length > 0) {
+                const nameCounts = geocodedNames.reduce((acc, name) => { acc[name] = (acc[name] || 0) + 1; return acc; }, {});
+                const mostCommonGoogleName = Object.keys(nameCounts).reduce((a, b) => nameCounts[a] > nameCounts[b] ? a : b);
+                
+                const osmParts = extractNameParts(osmName);
+                const googleParts = extractNameParts(mostCommonGoogleName);
+
+                if (osmParts.baseName && osmParts.baseName === googleParts.baseName) {
+                    if (!seenGoogleNames.has(mostCommonGoogleName)) {
+                        const newStreet = { googleName: mostCommonGoogleName, geometries: geometries };
+                        seenGoogleNames.add(newStreet.googleName);
+                        streetList.push(newStreet);
+                        await kv.set(cacheKey, newStreet, { ex: 60 * 60 * 24 * 30 }); // Cache for 30 days
+                    }
+                }
             }
         }
       }
@@ -77,6 +111,6 @@ export default async function handler(request, response) {
     response.status(200).json({ streets: streetList });
   } catch (error) {
     console.error(error);
-    response.status(500).json({ error: 'Error al procesar las calles.' });
+    response.status(500).json({ error: 'Error al procesar las calles.', details: error.message });
   }
 }

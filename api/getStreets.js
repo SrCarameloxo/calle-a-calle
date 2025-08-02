@@ -1,6 +1,5 @@
 import { createClient } from '@vercel/kv';
 
-// Esta es la línea que faltaba. Define la conexión a la base de datos.
 const kv = createClient({
   url: process.env.KV_REST_API_URL,
   token: process.env.KV_REST_API_TOKEN,
@@ -38,10 +37,24 @@ function extractNameParts(name) {
 }
 
 export default async function handler(request, response) {
-  const { zonePoints } = request.body;
-  if (!zonePoints || zonePoints.length < 3) {
+  // === LA CORRECCIÓN ESTÁ AQUÍ ===
+  // Leemos el parámetro 'zone' de la URL, no del body.
+  const { zone } = request.query; 
+
+  if (!zone) {
     return response.status(400).json({ error: 'Faltan los puntos de la zona.' });
   }
+
+  // Convertimos el texto de la URL de vuelta a un array de puntos que el código entiende.
+  const zonePoints = zone.split(';').map(pair => {
+    const [lat, lng] = pair.split(',');
+    return { lat: parseFloat(lat), lng: parseFloat(lng) };
+  });
+
+  if (zonePoints.length < 3) {
+    return response.status(400).json({ error: 'Se necesitan al menos 3 puntos para la zona.' });
+  }
+  // === FIN DE LA CORRECCIÓN ===
 
   try {
     const coords = zonePoints.map(p => `${p.lat} ${p.lng}`).join(' ');

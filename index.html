@@ -38,11 +38,11 @@
       flex-grow: 1;
       position: relative;
       padding: 1rem;
-      overflow-y: hidden; /* Controla el overflow para el panel */
+      overflow-y: hidden;
     }
     
     .content-panel {
-      display: none; /* Ocultos por defecto */
+      display: none;
       padding: 1.5rem;
       border-radius: 1rem;
       background-color: rgba(17, 24, 39, 0.85);
@@ -65,15 +65,15 @@
     /* --- ESTILOS PANTALLA DE LOGIN --- */
     #background-map {
         position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-        z-index: 1; filter: blur(4px) brightness(0.7); transition: opacity 0.8s ease-in-out;
+        z-index: 1; filter: blur(4px) brightness(0.7);
     }
     #login-screen {
         position: fixed; top: 0; left: 0; width: 100%; height: 100%;
         z-index: 20; display: flex; align-items: center; justify-content: center;
-        transition: opacity 0.5s ease-in-out;
     }
     
     /* --- ESTILOS DE BOTONES DE JUEGO (RESTAURADOS) --- */
+    button { cursor: pointer; }
     button.game-control-btn {
       width: 100%; padding: .45rem; border: none; border-radius: 6px;
       font-size: 1rem; box-sizing: border-box; 
@@ -121,35 +121,37 @@
       transition: background-color 0.2s;
     }
     .saved-zone-item:hover {
-      background-color: rgba(59, 130, 246, 0.3); /* hover:bg-blue-500/30 */
+      background-color: rgba(59, 130, 246, 0.3);
     }
     .delete-zone-btn {
       background: none;
       border: none;
       padding: 0.25rem;
-      display: none; /* Oculto por defecto */
-      color: #ef4444; /* text-red-500 */
+      display: none;
+      color: #ef4444;
     }
     .saved-zone-item:hover .delete-zone-btn {
-      display: block; /* Visible en hover */
+      display: block;
     }
     .delete-zone-btn:hover {
-      color: #dc2626; /* hover:text-red-600 */
+      color: #dc2626;
     }
   </style>
 </head>
 <body>
   <div id="background-map"></div>
   <div id="login-screen">
-    <div class="p-8 m-2 text-white bg-gray-900 border-8 border-transparent rounded-3xl shadow-xl bg-opacity-80 backdrop-blur-sm">
-      <h1 class="text-5xl font-bold text-center cursor-default">Calle a Calle</h1>
-      <p class="mt-2 mb-8 text-center text-gray-300">Inicia sesión para empezar a jugar</p>
-      <div class="flex justify-center">
-        <button id="google-login-btn" class="p-3 bg-white rounded-full shadow-lg login-btn hover:scale-105 transition transform duration-300">
-          <img class="w-10 h-10" loading="lazy" src="https://ucarecdn.com/8f25a2ba-bdcf-4ff1-b596-088f330416ef/" alt="Google" />
-        </button>
+    <section class="p-2 bg-gradient-to-r from-blue-800 to-purple-800 rounded-3xl">
+      <div class="p-8 text-white bg-gray-900 border-8 border-transparent rounded-2xl shadow-xl bg-opacity-80 backdrop-blur-sm">
+        <h1 class="text-5xl font-bold text-center cursor-default">Calle a Calle</h1>
+        <p class="mt-2 mb-8 text-center text-gray-300">Inicia sesión para empezar a jugar</p>
+        <div class="flex justify-center">
+          <button id="google-login-btn" class="p-3 bg-white rounded-full shadow-lg login-btn hover:scale-105 transition transform duration-300">
+            <img class="w-10 h-10" loading="lazy" src="https://ucarecdn.com/8f25a2ba-bdcf-4ff1-b596-088f330416ef/" alt="Google" />
+          </button>
+        </div>
       </div>
-    </div>
+    </section>
   </div>
 
   <div id="game-screen" class="hidden">
@@ -216,7 +218,7 @@
       const backgroundMapContainer = document.getElementById('background-map');
       const googleLoginBtn = document.getElementById('google-login-btn');
       
-      let backgroundMap, animationInterval, gameMap = null;
+      let backgroundMap, gameMap = null;
       const COL_ZONE = '#663399', COL_TRACE = '#007a2f', COL_DASH = '#1976d2';
       let drawing=false, zonePoly=null, tempMarkers=[], zonePoints=[], oldZonePoly=null;
       let playing=false, qIdx=0, target=null, userMk, guide, streetGrp;
@@ -236,9 +238,9 @@
           loginScreen.style.opacity = '0';
           setTimeout(() => loginScreen.classList.add('hidden'), 500);
           gameScreen.classList.remove('hidden');
-          if (animationInterval) clearInterval(animationInterval);
           
-          document.getElementById('user-info-details').innerHTML = `<p class="text-sm text-gray-400">Conectado como</p><p class="font-semibold text-lg">${user.email}</p>`;
+          // CORRECCIÓN ESTÉTICA: texto del email más pequeño y truncado si es largo
+          document.getElementById('user-info-details').innerHTML = `<p class="text-sm text-gray-400">Conectado como</p><p class="font-semibold text-base truncate">${user.email}</p>`;
           document.getElementById('logout-btn').addEventListener('click', signOut);
           
           if (!gameMap) initGame();
@@ -252,6 +254,7 @@
       }
 
       function initBackgroundMap() {
+          if (backgroundMap) return;
           backgroundMap = L.map('background-map', { zoomControl: false, dragging: false, scrollWheelZoom: false, doubleClickZoom: false, touchZoom: false });
           L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager_nolabels/{z}/{x}/{y}{r}.png', { attribution: '', maxZoom: 19 }).addTo(backgroundMap);
           backgroundMap.setView([38.88, -6.97], 15);
@@ -265,22 +268,18 @@
           button.addEventListener('click', () => {
             const panelId = button.dataset.panel;
             const targetPanel = document.getElementById(panelId);
-            const isAlreadyActive = targetPanel.classList.contains('active');
+            const isAlreadyActive = button.classList.contains('active');
             
-            // Ocultar todos los paneles y quitar 'active' de todos los botones
             contentPanels.forEach(p => p.classList.remove('active'));
             menuButtons.forEach(b => b.classList.remove('active'));
             
             if (isAlreadyActive) {
-              // Si ya estaba activo, simplemente lo dejamos oculto (efecto toggle)
-              return;
+              return; // Si ya estaba activo, lo oculta y no hace más.
             }
 
-            // Si no estaba activo, lo mostramos y activamos el botón
             button.classList.add('active');
             targetPanel.classList.add('active');
 
-            // Cargar datos si es necesario
             if (panelId === 'saved-zones-content') displaySavedZones();
             if (panelId === 'stats-content') displayStats();
           });
@@ -446,7 +445,7 @@
           
           fb.textContent = '';
           loaderContainer.classList.remove('hidden');
-          loadingText.innerHTML = `Identificando calles en la zona...`;
+          loadingText.innerHTML = `Identificando calles...`;
 
           try {
               const zoneParam = zonePoints.map(p => `${p.lat},${p.lng}`).join(';');
@@ -472,9 +471,7 @@
       
       function drawStreet(){
         const g = L.layerGroup().addTo(gameMap);
-        if (!target || !Array.isArray(target) || target.length === 0) {
-          gameMap.removeLayer(g); return null;
-        }
+        if (!target || !Array.isArray(target) || target.length === 0) return null;
         target.forEach(geom => {
             if (geom.isClosed) L.polygon(geom.points, { color: COL_TRACE, weight: 4, fillOpacity: 0.2 }).addTo(g);
             else L.polyline(geom.points, { color: COL_TRACE, weight: 8 }).addTo(g);
@@ -500,7 +497,7 @@
       function endGame() {
         playing = false;
         document.getElementById('fb').textContent = `¡Juego terminado! Has acertado ${streetsGuessedCorrectly} de ${totalQuestions}.`;
-        document.getElementById('question').textContent = 'Pulsa en el menú inferior para ver tus zonas o empezar de nuevo.';
+        document.getElementById('question').textContent = 'Elige una opción o dibuja una nueva zona.';
         document.getElementById('score-display').classList.add('hidden');
         if (zonePoly) {
             zonePoly.setStyle({ color: '#696969', weight: 2, dashArray: '5, 5', fillOpacity: 0.05 });
@@ -509,7 +506,6 @@
         lastGameZonePoints = [...zonePoints];
         saveGameStats(streetsGuessedCorrectly, totalQuestions);
         
-        // CORRECCIÓN: Mostrar los botones correctos al final
         ['next', 'start'].forEach(id => document.getElementById(id).classList.add('hidden'));
         ['drawZone', 'repeatZone', 'saveZoneBtn'].forEach(id => document.getElementById(id).classList.remove('hidden'));
         document.getElementById('repeatZone').disabled = (lastGameZonePoints.length < 3);
@@ -569,14 +565,17 @@
                 item.className = 'saved-zone-item';
                 
                 const nameSpan = document.createElement('span');
-                nameSpan.className = 'font-semibold flex-grow';
+                nameSpan.className = 'font-semibold flex-grow truncate';
                 nameSpan.textContent = zone.name;
                 nameSpan.onclick = () => playFromHistory(zone.zone_points);
                 
                 const deleteBtn = document.createElement('button');
                 deleteBtn.className = 'delete-zone-btn';
                 deleteBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 256 256"><rect width="256" height="256" fill="none"></rect><line x1="216" y1="56" x2="40" y2="56" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"></line><line x1="104" y1="104" x2="104" y2="168" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"></line><line x1="152" y1="104" x2="152" y2="168" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"></line><path d="M200,56V208a8,8,0,0,1-8,8H64a8,8,0,0,1-8-8V56" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"></path><path d="M168,56V40a16,16,0,0,0-16-16H104A16,16,0,0,0,88,40V56" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"></path></svg>`;
-                deleteBtn.onclick = () => deleteZone(zone.id);
+                deleteBtn.onclick = (e) => {
+                  e.stopPropagation(); // Evita que el clic se propague al div padre
+                  deleteZone(zone.id);
+                };
 
                 item.appendChild(nameSpan);
                 item.appendChild(deleteBtn);

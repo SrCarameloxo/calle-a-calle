@@ -18,7 +18,7 @@
     #game-screen { display: flex; height: 100%; width: 100%; }
     #game-map-container { flex: 1; position: relative; z-index: 5; }
 
-    /* --- ESTILOS ASIDE Y PANELES (NUEVA ESTRUCTURA) --- */
+    /* --- ESTILOS ASIDE Y PANELES --- */
     aside { 
       width: 320px;
       box-shadow: 2px 0 4px rgba(0,0,0,.15); 
@@ -35,27 +35,26 @@
     }
 
     #middle-panel-container {
-      flex-grow: 1; /* Ocupa el espacio disponible */
+      flex-grow: 1;
       position: relative;
       padding: 1rem;
-      overflow-y: auto;
+      overflow-y: hidden; /* Controla el overflow para el panel */
     }
     
     .content-panel {
       display: none; /* Ocultos por defecto */
-    }
-
-    /* Estilo para el panel activo, usando el diseño del login */
-    .content-panel.active {
-      display: block;
       padding: 1.5rem;
       border-radius: 1rem;
-      background-color: rgba(17, 24, 39, 0.85); /* bg-gray-900 bg-opacity-85 */
+      background-color: rgba(17, 24, 39, 0.85);
       backdrop-filter: blur(4px);
       border: 1px solid rgba(255, 255, 255, 0.1);
       color: white;
       height: 100%;
       overflow-y: auto;
+    }
+    
+    .content-panel.active {
+      display: block;
     }
     
     #bottom-menu {
@@ -73,19 +72,13 @@
         z-index: 20; display: flex; align-items: center; justify-content: center;
         transition: opacity 0.5s ease-in-out;
     }
-    @keyframes pulse {
-      0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(76, 175, 80, 0.7); }
-      50% { transform: scale(1.05); box-shadow: 0 0 0 10px rgba(76, 175, 80, 0); }
-    }
-    #google-login-btn { animation: pulse 2.5s infinite; }
     
-    /* --- ESTILOS DE BOTONES (RESTAURADOS) --- */
-    button { cursor: pointer; }
+    /* --- ESTILOS DE BOTONES DE JUEGO (RESTAURADOS) --- */
     button.game-control-btn {
       width: 100%; padding: .45rem; border: none; border-radius: 6px;
       font-size: 1rem; box-sizing: border-box; 
       transition: transform 0.05s ease-in-out, background-color 0.2s;
-      margin-bottom: 0.5rem; /* Espacio entre botones */
+      margin-bottom: 0.5rem;
     }
     button.game-control-btn:not(:disabled):active { transform: scale(0.97); }
     button.game-control-btn:disabled { opacity: .4; cursor: default; }
@@ -115,23 +108,47 @@
     #score-display { font-size: 1.1rem; font-weight: bold; color: #333; }
     .loader { margin-top: 1rem; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 10px; padding: 10px; background-color: #f8f9fa; border-radius: 8px; border: 1px solid #e5e7eb; }
     .loading-text { color: #333; font-size: 12pt; font-weight: 600; }
+    
+    /* --- NUEVOS ESTILOS PARA ZONAS GUARDADAS --- */
+    .saved-zone-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0.75rem;
+      border-radius: 0.375rem;
+      background-color: rgba(255, 255, 255, 0.1);
+      cursor: pointer;
+      transition: background-color 0.2s;
+    }
+    .saved-zone-item:hover {
+      background-color: rgba(59, 130, 246, 0.3); /* hover:bg-blue-500/30 */
+    }
+    .delete-zone-btn {
+      background: none;
+      border: none;
+      padding: 0.25rem;
+      display: none; /* Oculto por defecto */
+      color: #ef4444; /* text-red-500 */
+    }
+    .saved-zone-item:hover .delete-zone-btn {
+      display: block; /* Visible en hover */
+    }
+    .delete-zone-btn:hover {
+      color: #dc2626; /* hover:text-red-600 */
+    }
   </style>
 </head>
 <body>
   <div id="background-map"></div>
   <div id="login-screen">
-    <div class="grid gap-8">
-      <section class="bg-gradient-to-r from-blue-800 to-purple-800 rounded-3xl">
-        <div class="border-8 border-transparent rounded-xl bg-gray-900 bg-opacity-80 backdrop-blur-sm shadow-xl p-8 m-2 text-white">
-          <h1 class="text-5xl font-bold text-center cursor-default">Calle a Calle</h1>
-          <p class="text-center text-gray-300 mt-2 mb-8">Inicia sesión con Google para empezar a jugar</p>
-          <div class="flex justify-center">
-            <button id="google-login-btn" class="login-btn p-3 rounded-full bg-white hover:scale-105 transition transform duration-300 shadow-lg">
-              <img class="w-10 h-10" loading="lazy" src="https://ucarecdn.com/8f25a2ba-bdcf-4ff1-b596-088f330416ef/" alt="Google" />
-            </button>
-          </div>
-        </div>
-      </section>
+    <div class="p-8 m-2 text-white bg-gray-900 border-8 border-transparent rounded-3xl shadow-xl bg-opacity-80 backdrop-blur-sm">
+      <h1 class="text-5xl font-bold text-center cursor-default">Calle a Calle</h1>
+      <p class="mt-2 mb-8 text-center text-gray-300">Inicia sesión para empezar a jugar</p>
+      <div class="flex justify-center">
+        <button id="google-login-btn" class="p-3 bg-white rounded-full shadow-lg login-btn hover:scale-105 transition transform duration-300">
+          <img class="w-10 h-10" loading="lazy" src="https://ucarecdn.com/8f25a2ba-bdcf-4ff1-b596-088f330416ef/" alt="Google" />
+        </button>
+      </div>
     </div>
   </div>
 
@@ -155,35 +172,32 @@
       
       <div id="middle-panel-container">
         <div id="saved-zones-content" class="content-panel">
-            <h3 class="font-bold text-xl mb-4">Mis Zonas Guardadas</h3>
+            <h3 class="mb-4 text-xl font-bold">Mis Zonas Guardadas</h3>
             <div id="saved-zones-list" class="space-y-2"></div>
         </div>
         <div id="stats-content" class="content-panel">
-            <h3 class="font-bold text-xl mb-4">Estadísticas</h3>
+            <h3 class="mb-4 text-xl font-bold">Estadísticas</h3>
             <div id="stats-list"></div>
         </div>
         <div id="profile-content" class="content-panel">
-            <h3 class="font-bold text-xl mb-4">Perfil de Usuario</h3>
-            <div id="user-info-details" class="text-center p-4 rounded-lg bg-gray-700"></div>
-            <button id="logout-btn" class="game-control-btn mt-4 w-full" style="background-color: #dc3545;">Cerrar Sesión</button>
+            <h3 class="mb-4 text-xl font-bold">Perfil de Usuario</h3>
+            <div id="user-info-details" class="p-4 text-center bg-gray-700 rounded-lg"></div>
+            <button id="logout-btn" class="w-full mt-4 game-control-btn" style="background-color: #dc3545;">Cerrar Sesión</button>
         </div>
       </div>
 
       <div id="bottom-menu">
-        <article class="border border-solid border-gray-200 w-full ease-in-out duration-500 left-0 rounded-2xl flex shadow-lg shadow-black/5 bg-white">
-          <label class="has-[:checked]:bg-blue-50 has-[:checked]:text-blue-500 has-[:checked]:border-blue-200 relative w-full h-16 p-4 ease-in-out duration-300 border-r border-solid border-gray-200 group flex items-center justify-center text-gray-500 rounded-l-2xl" for="show-zones">
-            <input id="show-zones" name="path" type="radio" class="hidden peer/expand" />
-            <svg viewBox="0 0 24 24" height="28" width="28" xmlns="http://www.w3.org/2000/svg" class="group-hover:scale-110 ease-in-out duration-300"><path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"></path></svg>
-          </label>
-          <label class="has-[:checked]:bg-blue-50 has-[:checked]:text-blue-500 has-[:checked]:border-blue-200 relative w-full h-16 p-4 ease-in-out duration-300 border-r border-solid border-gray-200 group flex items-center justify-center text-gray-500" for="show-stats">
-            <input id="show-stats" name="path" type="radio" class="hidden peer/expand" />
-            <svg viewBox="0 0 24 24" height="28" width="28" xmlns="http://www.w3.org/2000/svg" class="group-hover:scale-110 ease-in-out duration-300"><path d="M3 3v18h18" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path><path d="M18.7 8l-5.1 5.2-2.8-2.7L7 14.3" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
-          </label>
-          <label class="has-[:checked]:bg-blue-50 has-[:checked]:text-blue-500 has-[:checked]:border-blue-200 relative w-full h-16 p-4 ease-in-out duration-300 group flex items-center justify-center text-gray-500 rounded-r-2xl" for="show-profile">
-            <input id="show-profile" name="path" type="radio" class="hidden peer/expand" />
-            <svg viewBox="0 0 24 24" height="28" width="28" xmlns="http://www.w3.org/2000/svg" class="group-hover:scale-110 ease-in-out duration-300"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path><circle cx="12" cy="7" r="4" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></circle></svg>
-          </label>
-        </article>
+        <div class="flex items-center justify-center w-auto p-2 bg-gray-100 rounded-2xl">
+          <button class="menu-btn group flex-1 p-3 flex justify-center items-center rounded-xl" data-panel="saved-zones-content">
+            <svg viewBox="0 0 24 24" height="28" width="28" xmlns="http://www.w3.org/2000/svg" class="text-gray-500 group-hover:text-blue-500 group-[.active]:text-blue-500 transition-colors"><path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+          </button>
+          <button class="menu-btn group flex-1 p-3 flex justify-center items-center rounded-xl" data-panel="stats-content">
+            <svg viewBox="0 0 24 24" height="28" width="28" xmlns="http://www.w3.org/2000/svg" class="text-gray-500 group-hover:text-blue-500 group-[.active]:text-blue-500 transition-colors"><path d="M3 3v18h18" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path><path d="M18.7 8l-5.1 5.2-2.8-2.7L7 14.3" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+          </button>
+          <button class="menu-btn group flex-1 p-3 flex justify-center items-center rounded-xl" data-panel="profile-content">
+            <svg viewBox="0 0 24 24" height="28" width="28" xmlns="http://www.w3.org/2000/svg" class="text-gray-500 group-hover:text-blue-500 group-[.active]:text-blue-500 transition-colors"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path><circle cx="12" cy="7" r="4" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></circle></svg>
+          </button>
+        </div>
       </div>
     </aside>
     <div id="game-map-container"></div>
@@ -223,8 +237,6 @@
           setTimeout(() => loginScreen.classList.add('hidden'), 500);
           gameScreen.classList.remove('hidden');
           if (animationInterval) clearInterval(animationInterval);
-          backgroundMapContainer.style.opacity = '0';
-          backgroundMapContainer.classList.add('hidden');
           
           document.getElementById('user-info-details').innerHTML = `<p class="text-sm text-gray-400">Conectado como</p><p class="font-semibold text-lg">${user.email}</p>`;
           document.getElementById('logout-btn').addEventListener('click', signOut);
@@ -236,60 +248,46 @@
           loginScreen.style.opacity = '1';
           gameScreen.classList.add('hidden');
           if (!backgroundMap) initBackgroundMap();
-          backgroundMapContainer.classList.remove('hidden');
-          backgroundMapContainer.style.opacity = '1';
         }
       }
 
       function initBackgroundMap() {
           backgroundMap = L.map('background-map', { zoomControl: false, dragging: false, scrollWheelZoom: false, doubleClickZoom: false, touchZoom: false });
           L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager_nolabels/{z}/{x}/{y}{r}.png', { attribution: '', maxZoom: 19 }).addTo(backgroundMap);
-          const pos1 = [38.88, -6.97], pos2 = [38.885, -6.96], pos3 = [38.875, -6.98];
-          let targetPos = pos2;
-          backgroundMap.setView(pos1, 15);
-          if (animationInterval) clearInterval(animationInterval);
-          animationInterval = setInterval(() => {
-              if (!backgroundMap) return;
-              backgroundMap.panTo(targetPos, { animate: true, duration: 15 });
-              if (backgroundMap.distance(backgroundMap.getCenter(), targetPos) < 100) targetPos = (targetPos === pos2) ? pos3 : pos2;
-          }, 100);
+          backgroundMap.setView([38.88, -6.97], 15);
       }
       
       function setupMenu() {
-        const radioButtons = document.querySelectorAll('input[name="path"]');
-        const contentPanels = {
-          'show-zones': document.getElementById('saved-zones-content'),
-          'show-stats': document.getElementById('stats-content'),
-          'show-profile': document.getElementById('profile-content')
-        };
+        const menuButtons = document.querySelectorAll('.menu-btn');
+        const contentPanels = document.querySelectorAll('.content-panel');
 
-        radioButtons.forEach(radio => {
-          radio.addEventListener('change', () => {
-            // Oculta todos los paneles
-            Object.values(contentPanels).forEach(panel => panel.classList.remove('active'));
-
-            if (radio.checked) {
-              const panelToShow = contentPanels[radio.id];
-              if (panelToShow) {
-                // Carga los datos necesarios antes de mostrar
-                if (radio.id === 'show-zones') displaySavedZones();
-                if (radio.id === 'show-stats') displayStats();
-                
-                panelToShow.classList.add('active');
-              }
+        menuButtons.forEach(button => {
+          button.addEventListener('click', () => {
+            const panelId = button.dataset.panel;
+            const targetPanel = document.getElementById(panelId);
+            const isAlreadyActive = targetPanel.classList.contains('active');
+            
+            // Ocultar todos los paneles y quitar 'active' de todos los botones
+            contentPanels.forEach(p => p.classList.remove('active'));
+            menuButtons.forEach(b => b.classList.remove('active'));
+            
+            if (isAlreadyActive) {
+              // Si ya estaba activo, simplemente lo dejamos oculto (efecto toggle)
+              return;
             }
+
+            // Si no estaba activo, lo mostramos y activamos el botón
+            button.classList.add('active');
+            targetPanel.classList.add('active');
+
+            // Cargar datos si es necesario
+            if (panelId === 'saved-zones-content') displaySavedZones();
+            if (panelId === 'stats-content') displayStats();
           });
         });
       }
 
       function initGame(){
-        const btnDraw = document.getElementById('drawZone');
-        const btnUndo = document.getElementById('undoPoint');
-        const bStart = document.getElementById('start');
-        const btnRepeat = document.getElementById('repeatZone');
-        const bNext = document.getElementById('next');
-        const btnSaveZone = document.getElementById('saveZoneBtn');
-        
         gameMap = L.map('game-map-container',{zoomSnap:0.25});
         L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager_nolabels/{z}/{x}/{y}{r}.png',{
           attribution: '© OSM & CARTO', subdomains:'abcd', maxZoom:19
@@ -298,13 +296,13 @@
         
         setTimeout(() => gameMap.invalidateSize(), 10);
 
-        btnDraw.addEventListener('click', startDrawing);
-        btnUndo.addEventListener('click', undoLastPoint);
-        bNext.addEventListener('click', () => { bNext.disabled=true; nextQ(); });
-        btnRepeat.addEventListener('click', repeatLastZone);
-        btnSaveZone.addEventListener('click', saveCurrentZone);
-        setupStartButton(bStart);
-        setupMenu(); // Inicializamos el nuevo menú
+        document.getElementById('drawZone').addEventListener('click', startDrawing);
+        document.getElementById('undoPoint').addEventListener('click', undoLastPoint);
+        document.getElementById('next').addEventListener('click', () => { document.getElementById('next').disabled=true; nextQ(); });
+        document.getElementById('repeatZone').addEventListener('click', repeatLastZone);
+        document.getElementById('saveZoneBtn').addEventListener('click', saveCurrentZone);
+        setupStartButton(document.getElementById('start'));
+        setupMenu();
       }
       
       function setupStartButton(bStart) {
@@ -342,26 +340,19 @@
       }
 
       function startDrawing(){
-        const fb = document.getElementById('fb');
-        const btnDraw = document.getElementById('drawZone');
-        const btnUndo = document.getElementById('undoPoint');
-        const bStart = document.getElementById('start');
-        const btnRepeat = document.getElementById('repeatZone');
-        const btnSaveZone = document.getElementById('saveZoneBtn');
+        document.getElementById('fb').textContent = 'Haz click para añadir vértices. Con 3 se habilita Start. Haz click en el primer vértice para cerrar.';
+        ['repeatZone', 'saveZoneBtn', 'drawZone'].forEach(id => document.getElementById(id).classList.add('hidden'));
+        ['undoPoint', 'start'].forEach(id => document.getElementById(id).classList.remove('hidden'));
+        document.getElementById('start').disabled = true;
+        document.getElementById('start').textContent = 'Start';
+
         if (zonePoly) gameMap.removeLayer(zonePoly);
         if (oldZonePoly) gameMap.removeLayer(oldZonePoly);
         zonePoints = []; tempMarkers = []; zonePoly = null;
         playing = false;
         drawing = true;
-        fb.textContent = 'Haz click para añadir vértices. Con 3 se habilita Start. Haz click en el primer vértice para cerrar.';
-        btnDraw.classList.add('hidden');
-        btnRepeat.classList.add('hidden');
-        btnSaveZone.classList.add('hidden');
-        btnUndo.classList.remove('hidden');
-        bStart.classList.remove('hidden');
-        bStart.disabled = true;
-        bStart.textContent = 'Start';
-        setupStartButton(bStart);
+        
+        setupStartButton(document.getElementById('start'));
         gameMap.on('click', addVertex);
       }
 
@@ -404,21 +395,15 @@
         document.getElementById('fb').textContent = zonePoints.length > 0 ? 'Punto eliminado. Sigue añadiendo.' : 'Haz click para añadir vértices.';
       }
 
-      async function repeatLastZone() {
+      function repeatLastZone() {
         if (lastGameZonePoints.length < 3) return;
         startDrawing();
         drawing = false;
         gameMap.off('click', addVertex);
         zonePoints = [...lastGameZonePoints];
         zonePoly = L.polygon(zonePoints, { color: COL_ZONE, weight: 2, fillOpacity: 0.1 }).addTo(gameMap);
-        const bStart = document.getElementById('start');
-        document.getElementById('drawZone').classList.add('hidden');
-        document.getElementById('repeatZone').classList.add('hidden');
         document.getElementById('undoPoint').classList.add('hidden');
-        bStart.classList.remove('hidden');
-        bStart.disabled = false;
-        bStart.textContent = 'Start';
-        setupStartButton(bStart);
+        document.getElementById('start').disabled = false;
         document.getElementById('fb').textContent = 'Zona anterior cargada. Pulsa Start.';
       }
 
@@ -430,13 +415,11 @@
         streetGrp = drawStreet(); 
         if(streetGrp){
           const streetCheck = getDistanceToStreet(userMk.getLatLng(), streetGrp);
-          const distance = streetCheck.distance;
-          const clickTolerance = 30;
-          if (distance <= clickTolerance) {
+          if (streetCheck.distance <= 30) {
             streetsGuessedCorrectly++;
             document.getElementById('fb').textContent = `¡Correcto! Has acertado.`;
           } else {
-            document.getElementById('fb').textContent = `Casi, pero no has hecho clic sobre el lugar (a ${Math.round(distance)} metros).`;
+            document.getElementById('fb').textContent = `Casi, pero no has hecho clic sobre el lugar (a ${Math.round(streetCheck.distance)} metros).`;
           }
           document.getElementById('score').textContent = `${streetsGuessedCorrectly} / ${totalQuestions}`;
           if (streetCheck.point) {
@@ -449,7 +432,7 @@
       }
 
       function clear(){ 
-        if (!gameMap) return;
+        if (!gameMap || !playing) return;
         [userMk, guide, streetGrp].forEach(layer => {
             if (layer && gameMap.hasLayer(layer)) gameMap.removeLayer(layer);
         });
@@ -460,8 +443,7 @@
           const fb = document.getElementById('fb');
           const loaderContainer = document.getElementById('loader-container');
           const loadingText = document.getElementById('loading-text');
-          const scoreEl = document.getElementById('score');
-
+          
           fb.textContent = '';
           loaderContainer.classList.remove('hidden');
           loadingText.innerHTML = `Identificando calles en la zona...`;
@@ -471,18 +453,18 @@
               const response = await fetch(`/api/getStreets?zone=${encodeURIComponent(zoneParam)}`);
               if (!response.ok) {
                   const errorData = await response.json();
-                  throw new Error(errorData.error || 'Server error while loading streets.');
+                  throw new Error(errorData.error || 'Error del servidor.');
               }
               const data = await response.json();
               streetList = data.streets;
               totalQuestions = streetList.length;
               streetList.sort(() => Math.random() - 0.5);
-              if (totalQuestions > 0) fb.textContent = `Se han encontrado y validado ${totalQuestions} lugares. ¡Listo para jugar!`;
-              else fb.textContent = 'No se han encontrado lugares válidos en la zona. Dibuja un polígono más grande.';
-              scoreEl.textContent = `0 / ${totalQuestions}`;
+              if (totalQuestions > 0) fb.textContent = `Se han encontrado ${totalQuestions} lugares. ¡Listo!`;
+              else fb.textContent = 'No se han encontrado lugares válidos. Dibuja otra zona.';
+              document.getElementById('score').textContent = `0 / ${totalQuestions}`;
           } catch (error) {
               console.error(error);
-              fb.textContent = `Hubo un error al cargar las calles. ${error.message}`;
+              fb.textContent = `Error al cargar las calles: ${error.message}`;
           } finally {
               loaderContainer.classList.add('hidden');
           }
@@ -491,9 +473,7 @@
       function drawStreet(){
         const g = L.layerGroup().addTo(gameMap);
         if (!target || !Array.isArray(target) || target.length === 0) {
-          document.getElementById('fb').textContent = '⚠️ No se encontró la geometría para este lugar.';
-          gameMap.removeLayer(g);
-          return null;
+          gameMap.removeLayer(g); return null;
         }
         target.forEach(geom => {
             if (geom.isClosed) L.polygon(geom.points, { color: COL_TRACE, weight: 4, fillOpacity: 0.2 }).addTo(g);
@@ -503,34 +483,18 @@
       }
 
       function getDistanceToStreet(userPoint, streetLayer) {
-          let minDistance = Infinity;
-          let closestPointOnStreet = null;
-          if (!gameMap) return { distance: Infinity, point: null };
+          let minDistance = Infinity, closestPointOnStreet = null;
           streetLayer.eachLayer(layer => {
-              let latlngs;
-              if (layer instanceof L.Polygon) latlngs = layer.getLatLngs()[0];
-              else if (layer instanceof L.Polyline) latlngs = layer.getLatLngs();
-              else return;
-              if (latlngs.length < 2) return;
+              let latlngs = (layer instanceof L.Polygon) ? layer.getLatLngs()[0] : (layer instanceof L.Polyline) ? layer.getLatLngs() : [];
               for (let i = 0; i < latlngs.length - 1; i++) {
-                  const p1 = gameMap.latLngToLayerPoint(latlngs[i]), p2 = gameMap.latLngToLayerPoint(latlngs[i + 1]);
-                  const userP = gameMap.latLngToLayerPoint(userPoint);
-                  const a = userP.x - p1.x, b = userP.y - p1.y, c = p2.x - p1.x, d = p2.y - p1.y;
-                  let dot = a * c + b * d, len_sq = c * c + d * d;
-                  let param = len_sq !== 0 ? dot / len_sq : -1;
-                  let xx, yy;
-                  if (param < 0) { xx = p1.x; yy = p1.y; }
-                  else if (param > 1) { xx = p2.x; yy = p2.y; }
-                  else { xx = p1.x + param * c; yy = p1.y + param * d; }
-                  const dx = userP.x - xx, dy = userP.y - yy;
-                  const dist = Math.sqrt(dx * dx + dy * dy);
-                  if (dist < minDistance) {
-                      minDistance = dist;
-                      closestPointOnStreet = gameMap.layerPointToLatLng([xx, yy]);
-                  }
+                  let p1=gameMap.latLngToLayerPoint(latlngs[i]), p2=gameMap.latLngToLayerPoint(latlngs[i+1]), p=gameMap.latLngToLayerPoint(userPoint);
+                  let x=p1.x,y=p1.y,dx=p2.x-x,dy=p2.y-y;
+                  if(dx!==0||dy!==0){let t=((p.x-x)*dx+(p.y-y)*dy)/(dx*dx+dy*dy);if(t>1){x=p2.x;y=p2.y}else if(t>0){x+=dx*t;y+=dy*t}}
+                  dx=p.x-x;dy=p.y-y;let dist=dx*dx+dy*dy;
+                  if(dist<minDistance){minDistance=dist;closestPointOnStreet=gameMap.layerPointToLatLng(L.point(x,y))}
               }
           });
-          return { distance: minDistance, point: closestPointOnStreet };
+          return { distance: Math.sqrt(minDistance), point: closestPointOnStreet };
       }
 
       function endGame() {
@@ -545,8 +509,11 @@
         lastGameZonePoints = [...zonePoints];
         saveGameStats(streetsGuessedCorrectly, totalQuestions);
         
-        document.getElementById('next').classList.add('hidden');
-        document.getElementById('saveZoneBtn').classList.remove('hidden');
+        // CORRECCIÓN: Mostrar los botones correctos al final
+        ['next', 'start'].forEach(id => document.getElementById(id).classList.add('hidden'));
+        ['drawZone', 'repeatZone', 'saveZoneBtn'].forEach(id => document.getElementById(id).classList.remove('hidden'));
+        document.getElementById('repeatZone').disabled = (lastGameZonePoints.length < 3);
+
         zonePoly = null; 
         zonePoints = []; 
         streetList = []; 
@@ -556,8 +523,6 @@
 
       function nextQ(){
         clear();
-        const bNext = document.getElementById('next');
-        bNext.disabled = true;
         if(qIdx >= totalQuestions){ endGame(); return; }
         gameMap.on('click', onMapClick);
         const s = streetList[qIdx];
@@ -565,6 +530,7 @@
         qIdx++;
         document.getElementById('question').textContent = `Pregunta ${qIdx} / ${totalQuestions}: ¿Dónde está «${s.googleName}»?`;
         document.getElementById('fb').textContent = 'Haz clic en el mapa para responder.';
+        document.getElementById('next').disabled = true;
       }
       
       async function saveCurrentZone() {
@@ -599,19 +565,38 @@
                 return;
             }
             zones.forEach(zone => {
-                const zoneElement = document.createElement('button');
-                zoneElement.className = 'game-control-btn w-full text-left p-3 mb-2 rounded-md bg-gray-700 hover:bg-blue-600 transition';
-                zoneElement.innerHTML = `<span class="font-semibold block">${zone.name}</span>`;
-                zoneElement.addEventListener('click', () => {
-                    playFromHistory(zone.zone_points);
-                    document.getElementById('show-zones').checked = false;
-                    document.getElementById('middle-panel-container').querySelector('.active').classList.remove('active');
-                });
-                listContainer.appendChild(zoneElement);
+                const item = document.createElement('div');
+                item.className = 'saved-zone-item';
+                
+                const nameSpan = document.createElement('span');
+                nameSpan.className = 'font-semibold flex-grow';
+                nameSpan.textContent = zone.name;
+                nameSpan.onclick = () => playFromHistory(zone.zone_points);
+                
+                const deleteBtn = document.createElement('button');
+                deleteBtn.className = 'delete-zone-btn';
+                deleteBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 256 256"><rect width="256" height="256" fill="none"></rect><line x1="216" y1="56" x2="40" y2="56" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"></line><line x1="104" y1="104" x2="104" y2="168" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"></line><line x1="152" y1="104" x2="152" y2="168" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"></line><path d="M200,56V208a8,8,0,0,1-8,8H64a8,8,0,0,1-8-8V56" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"></path><path d="M168,56V40a16,16,0,0,0-16-16H104A16,16,0,0,0,88,40V56" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"></path></svg>`;
+                deleteBtn.onclick = () => deleteZone(zone.id);
+
+                item.appendChild(nameSpan);
+                item.appendChild(deleteBtn);
+                listContainer.appendChild(item);
             });
         } catch (error) {
             console.error('Error cargando zonas guardadas:', error.message);
             listContainer.innerHTML = '<p class="text-red-400">Error al cargar zonas.</p>';
+        }
+      }
+
+      async function deleteZone(zoneId) {
+        if (!confirm('¿Estás seguro de que quieres eliminar esta zona?')) return;
+        try {
+            const { error } = await supabaseClient.from('saved_zones').delete().eq('id', zoneId);
+            if (error) throw error;
+            displaySavedZones(); // Refrescar la lista
+        } catch (error) {
+            console.error('Error al eliminar la zona:', error.message);
+            alert('No se pudo eliminar la zona.');
         }
       }
 
@@ -643,7 +628,7 @@
             statsContent.innerHTML = `
                 <div class="text-center">
                     <p class="text-5xl font-bold text-blue-400">${percentage}%</p>
-                    <p class="text-lg text-gray-300 mt-2">de aciertos</p>
+                    <p class="mt-2 text-lg text-gray-300">de aciertos</p>
                     <p class="text-sm text-gray-400">(${totalCorrect} de ${totalPlayed} en las últimas partidas)</p>
                 </div>`;
         } catch (error) {
@@ -663,14 +648,8 @@
         gameMap.off('click', addVertex);
         zonePoints = points.map(p => L.latLng(p.lat, p.lng));
         zonePoly = L.polygon(zonePoints, { color: COL_ZONE, weight: 2, fillOpacity: 0.1 }).addTo(gameMap);
-        const bStart = document.getElementById('start');
-        document.getElementById('drawZone').classList.add('hidden');
-        document.getElementById('repeatZone').classList.add('hidden');
         document.getElementById('undoPoint').classList.add('hidden');
-        bStart.classList.remove('hidden');
-        bStart.disabled = false;
-        bStart.textContent = 'Start';
-        setupStartButton(bStart);
+        document.getElementById('start').disabled = false;
         document.getElementById('fb').textContent = 'Zona cargada. Pulsa Start.';
         gameMap.fitBounds(zonePoly.getBounds(), { padding: [50, 50] });
       }

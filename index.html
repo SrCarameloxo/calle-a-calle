@@ -10,33 +10,67 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
   <style>
-    /* --- ESTILOS GENERALES (Existentes) --- */
+    /* --- ESTILOS GENERALES Y DE MAPA --- */
     html, body { height: 100%; margin: 0; overflow: hidden; }
     body { font-family: system-ui, sans-serif; background-color: #1a1a1a; }
     .hidden { display: none !important; }
     
     #game-screen { display: flex; height: 100%; width: 100%; }
-    #game-map-container { flex: 1; }
+    #game-map-container { flex: 1; position: relative; z-index: 5; }
 
+    /* --- ESTILOS ASIDE Y PANELES (NUEVA ESTRUCTURA) --- */
     aside { 
-      width: 300px;
-      padding: 1rem;
+      width: 320px;
       box-shadow: 2px 0 4px rgba(0,0,0,.15); 
       display: flex;
       flex-direction: column;
-      overflow: hidden; /* Cambiado para controlar la animación del panel */
       background-color: white;
       z-index: 10;
-      position: relative; /* Necesario para posicionar los paneles */
+      position: relative;
     }
 
+    #top-panel {
+      padding: 1rem;
+      border-bottom: 1px solid #e5e7eb;
+    }
+
+    #middle-panel-container {
+      flex-grow: 1; /* Ocupa el espacio disponible */
+      position: relative;
+      padding: 1rem;
+      overflow-y: auto;
+    }
+    
+    .content-panel {
+      display: none; /* Ocultos por defecto */
+    }
+
+    /* Estilo para el panel activo, usando el diseño del login */
+    .content-panel.active {
+      display: block;
+      padding: 1.5rem;
+      border-radius: 1rem;
+      background-color: rgba(17, 24, 39, 0.85); /* bg-gray-900 bg-opacity-85 */
+      backdrop-filter: blur(4px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      color: white;
+      height: 100%;
+      overflow-y: auto;
+    }
+    
+    #bottom-menu {
+      padding: 0.5rem;
+      border-top: 1px solid #e5e7eb;
+    }
+
+    /* --- ESTILOS PANTALLA DE LOGIN --- */
     #background-map {
         position: fixed; top: 0; left: 0; width: 100%; height: 100%;
         z-index: 1; filter: blur(4px) brightness(0.7); transition: opacity 0.8s ease-in-out;
     }
     #login-screen {
         position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-        z-index: 2; display: flex; align-items: center; justify-content: center;
+        z-index: 20; display: flex; align-items: center; justify-content: center;
         transition: opacity 0.5s ease-in-out;
     }
     @keyframes pulse {
@@ -45,150 +79,42 @@
     }
     #google-login-btn { animation: pulse 2.5s infinite; }
     
+    /* --- ESTILOS DE BOTONES (RESTAURADOS) --- */
     button { cursor: pointer; }
-    button:not(.login-btn) {
+    button.game-control-btn {
       width: 100%; padding: .45rem; border: none; border-radius: 6px;
-      background: #007BFF; color: #fff; font-size: 1rem;
-      box-sizing: border-box; transition: transform 0.05s ease-in-out, background-color 0.2s;
+      font-size: 1rem; box-sizing: border-box; 
+      transition: transform 0.05s ease-in-out, background-color 0.2s;
+      margin-bottom: 0.5rem; /* Espacio entre botones */
     }
-    button:not(.login-btn):not(:disabled):hover { background-color: #0069d9; }
-    button:not(.login-btn):not(:disabled):active { transform: scale(0.97); }
-    button:not(.login-btn):disabled { opacity: .4; cursor: default; }
+    button.game-control-btn:not(:disabled):active { transform: scale(0.97); }
+    button.game-control-btn:disabled { opacity: .4; cursor: default; }
+    
+    #drawZone, #start, #next { background: #007BFF; color: #fff; }
+    #drawZone:not(:disabled):hover, #start:not(:disabled):hover, #next:not(:disabled):hover { background-color: #0069d9; }
 
+    #undoPoint { background-color: #c82333; color: #fff; }
+    #undoPoint:not(:disabled):hover { background-color: #a71d2a; }
+
+    #repeatZone { background-color: #28a745; color: #fff; }
+    #repeatZone:not(:disabled):hover { background-color: #218838; }
+
+    #saveZoneBtn { background-color: #ffc107; color: black; }
+    #saveZoneBtn:not(:disabled):hover { background-color: #e0a800; }
+    
+    /* --- OTROS ESTILOS --- */
     .gradient-text {
         font-size: 2.25rem; font-weight: 700; text-align: center;
         background: linear-gradient(to right, #3b82f6, #8b5cf6);
         -webkit-background-clip: text; background-clip: text; color: transparent;
+        margin-bottom: 1rem;
     }
     
     #question { font-weight: 700; margin: .5rem 0; }
-    #fb { margin: .5rem 0; }
+    #fb { margin: .5rem 0; font-size: 0.9rem; }
     #score-display { font-size: 1.1rem; font-weight: bold; color: #333; }
-    .loader { display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 10px; padding: 10px; background-color: #333; border-radius: 8px; }
-    .loading-text { color: white; font-size: 12pt; font-weight: 600; }
-    .loading-bar-background { --height: 20px; display: flex; align-items: center; box-sizing: border-box; padding: 3px; width: 100%; height: var(--height); background-color: #212121; box-shadow: #0c0c0c -2px 2px 4px 0px inset; border-radius: calc(var(--height) / 2); }
-    .loading-bar { position: relative; display: flex; justify-content: center; flex-direction: column; height: 100%; width: 0%; overflow: hidden; background: #007BFF; border-radius: 10px; transition: width 0.2s ease-out; }
-
-    /* --- NUEVOS ESTILOS PARA EL MENÚ Y PANELES --- */
-    #main-content {
-      flex-grow: 1;
-      position: relative;
-    }
-
-    .content-panel {
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      padding: 1rem;
-      border-radius: 1.5rem;
-      background-color: rgba(17, 24, 39, 0.8); /* bg-gray-900 bg-opacity-80 */
-      backdrop-filter: blur(4px);
-      border: 2px solid rgba(255, 255, 255, 0.1);
-      color: white;
-      transform: translateY(100%);
-      opacity: 0;
-      transition: transform 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94), opacity 0.4s ease-in-out;
-      overflow-y: auto;
-      z-index: 20;
-    }
-    .content-panel.visible {
-      transform: translateY(0);
-      opacity: 1;
-    }
-    
-    .menu {
-      margin-top: auto; /* Empuja el menú hacia abajo */
-      padding: 0.5rem;
-      background-color: #f8f9fa;
-      position: relative;
-      display: flex;
-      justify-content: center;
-      border-radius: 15px;
-      box-shadow: 0 10px 25px 0 rgba(0, 0, 0, 0.075);
-      z-index: 30;
-    }
-
-    .menu-link {
-      display: inline-flex;
-      justify-content: center;
-      align-items: center;
-      width: 70px;
-      height: 50px;
-      border-radius: 8px;
-      position: relative;
-      z-index: 1;
-      overflow: hidden;
-      transform-origin: center left;
-      transition: width 0.2s ease-in;
-      text-decoration: none;
-      color: #343a40;
-    }
-    
-    .menu-link:before {
-      position: absolute;
-      z-index: -1;
-      content: "";
-      display: block;
-      border-radius: 8px;
-      width: 100%;
-      height: 100%;
-      top: 0;
-      transform: translateX(100%);
-      transition: transform 0.2s ease-in;
-      transform-origin: center right;
-      background-color: #e9ecef;
-    }
-
-    .menu-link:hover,
-    .menu-link:focus,
-    .menu-link.active { /* Estilo para el botón activo */
-      outline: 0;
-      width: 130px;
-      color: #007bff;
-    }
-
-    .menu-link:hover:before,
-    .menu-link:focus:before,
-    .menu-link.active:before {
-      transform: translateX(0);
-    }
-    
-    .menu-link:hover .link-title,
-    .menu-link:focus .link-title,
-    .menu-link.active .link-title {
-      transform: translateX(0);
-      opacity: 1;
-    }
-
-    .link-icon {
-      width: 28px;
-      height: 28px;
-      display: block;
-      flex-shrink: 0;
-      left: 21px; /* Centrado en 70px */
-      position: absolute;
-      transition: transform 0.2s ease-in;
-    }
-    
-    .menu-link:hover .link-icon,
-    .menu-link:focus .link-icon,
-    .menu-link.active .link-icon {
-        transform: translateX(-15px); /* Mueve el icono a la izquierda */
-    }
-
-    .link-title {
-      opacity: 0;
-      transform: translateX(100%);
-      transition: transform 0.2s ease-in, opacity 0.1s ease-in;
-      transform-origin: center right;
-      display: block;
-      text-align: center;
-      text-indent: 18px; /* Espacio para el icono */
-      width: 100%;
-      font-weight: 600;
-    }
+    .loader { margin-top: 1rem; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 10px; padding: 10px; background-color: #f8f9fa; border-radius: 8px; border: 1px solid #e5e7eb; }
+    .loading-text { color: #333; font-size: 12pt; font-weight: 600; }
   </style>
 </head>
 <body>
@@ -204,9 +130,6 @@
               <img class="w-10 h-10" loading="lazy" src="https://ucarecdn.com/8f25a2ba-bdcf-4ff1-b596-088f330416ef/" alt="Google" />
             </button>
           </div>
-          <div class="mt-8 text-center text-xs text-gray-400">
-            <p>Al iniciar sesión, aceptas nuestros Términos y Política de Privacidad.</p>
-          </div>
         </div>
       </section>
     </div>
@@ -214,65 +137,53 @@
 
   <div id="game-screen" class="hidden">
     <aside>
-      <div id="main-content">
-        <div id="game-panel" class="content-panel visible" style="background: none; border: none; backdrop-filter: none;">
-            <h1 class="gradient-text">Calle a Calle</h1>
-            <button id="drawZone">Establecer zona</button>
-            <button id="undoPoint" class="hidden">Retroceder Punto</button>
-            <button id="start" class="hidden" disabled>Start</button>
-            <button id="repeatZone" class="hidden" disabled>Repetir Zona</button>
-            <button id="saveZoneBtn" class="hidden" style="background-color: #ffc107; color: black;">Guardar Zona</button>
-            <button id="next" class="hidden" disabled>Siguiente</button>
-            <p id="question"></p>
-            <p id="score-display" class="hidden">Calles acertadas: <span id="score">0 / 0</span></p>
-            <div id="loader-container" class="loader hidden">
-              <div id="loading-text" class="loading-text"></div>
-              <div class="loading-bar-background">
-                <div id="progress-bar" class="loading-bar"></div>
-              </div>
-            </div>
-            <p id="fb"></p>
-        </div>
-        <div id="saved-zones-panel" class="content-panel">
+      <div id="top-panel">
+          <h1 class="gradient-text">Calle a Calle</h1>
+          <button id="drawZone" class="game-control-btn">Establecer zona</button>
+          <button id="undoPoint" class="game-control-btn hidden">Retroceder Punto</button>
+          <button id="start" class="game-control-btn hidden" disabled>Start</button>
+          <button id="repeatZone" class="game-control-btn hidden" disabled>Repetir Zona</button>
+          <button id="saveZoneBtn" class="game-control-btn hidden">Guardar Zona</button>
+          <button id="next" class="game-control-btn hidden" disabled>Siguiente</button>
+          <p id="question"></p>
+          <p id="score-display" class="hidden">Calles acertadas: <span id="score">0 / 0</span></p>
+          <div id="loader-container" class="loader hidden">
+            <div id="loading-text" class="loading-text"></div>
+          </div>
+          <p id="fb"></p>
+      </div>
+      
+      <div id="middle-panel-container">
+        <div id="saved-zones-content" class="content-panel">
             <h3 class="font-bold text-xl mb-4">Mis Zonas Guardadas</h3>
             <div id="saved-zones-list" class="space-y-2"></div>
         </div>
-        <div id="stats-panel" class="content-panel">
+        <div id="stats-content" class="content-panel">
             <h3 class="font-bold text-xl mb-4">Estadísticas</h3>
-            <div id="stats-content"></div>
+            <div id="stats-list"></div>
         </div>
-        <div id="profile-panel" class="content-panel">
-            <h3 class="font-bold text-xl mb-4">Perfil</h3>
-            <div id="user-info-content" class="text-center"></div>
-            <button id="logout-btn" class="mt-4" style="background-color: #dc3545;">Cerrar Sesión</button>
+        <div id="profile-content" class="content-panel">
+            <h3 class="font-bold text-xl mb-4">Perfil de Usuario</h3>
+            <div id="user-info-details" class="text-center p-4 rounded-lg bg-gray-700"></div>
+            <button id="logout-btn" class="game-control-btn mt-4 w-full" style="background-color: #dc3545;">Cerrar Sesión</button>
         </div>
       </div>
-      
-      <div class="menu">
-        <a href="#" class="menu-link active" data-panel="game-panel">
-          <span class="link-icon">
-            <svg xmlns="http://www.w3.org/2000/svg" width="192" height="192" fill="currentColor" viewBox="0 0 256 256"><rect width="256" height="256" fill="none"></rect><path d="M213.3815,109.61945,133.376,36.88436a8,8,0,0,0-10.76339.00036l-79.9945,72.73477A8,8,0,0,0,40,115.53855V208a8,8,0,0,0,8,8H208a8,8,0,0,0,8-8V115.53887A8,8,0,0,0,213.3815,109.61945Z" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"></path></svg>
-          </span>
-          <span class="link-title">Juego</span>
-        </a>
-        <a href="#" class="menu-link" data-panel="saved-zones-panel">
-          <span class="link-icon">
-             <svg xmlns="http://www.w3.org/2000/svg" width="192" height="192" fill="currentColor" viewBox="0 0 256 256"><rect width="256" height="256" fill="none"></rect><path d="M128,24,94.2,90.41,24,101.41l50.8,49.5L62.1,224,128,189.9,193.9,224,181.2,150.91,232,101.41l-70.2-.1Z" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"></path></svg>
-          </span>
-          <span class="link-title">Zonas</span>
-        </a>
-        <a href="#" class="menu-link" data-panel="stats-panel">
-          <span class="link-icon">
-             <svg xmlns="http://www.w3.org/2000/svg" width="192" height="192" fill="currentColor" viewBox="0 0 256 256"><rect width="256" height="256" fill="none"></rect><path d="M40,168V104a8,8,0,0,1,8-8H96a8,8,0,0,1,0,16H56v56a8,8,0,0,1-16,0Z" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"></path><path d="M208,104v64a8,8,0,0,1-8,8H160a8,8,0,0,1,0-16h40V112a8,8,0,0,1,16,0Z" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"></path><polyline points="40 88 40 56 72 56" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"></polyline><polyline points="216 168 216 200 184 200" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"></polyline><line x1="160" y1="52.4" x2="96" y2="84" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"></line></svg>
-          </span>
-          <span class="link-title">Stats</span>
-        </a>
-        <a href="#" class="menu-link" data-panel="profile-panel">
-          <span class="link-icon">
-            <svg xmlns="http://www.w3.org/2000/svg" width="192" height="192" fill="currentColor" viewBox="0 0 256 256"><rect width="256" height="256" fill="none"></rect><circle cx="128" cy="96" r="64" fill="none" stroke="currentColor" stroke-miterlimit="10" stroke-width="16"></circle><path d="M30.989,215.99064a112.03731,112.03731,0,0,1,194.02311.002" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"></path></svg>
-          </span>
-          <span class="link-title">Perfil</span>
-        </a>
+
+      <div id="bottom-menu">
+        <article class="border border-solid border-gray-200 w-full ease-in-out duration-500 left-0 rounded-2xl flex shadow-lg shadow-black/5 bg-white">
+          <label class="has-[:checked]:bg-blue-50 has-[:checked]:text-blue-500 has-[:checked]:border-blue-200 relative w-full h-16 p-4 ease-in-out duration-300 border-r border-solid border-gray-200 group flex items-center justify-center text-gray-500 rounded-l-2xl" for="show-zones">
+            <input id="show-zones" name="path" type="radio" class="hidden peer/expand" />
+            <svg viewBox="0 0 24 24" height="28" width="28" xmlns="http://www.w3.org/2000/svg" class="group-hover:scale-110 ease-in-out duration-300"><path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+          </label>
+          <label class="has-[:checked]:bg-blue-50 has-[:checked]:text-blue-500 has-[:checked]:border-blue-200 relative w-full h-16 p-4 ease-in-out duration-300 border-r border-solid border-gray-200 group flex items-center justify-center text-gray-500" for="show-stats">
+            <input id="show-stats" name="path" type="radio" class="hidden peer/expand" />
+            <svg viewBox="0 0 24 24" height="28" width="28" xmlns="http://www.w3.org/2000/svg" class="group-hover:scale-110 ease-in-out duration-300"><path d="M3 3v18h18" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path><path d="M18.7 8l-5.1 5.2-2.8-2.7L7 14.3" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+          </label>
+          <label class="has-[:checked]:bg-blue-50 has-[:checked]:text-blue-500 has-[:checked]:border-blue-200 relative w-full h-16 p-4 ease-in-out duration-300 group flex items-center justify-center text-gray-500 rounded-r-2xl" for="show-profile">
+            <input id="show-profile" name="path" type="radio" class="hidden peer/expand" />
+            <svg viewBox="0 0 24 24" height="28" width="28" xmlns="http://www.w3.org/2000/svg" class="group-hover:scale-110 ease-in-out duration-300"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path><circle cx="12" cy="7" r="4" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></circle></svg>
+          </label>
+        </article>
       </div>
     </aside>
     <div id="game-map-container"></div>
@@ -286,20 +197,17 @@
       const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhwcHp3Znd0ZWRnaHBzeGZvbm9oIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQxMjQzNDMsImV4cCI6MjA2OTcwMDM0M30.BAh6i5iJ5YkDBoydfkC9azAD4eMdYBkEBdxws9kj5Hg';
       const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-      // --- Referencias a elementos del DOM ---
       const loginScreen = document.getElementById('login-screen');
       const gameScreen = document.getElementById('game-screen');
       const backgroundMapContainer = document.getElementById('background-map');
       const googleLoginBtn = document.getElementById('google-login-btn');
       
-      // --- Variables de estado del juego ---
       let backgroundMap, animationInterval, gameMap = null;
       const COL_ZONE = '#663399', COL_TRACE = '#007a2f', COL_DASH = '#1976d2';
       let drawing=false, zonePoly=null, tempMarkers=[], zonePoints=[], oldZonePoly=null;
       let playing=false, qIdx=0, target=null, userMk, guide, streetGrp;
       let streetList = [], totalQuestions = 0, streetsGuessedCorrectly = 0, lastGameZonePoints = [];
 
-      // --- Lógica de Autenticación ---
       async function signInWithGoogle() { 
         await supabaseClient.auth.signInWithOAuth({ 
           provider: 'google',
@@ -318,7 +226,7 @@
           backgroundMapContainer.style.opacity = '0';
           backgroundMapContainer.classList.add('hidden');
           
-          document.getElementById('user-info-content').innerHTML = `<p style="margin: 0 0 10px 0; font-size: 0.9rem;">Hola,</p><p><strong>${user.email}</strong></p>`;
+          document.getElementById('user-info-details').innerHTML = `<p class="text-sm text-gray-400">Conectado como</p><p class="font-semibold text-lg">${user.email}</p>`;
           document.getElementById('logout-btn').addEventListener('click', signOut);
           
           if (!gameMap) initGame();
@@ -347,36 +255,33 @@
           }, 100);
       }
       
-      // --- Lógica del Menú y Paneles ---
       function setupMenu() {
-        const menuLinks = document.querySelectorAll('.menu-link');
-        const contentPanels = document.querySelectorAll('.content-panel');
+        const radioButtons = document.querySelectorAll('input[name="path"]');
+        const contentPanels = {
+          'show-zones': document.getElementById('saved-zones-content'),
+          'show-stats': document.getElementById('stats-content'),
+          'show-profile': document.getElementById('profile-content')
+        };
 
-        menuLinks.forEach(link => {
-          link.addEventListener('click', (e) => {
-            e.preventDefault();
-            const panelId = link.dataset.panel;
-            
-            // Gestionar estado activo del link
-            menuLinks.forEach(l => l.classList.remove('active'));
-            link.classList.add('active');
+        radioButtons.forEach(radio => {
+          radio.addEventListener('change', () => {
+            // Oculta todos los paneles
+            Object.values(contentPanels).forEach(panel => panel.classList.remove('active'));
 
-            // Mostrar el panel correspondiente
-            contentPanels.forEach(panel => {
-              if (panel.id === panelId) {
-                // Si el panel que vamos a mostrar es el de zonas o stats, recargamos sus datos
-                if (panelId === 'saved-zones-panel') displaySavedZones();
-                if (panelId === 'stats-panel') displayStats();
-                panel.classList.add('visible');
-              } else {
-                panel.classList.remove('visible');
+            if (radio.checked) {
+              const panelToShow = contentPanels[radio.id];
+              if (panelToShow) {
+                // Carga los datos necesarios antes de mostrar
+                if (radio.id === 'show-zones') displaySavedZones();
+                if (radio.id === 'show-stats') displayStats();
+                
+                panelToShow.classList.add('active');
               }
-            });
+            }
           });
         });
       }
 
-      // --- Lógica Principal del Juego ---
       function initGame(){
         const btnDraw = document.getElementById('drawZone');
         const btnUndo = document.getElementById('undoPoint');
@@ -401,8 +306,6 @@
         setupStartButton(bStart);
         setupMenu(); // Inicializamos el nuevo menú
       }
-      
-      // ... (El resto de funciones del juego como setupStartButton, startDrawing, onMapClick, etc., permanecen igual) ...
       
       function setupStartButton(bStart) {
         bStart.onclick = async () => {
@@ -632,7 +535,6 @@
 
       function endGame() {
         playing = false;
-        const bStart = document.getElementById('start');
         document.getElementById('fb').textContent = `¡Juego terminado! Has acertado ${streetsGuessedCorrectly} de ${totalQuestions}.`;
         document.getElementById('question').textContent = 'Pulsa en el menú inferior para ver tus zonas o empezar de nuevo.';
         document.getElementById('score-display').classList.add('hidden');
@@ -644,15 +546,11 @@
         saveGameStats(streetsGuessedCorrectly, totalQuestions);
         
         document.getElementById('next').classList.add('hidden');
-        document.getElementById('drawZone').classList.add('hidden'); 
-        document.getElementById('repeatZone').classList.add('hidden'); 
         document.getElementById('saveZoneBtn').classList.remove('hidden');
-        bStart.classList.add('hidden');
         zonePoly = null; 
         zonePoints = []; 
         streetList = []; 
         totalQuestions = 0;
-        setupStartButton(bStart);
         gameMap.off('click', onMapClick);
       }
 
@@ -669,7 +567,6 @@
         document.getElementById('fb').textContent = 'Haz clic en el mapa para responder.';
       }
       
-      // --- Funciones de Datos (Zonas y Stats) ---
       async function saveCurrentZone() {
         const zoneName = prompt("Dale un nombre a esta zona:", "Mi barrio");
         if (!zoneName || zoneName.trim() === '') return;
@@ -678,9 +575,7 @@
             const { data: { session } } = await supabaseClient.auth.getSession();
             if (!session) return;
             const zoneString = lastGameZonePoints.map(p => `${p.lat},${p.lng}`).join(';');
-            const { error } = await supabaseClient
-                .from('saved_zones')
-                .insert({ user_id: session.user.id, name: zoneName, zone_points: zoneString });
+            const { error } = await supabaseClient.from('saved_zones').insert({ user_id: session.user.id, name: zoneName, zone_points: zoneString });
             if (error) throw error;
             alert(`¡Zona "${zoneName}" guardada con éxito!`);
             document.getElementById('saveZoneBtn').classList.add('hidden');
@@ -696,25 +591,21 @@
         try {
             const { data: { session } } = await supabaseClient.auth.getSession();
             if (!session) return;
-            const { data: zones, error } = await supabaseClient
-                .from('saved_zones')
-                .select('id, name, zone_points')
-                .eq('user_id', session.user.id)
-                .order('created_at', { ascending: false });
+            const { data: zones, error } = await supabaseClient.from('saved_zones').select('id, name, zone_points').eq('user_id', session.user.id).order('created_at', { ascending: false });
             if (error) throw error;
             listContainer.innerHTML = '';
             if (zones.length === 0) {
-                listContainer.innerHTML = '<p>No tienes zonas guardadas.</p>';
+                listContainer.innerHTML = '<p>Aún no tienes zonas guardadas.</p>';
                 return;
             }
             zones.forEach(zone => {
                 const zoneElement = document.createElement('button');
-                zoneElement.className = 'w-full text-left p-3 mb-2 rounded-md bg-gray-700 hover:bg-blue-600 transition';
+                zoneElement.className = 'game-control-btn w-full text-left p-3 mb-2 rounded-md bg-gray-700 hover:bg-blue-600 transition';
                 zoneElement.innerHTML = `<span class="font-semibold block">${zone.name}</span>`;
                 zoneElement.addEventListener('click', () => {
                     playFromHistory(zone.zone_points);
-                    // Opcional: volver al panel de juego
-                    document.querySelector('.menu-link[data-panel="game-panel"]').click();
+                    document.getElementById('show-zones').checked = false;
+                    document.getElementById('middle-panel-container').querySelector('.active').classList.remove('active');
                 });
                 listContainer.appendChild(zoneElement);
             });
@@ -728,26 +619,19 @@
         try {
             const { data: { session } } = await supabaseClient.auth.getSession();
             if (!session || total === 0) return;
-            await supabaseClient
-                .from('game_stats')
-                .insert({ user_id: session.user.id, correct_guesses: correct, total_questions: total });
+            await supabaseClient.from('game_stats').insert({ user_id: session.user.id, correct_guesses: correct, total_questions: total });
         } catch (error) {
             console.error('Error guardando estadísticas:', error.message);
         }
       }
 
       async function displayStats() {
-        const statsContent = document.getElementById('stats-content');
+        const statsContent = document.getElementById('stats-list');
         statsContent.innerHTML = '<p>Calculando estadísticas...</p>';
         try {
             const { data: { session } } = await supabaseClient.auth.getSession();
             if (!session) return;
-            const { data: stats, error } = await supabaseClient
-                .from('game_stats')
-                .select('correct_guesses, total_questions')
-                .eq('user_id', session.user.id)
-                .order('created_at', { ascending: false })
-                .limit(15);
+            const { data: stats, error } = await supabaseClient.from('game_stats').select('correct_guesses, total_questions').eq('user_id', session.user.id).order('created_at', { ascending: false }).limit(15);
             if (error) throw error;
             if (stats.length === 0) {
                 statsContent.innerHTML = '<p>Juega una partida para ver tus estadísticas.</p>';
@@ -791,7 +675,6 @@
         gameMap.fitBounds(zonePoly.getBounds(), { padding: [50, 50] });
       }
       
-      // --- Inicialización General ---
       googleLoginBtn.addEventListener('click', signInWithGoogle);
       supabaseClient.auth.onAuthStateChange(handleAuthStateChange);
 

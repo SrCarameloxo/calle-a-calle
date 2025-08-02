@@ -105,7 +105,7 @@
     window.addEventListener('DOMContentLoaded', () => {
     
       const SUPABASE_URL = 'https://hppzwfwtedghpsxfonoh.supabase.co';
-      const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhwcHp3Znd0ZWRnaHBzeGZvbm9oIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQxMjQzNDMsImV4cCI6MjA2OTcwMDMहायM30.BAh6i5iJ5YkDBoydfkC9azAD4eMdYBkEBdxws9kj5Hg';
+      const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhwcHp3Znd0ZWRnaHBzeGZvbm9oIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQxMjQzNDMsImV4cCI6MjA2OTcwMDM0M30.BAh6i5iJ5YkDBoydfkC9azAD4eMdYBkEBdxws9kj5Hg';
       const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
       const loginScreen = document.getElementById('login-screen');
@@ -122,10 +122,7 @@
 
       async function signInWithGoogle() { 
         await supabaseClient.auth.signInWithOAuth({ 
-          provider: 'google',
-          options: {
-            redirectTo: window.location.origin
-          }
+          provider: 'google'
         }); 
       }
       async function signOut() { await supabaseClient.auth.signOut(); }

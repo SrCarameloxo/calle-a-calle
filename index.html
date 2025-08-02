@@ -10,17 +10,25 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
   <style>
+    /* --- ESTILOS GENERALES (Existentes) --- */
     html, body { height: 100%; margin: 0; overflow: hidden; }
     body { font-family: system-ui, sans-serif; background-color: #1a1a1a; }
     .hidden { display: none !important; }
     
     #game-screen { display: flex; height: 100%; width: 100%; }
-    aside { 
-      width: 300px; padding: 1rem; box-shadow: 2px 0 4px rgba(0,0,0,.15); 
-      display: flex; flex-direction: column; gap: 1rem; 
-      overflow-y: auto; background-color: white; z-index: 10;
-    }
     #game-map-container { flex: 1; }
+
+    aside { 
+      width: 300px;
+      padding: 1rem;
+      box-shadow: 2px 0 4px rgba(0,0,0,.15); 
+      display: flex;
+      flex-direction: column;
+      overflow: hidden; /* Cambiado para controlar la animación del panel */
+      background-color: white;
+      z-index: 10;
+      position: relative; /* Necesario para posicionar los paneles */
+    }
 
     #background-map {
         position: fixed; top: 0; left: 0; width: 100%; height: 100%;
@@ -47,13 +55,6 @@
     button:not(.login-btn):not(:disabled):active { transform: scale(0.97); }
     button:not(.login-btn):disabled { opacity: .4; cursor: default; }
 
-    #undoPoint { background-color: #c82333; }
-    #undoPoint:not(:disabled):hover { background-color: #a71d2a; }
-    #repeatZone { background-color: #28a745; }
-    #repeatZone:not(:disabled):hover { background-color: #218838; }
-    #saveZoneBtn { background-color: #ffc107; color: black; }
-    #saveZoneBtn:not(:disabled):hover { background-color: #e0a800; }
-
     .gradient-text {
         font-size: 2.25rem; font-weight: 700; text-align: center;
         background: linear-gradient(to right, #3b82f6, #8b5cf6);
@@ -67,10 +68,130 @@
     .loading-text { color: white; font-size: 12pt; font-weight: 600; }
     .loading-bar-background { --height: 20px; display: flex; align-items: center; box-sizing: border-box; padding: 3px; width: 100%; height: var(--height); background-color: #212121; box-shadow: #0c0c0c -2px 2px 4px 0px inset; border-radius: calc(var(--height) / 2); }
     .loading-bar { position: relative; display: flex; justify-content: center; flex-direction: column; height: 100%; width: 0%; overflow: hidden; background: #007BFF; border-radius: 10px; transition: width 0.2s ease-out; }
+
+    /* --- NUEVOS ESTILOS PARA EL MENÚ Y PANELES --- */
+    #main-content {
+      flex-grow: 1;
+      position: relative;
+    }
+
+    .content-panel {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      padding: 1rem;
+      border-radius: 1.5rem;
+      background-color: rgba(17, 24, 39, 0.8); /* bg-gray-900 bg-opacity-80 */
+      backdrop-filter: blur(4px);
+      border: 2px solid rgba(255, 255, 255, 0.1);
+      color: white;
+      transform: translateY(100%);
+      opacity: 0;
+      transition: transform 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94), opacity 0.4s ease-in-out;
+      overflow-y: auto;
+      z-index: 20;
+    }
+    .content-panel.visible {
+      transform: translateY(0);
+      opacity: 1;
+    }
+    
+    .menu {
+      margin-top: auto; /* Empuja el menú hacia abajo */
+      padding: 0.5rem;
+      background-color: #f8f9fa;
+      position: relative;
+      display: flex;
+      justify-content: center;
+      border-radius: 15px;
+      box-shadow: 0 10px 25px 0 rgba(0, 0, 0, 0.075);
+      z-index: 30;
+    }
+
+    .menu-link {
+      display: inline-flex;
+      justify-content: center;
+      align-items: center;
+      width: 70px;
+      height: 50px;
+      border-radius: 8px;
+      position: relative;
+      z-index: 1;
+      overflow: hidden;
+      transform-origin: center left;
+      transition: width 0.2s ease-in;
+      text-decoration: none;
+      color: #343a40;
+    }
+    
+    .menu-link:before {
+      position: absolute;
+      z-index: -1;
+      content: "";
+      display: block;
+      border-radius: 8px;
+      width: 100%;
+      height: 100%;
+      top: 0;
+      transform: translateX(100%);
+      transition: transform 0.2s ease-in;
+      transform-origin: center right;
+      background-color: #e9ecef;
+    }
+
+    .menu-link:hover,
+    .menu-link:focus,
+    .menu-link.active { /* Estilo para el botón activo */
+      outline: 0;
+      width: 130px;
+      color: #007bff;
+    }
+
+    .menu-link:hover:before,
+    .menu-link:focus:before,
+    .menu-link.active:before {
+      transform: translateX(0);
+    }
+    
+    .menu-link:hover .link-title,
+    .menu-link:focus .link-title,
+    .menu-link.active .link-title {
+      transform: translateX(0);
+      opacity: 1;
+    }
+
+    .link-icon {
+      width: 28px;
+      height: 28px;
+      display: block;
+      flex-shrink: 0;
+      left: 21px; /* Centrado en 70px */
+      position: absolute;
+      transition: transform 0.2s ease-in;
+    }
+    
+    .menu-link:hover .link-icon,
+    .menu-link:focus .link-icon,
+    .menu-link.active .link-icon {
+        transform: translateX(-15px); /* Mueve el icono a la izquierda */
+    }
+
+    .link-title {
+      opacity: 0;
+      transform: translateX(100%);
+      transition: transform 0.2s ease-in, opacity 0.1s ease-in;
+      transform-origin: center right;
+      display: block;
+      text-align: center;
+      text-indent: 18px; /* Espacio para el icono */
+      width: 100%;
+      font-weight: 600;
+    }
   </style>
 </head>
 <body>
-
   <div id="background-map"></div>
   <div id="login-screen">
     <div class="grid gap-8">
@@ -93,39 +214,66 @@
 
   <div id="game-screen" class="hidden">
     <aside>
-      <h1 class="gradient-text">Calle a Calle</h1>
-      <button id="drawZone">Establecer zona</button>
-      <button id="undoPoint" class="hidden">Retroceder Punto</button>
-      <button id="start" class="hidden" disabled>Start</button>
-      <button id="repeatZone" class="hidden" disabled>Repetir Zona</button>
-      <button id="saveZoneBtn" class="hidden">Guardar Zona</button>
-      <button id="next" class="hidden" disabled>Siguiente</button>
-
-      <p id="question"></p>
-      <p id="score-display" class="hidden">Calles acertadas: <span id="score">0 / 0</span></p>
-      
-      <div id="loader-container" class="loader hidden">
-        <div id="loading-text" class="loading-text"></div>
-        <div class="loading-bar-background">
-          <div id="progress-bar" class="loading-bar"></div>
+      <div id="main-content">
+        <div id="game-panel" class="content-panel visible" style="background: none; border: none; backdrop-filter: none;">
+            <h1 class="gradient-text">Calle a Calle</h1>
+            <button id="drawZone">Establecer zona</button>
+            <button id="undoPoint" class="hidden">Retroceder Punto</button>
+            <button id="start" class="hidden" disabled>Start</button>
+            <button id="repeatZone" class="hidden" disabled>Repetir Zona</button>
+            <button id="saveZoneBtn" class="hidden" style="background-color: #ffc107; color: black;">Guardar Zona</button>
+            <button id="next" class="hidden" disabled>Siguiente</button>
+            <p id="question"></p>
+            <p id="score-display" class="hidden">Calles acertadas: <span id="score">0 / 0</span></p>
+            <div id="loader-container" class="loader hidden">
+              <div id="loading-text" class="loading-text"></div>
+              <div class="loading-bar-background">
+                <div id="progress-bar" class="loading-bar"></div>
+              </div>
+            </div>
+            <p id="fb"></p>
+        </div>
+        <div id="saved-zones-panel" class="content-panel">
+            <h3 class="font-bold text-xl mb-4">Mis Zonas Guardadas</h3>
+            <div id="saved-zones-list" class="space-y-2"></div>
+        </div>
+        <div id="stats-panel" class="content-panel">
+            <h3 class="font-bold text-xl mb-4">Estadísticas</h3>
+            <div id="stats-content"></div>
+        </div>
+        <div id="profile-panel" class="content-panel">
+            <h3 class="font-bold text-xl mb-4">Perfil</h3>
+            <div id="user-info-content" class="text-center"></div>
+            <button id="logout-btn" class="mt-4" style="background-color: #dc3545;">Cerrar Sesión</button>
         </div>
       </div>
       
-      <p id="fb"></p>
-
-      <div id="saved-zones-container" class="mt-4 pt-4 border-t border-gray-200">
-        <h3 class="font-bold text-lg mb-2 text-gray-700">Mis Zonas Guardadas</h3>
-        <div id="saved-zones-list" class="space-y-2 max-h-48 overflow-y-auto"></div>
+      <div class="menu">
+        <a href="#" class="menu-link active" data-panel="game-panel">
+          <span class="link-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" width="192" height="192" fill="currentColor" viewBox="0 0 256 256"><rect width="256" height="256" fill="none"></rect><path d="M213.3815,109.61945,133.376,36.88436a8,8,0,0,0-10.76339.00036l-79.9945,72.73477A8,8,0,0,0,40,115.53855V208a8,8,0,0,0,8,8H208a8,8,0,0,0,8-8V115.53887A8,8,0,0,0,213.3815,109.61945Z" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"></path></svg>
+          </span>
+          <span class="link-title">Juego</span>
+        </a>
+        <a href="#" class="menu-link" data-panel="saved-zones-panel">
+          <span class="link-icon">
+             <svg xmlns="http://www.w3.org/2000/svg" width="192" height="192" fill="currentColor" viewBox="0 0 256 256"><rect width="256" height="256" fill="none"></rect><path d="M128,24,94.2,90.41,24,101.41l50.8,49.5L62.1,224,128,189.9,193.9,224,181.2,150.91,232,101.41l-70.2-.1Z" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"></path></svg>
+          </span>
+          <span class="link-title">Zonas</span>
+        </a>
+        <a href="#" class="menu-link" data-panel="stats-panel">
+          <span class="link-icon">
+             <svg xmlns="http://www.w3.org/2000/svg" width="192" height="192" fill="currentColor" viewBox="0 0 256 256"><rect width="256" height="256" fill="none"></rect><path d="M40,168V104a8,8,0,0,1,8-8H96a8,8,0,0,1,0,16H56v56a8,8,0,0,1-16,0Z" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"></path><path d="M208,104v64a8,8,0,0,1-8,8H160a8,8,0,0,1,0-16h40V112a8,8,0,0,1,16,0Z" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"></path><polyline points="40 88 40 56 72 56" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"></polyline><polyline points="216 168 216 200 184 200" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"></polyline><line x1="160" y1="52.4" x2="96" y2="84" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"></line></svg>
+          </span>
+          <span class="link-title">Stats</span>
+        </a>
+        <a href="#" class="menu-link" data-panel="profile-panel">
+          <span class="link-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" width="192" height="192" fill="currentColor" viewBox="0 0 256 256"><rect width="256" height="256" fill="none"></rect><circle cx="128" cy="96" r="64" fill="none" stroke="currentColor" stroke-miterlimit="10" stroke-width="16"></circle><path d="M30.989,215.99064a112.03731,112.03731,0,0,1,194.02311.002" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"></path></svg>
+          </span>
+          <span class="link-title">Perfil</span>
+        </a>
       </div>
-
-      <div id="stats-container" class="mt-4 pt-4 border-t border-gray-200">
-        <h3 class="font-bold text-lg mb-2 text-gray-700">Estadísticas (Últimas 15 partidas)</h3>
-        <div id="stats-content">
-          <p class="text-sm text-gray-500">Inicia sesión para ver tus estadísticas.</p>
-        </div>
-      </div>
-      
-      <div id="user-info" style="margin-top: auto;"></div>
     </aside>
     <div id="game-map-container"></div>
   </div>
@@ -138,18 +286,20 @@
       const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhwcHp3Znd0ZWRnaHBzeGZvbm9oIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQxMjQzNDMsImV4cCI6MjA2OTcwMDM0M30.BAh6i5iJ5YkDBoydfkC9azAD4eMdYBkEBdxws9kj5Hg';
       const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
+      // --- Referencias a elementos del DOM ---
       const loginScreen = document.getElementById('login-screen');
       const gameScreen = document.getElementById('game-screen');
       const backgroundMapContainer = document.getElementById('background-map');
       const googleLoginBtn = document.getElementById('google-login-btn');
-      const userInfoContainer = document.getElementById('user-info');
       
+      // --- Variables de estado del juego ---
       let backgroundMap, animationInterval, gameMap = null;
       const COL_ZONE = '#663399', COL_TRACE = '#007a2f', COL_DASH = '#1976d2';
       let drawing=false, zonePoly=null, tempMarkers=[], zonePoints=[], oldZonePoly=null;
       let playing=false, qIdx=0, target=null, userMk, guide, streetGrp;
       let streetList = [], totalQuestions = 0, streetsGuessedCorrectly = 0, lastGameZonePoints = [];
 
+      // --- Lógica de Autenticación ---
       async function signInWithGoogle() { 
         await supabaseClient.auth.signInWithOAuth({ 
           provider: 'google',
@@ -167,22 +317,19 @@
           if (animationInterval) clearInterval(animationInterval);
           backgroundMapContainer.style.opacity = '0';
           backgroundMapContainer.classList.add('hidden');
-          userInfoContainer.innerHTML = `<div style="padding: 10px; border: 1px solid #ddd; border-radius: 6px; text-align: center; margin-top: 1rem;"><p style="margin: 0 0 10px 0; font-size: 0.9rem;">Hola, <strong>${user.email}</strong></p><button id="logout-btn" class="login-btn" style="background-color: #6c757d; width: auto; padding: 5px 15px; border-radius: 6px; color: white;">Cerrar Sesión</button></div>`;
+          
+          document.getElementById('user-info-content').innerHTML = `<p style="margin: 0 0 10px 0; font-size: 0.9rem;">Hola,</p><p><strong>${user.email}</strong></p>`;
           document.getElementById('logout-btn').addEventListener('click', signOut);
           
           if (!gameMap) initGame();
           else setTimeout(() => gameMap.invalidateSize(), 10);
-          
-          displaySavedZones();
-          displayStats();
         } else {
           loginScreen.classList.remove('hidden');
           loginScreen.style.opacity = '1';
           gameScreen.classList.add('hidden');
-          userInfoContainer.innerHTML = '';
+          if (!backgroundMap) initBackgroundMap();
           backgroundMapContainer.classList.remove('hidden');
           backgroundMapContainer.style.opacity = '1';
-          if (!backgroundMap) initBackgroundMap();
         }
       }
 
@@ -200,6 +347,36 @@
           }, 100);
       }
       
+      // --- Lógica del Menú y Paneles ---
+      function setupMenu() {
+        const menuLinks = document.querySelectorAll('.menu-link');
+        const contentPanels = document.querySelectorAll('.content-panel');
+
+        menuLinks.forEach(link => {
+          link.addEventListener('click', (e) => {
+            e.preventDefault();
+            const panelId = link.dataset.panel;
+            
+            // Gestionar estado activo del link
+            menuLinks.forEach(l => l.classList.remove('active'));
+            link.classList.add('active');
+
+            // Mostrar el panel correspondiente
+            contentPanels.forEach(panel => {
+              if (panel.id === panelId) {
+                // Si el panel que vamos a mostrar es el de zonas o stats, recargamos sus datos
+                if (panelId === 'saved-zones-panel') displaySavedZones();
+                if (panelId === 'stats-panel') displayStats();
+                panel.classList.add('visible');
+              } else {
+                panel.classList.remove('visible');
+              }
+            });
+          });
+        });
+      }
+
+      // --- Lógica Principal del Juego ---
       function initGame(){
         const btnDraw = document.getElementById('drawZone');
         const btnUndo = document.getElementById('undoPoint');
@@ -222,7 +399,10 @@
         btnRepeat.addEventListener('click', repeatLastZone);
         btnSaveZone.addEventListener('click', saveCurrentZone);
         setupStartButton(bStart);
+        setupMenu(); // Inicializamos el nuevo menú
       }
+      
+      // ... (El resto de funciones del juego como setupStartButton, startDrawing, onMapClick, etc., permanecen igual) ...
       
       function setupStartButton(bStart) {
         bStart.onclick = async () => {
@@ -377,13 +557,10 @@
           const fb = document.getElementById('fb');
           const loaderContainer = document.getElementById('loader-container');
           const loadingText = document.getElementById('loading-text');
-          const progressBar = document.getElementById('progress-bar');
           const scoreEl = document.getElementById('score');
 
           fb.textContent = '';
-          fb.classList.add('hidden');
           loaderContainer.classList.remove('hidden');
-          progressBar.style.width = '0%';
           loadingText.innerHTML = `Identificando calles en la zona...`;
 
           try {
@@ -405,7 +582,6 @@
               fb.textContent = `Hubo un error al cargar las calles. ${error.message}`;
           } finally {
               loaderContainer.classList.add('hidden');
-              fb.classList.remove('hidden');
           }
       }
       
@@ -458,7 +634,7 @@
         playing = false;
         const bStart = document.getElementById('start');
         document.getElementById('fb').textContent = `¡Juego terminado! Has acertado ${streetsGuessedCorrectly} de ${totalQuestions}.`;
-        document.getElementById('question').textContent = 'Pulsa para dibujar una nueva zona o para repetir la anterior.';
+        document.getElementById('question').textContent = 'Pulsa en el menú inferior para ver tus zonas o empezar de nuevo.';
         document.getElementById('score-display').classList.add('hidden');
         if (zonePoly) {
             zonePoly.setStyle({ color: '#696969', weight: 2, dashArray: '5, 5', fillOpacity: 0.05 });
@@ -466,13 +642,10 @@
         }
         lastGameZonePoints = [...zonePoints];
         saveGameStats(streetsGuessedCorrectly, totalQuestions);
-        displayStats();
         
         document.getElementById('next').classList.add('hidden');
-        document.getElementById('drawZone').classList.remove('hidden'); 
-        document.getElementById('drawZone').disabled = false;
-        document.getElementById('repeatZone').classList.remove('hidden'); 
-        document.getElementById('repeatZone').disabled = (lastGameZonePoints.length < 3);
+        document.getElementById('drawZone').classList.add('hidden'); 
+        document.getElementById('repeatZone').classList.add('hidden'); 
         document.getElementById('saveZoneBtn').classList.remove('hidden');
         bStart.classList.add('hidden');
         zonePoly = null; 
@@ -496,8 +669,7 @@
         document.getElementById('fb').textContent = 'Haz clic en el mapa para responder.';
       }
       
-      // --- NUEVAS FUNCIONES PARA ZONAS GUARDADAS Y ESTADÍSTICAS ---
-
+      // --- Funciones de Datos (Zonas y Stats) ---
       async function saveCurrentZone() {
         const zoneName = prompt("Dale un nombre a esta zona:", "Mi barrio");
         if (!zoneName || zoneName.trim() === '') return;
@@ -511,7 +683,6 @@
                 .insert({ user_id: session.user.id, name: zoneName, zone_points: zoneString });
             if (error) throw error;
             alert(`¡Zona "${zoneName}" guardada con éxito!`);
-            displaySavedZones();
             document.getElementById('saveZoneBtn').classList.add('hidden');
         } catch (error) {
             console.error('Error al guardar la zona:', error.message);
@@ -521,32 +692,35 @@
       
       async function displaySavedZones() {
         const listContainer = document.getElementById('saved-zones-list');
-        listContainer.innerHTML = '';
+        listContainer.innerHTML = '<p>Cargando zonas...</p>';
         try {
             const { data: { session } } = await supabaseClient.auth.getSession();
-            if (!session) {
-                listContainer.innerHTML = '<p class="text-sm text-gray-500">Inicia sesión para ver tus zonas.</p>';
-                return;
-            };
+            if (!session) return;
             const { data: zones, error } = await supabaseClient
                 .from('saved_zones')
                 .select('id, name, zone_points')
                 .eq('user_id', session.user.id)
                 .order('created_at', { ascending: false });
             if (error) throw error;
+            listContainer.innerHTML = '';
             if (zones.length === 0) {
-                listContainer.innerHTML = '<p class="text-sm text-gray-500">No tienes zonas guardadas.</p>';
+                listContainer.innerHTML = '<p>No tienes zonas guardadas.</p>';
                 return;
             }
             zones.forEach(zone => {
                 const zoneElement = document.createElement('button');
-                zoneElement.className = 'w-full text-left p-2 rounded-md bg-green-100 hover:bg-green-200 transition';
+                zoneElement.className = 'w-full text-left p-3 mb-2 rounded-md bg-gray-700 hover:bg-blue-600 transition';
                 zoneElement.innerHTML = `<span class="font-semibold block">${zone.name}</span>`;
-                zoneElement.addEventListener('click', () => playFromHistory(zone.zone_points));
+                zoneElement.addEventListener('click', () => {
+                    playFromHistory(zone.zone_points);
+                    // Opcional: volver al panel de juego
+                    document.querySelector('.menu-link[data-panel="game-panel"]').click();
+                });
                 listContainer.appendChild(zoneElement);
             });
         } catch (error) {
             console.error('Error cargando zonas guardadas:', error.message);
+            listContainer.innerHTML = '<p class="text-red-400">Error al cargar zonas.</p>';
         }
       }
 
@@ -564,12 +738,10 @@
 
       async function displayStats() {
         const statsContent = document.getElementById('stats-content');
+        statsContent.innerHTML = '<p>Calculando estadísticas...</p>';
         try {
             const { data: { session } } = await supabaseClient.auth.getSession();
-            if (!session) {
-                statsContent.innerHTML = '<p class="text-sm text-gray-500">Inicia sesión para ver tus estadísticas.</p>';
-                return;
-            }
+            if (!session) return;
             const { data: stats, error } = await supabaseClient
                 .from('game_stats')
                 .select('correct_guesses, total_questions')
@@ -578,17 +750,21 @@
                 .limit(15);
             if (error) throw error;
             if (stats.length === 0) {
-                statsContent.innerHTML = '<p class="text-sm text-gray-500">Juega una partida para ver tus estadísticas.</p>';
+                statsContent.innerHTML = '<p>Juega una partida para ver tus estadísticas.</p>';
                 return;
             }
             const totalCorrect = stats.reduce((sum, game) => sum + game.correct_guesses, 0);
             const totalPlayed = stats.reduce((sum, game) => sum + game.total_questions, 0);
             const percentage = totalPlayed > 0 ? Math.round((totalCorrect / totalPlayed) * 100) : 0;
             statsContent.innerHTML = `
-                <p class="text-2xl font-bold text-center text-blue-600">${percentage}%</p>
-                <p class="text-sm text-gray-600 text-center">de aciertos (${totalCorrect} de ${totalPlayed})</p>`;
+                <div class="text-center">
+                    <p class="text-5xl font-bold text-blue-400">${percentage}%</p>
+                    <p class="text-lg text-gray-300 mt-2">de aciertos</p>
+                    <p class="text-sm text-gray-400">(${totalCorrect} de ${totalPlayed} en las últimas partidas)</p>
+                </div>`;
         } catch (error) {
             console.error('Error cargando estadísticas:', error.message);
+            statsContent.innerHTML = '<p class="text-red-400">Error al cargar estadísticas.</p>';
         }
       }
       
@@ -614,9 +790,8 @@
         document.getElementById('fb').textContent = 'Zona cargada. Pulsa Start.';
         gameMap.fitBounds(zonePoly.getBounds(), { padding: [50, 50] });
       }
-
-      // --- FIN DE NUEVAS FUNCIONES ---
-
+      
+      // --- Inicialización General ---
       googleLoginBtn.addEventListener('click', signInWithGoogle);
       supabaseClient.auth.onAuthStateChange(handleAuthStateChange);
 

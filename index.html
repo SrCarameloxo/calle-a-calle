@@ -61,6 +61,10 @@
     #question { font-weight: 700; margin: .5rem 0; }
     #fb { margin: .5rem 0; }
     #score-display { font-size: 1.1rem; font-weight: bold; color: #333; }
+    .loader { display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 10px; padding: 10px; background-color: #333; border-radius: 8px; }
+    .loading-text { color: white; font-size: 12pt; font-weight: 600; }
+    .loading-bar-background { --height: 20px; display: flex; align-items: center; box-sizing: border-box; padding: 3px; width: 100%; height: var(--height); background-color: #212121; box-shadow: #0c0c0c -2px 2px 4px 0px inset; border-radius: calc(var(--height) / 2); }
+    .loading-bar { position: relative; display: flex; justify-content: center; flex-direction: column; height: 100%; width: 0%; overflow: hidden; background: #007BFF; border-radius: 10px; transition: width 0.2s ease-out; }
   </style>
 </head>
 <body>
@@ -94,6 +98,12 @@
       <button id="next" class="hidden" disabled>Siguiente</button>
       <p id="question"></p>
       <p id="score-display" class="hidden">Calles acertadas: <span id="score">0 / 0</span></p>
+      <div id="loader-container" class="loader hidden">
+        <div id="loading-text" class="loading-text"></div>
+        <div class="loading-bar-background">
+          <div id="progress-bar" class="loading-bar"></div>
+        </div>
+      </div>
       <p id="fb"></p>
       <div id="user-info" style="margin-top: auto;"></div>
     </aside>
@@ -122,7 +132,10 @@
 
       async function signInWithGoogle() { 
         await supabaseClient.auth.signInWithOAuth({ 
-          provider: 'google'
+          provider: 'google',
+          options: {
+            redirectTo: window.location.origin
+          }
         }); 
       }
       async function signOut() { await supabaseClient.auth.signOut(); }
@@ -200,6 +213,7 @@
             }
             document.getElementById('undoPoint').classList.add('hidden');
             bStart.disabled = true;
+            bStart.textContent = 'Cargando calles...';
             await preloadStreets();
             bStart.textContent = 'Iniciar juego';
             bStart.onclick = () => {
@@ -211,7 +225,13 @@
                 gameMap.fitBounds(zonePoly.getBounds(), { padding: [50, 50] });
                 nextQ();
             };
-            if (totalQuestions > 0) bStart.disabled = false;
+            if (totalQuestions > 0) {
+              bStart.disabled = false;
+            } else {
+              document.getElementById('fb').textContent = 'No se encontraron calles. Dibuja otra zona.';
+              bStart.classList.add('hidden');
+              document.getElementById('drawZone').classList.remove('hidden');
+            }
         };
       }
 
@@ -221,6 +241,10 @@
         const btnUndo = document.getElementById('undoPoint');
         const bStart = document.getElementById('start');
         const btnRepeat = document.getElementById('repeatZone');
+        if (zonePoly) gameMap.removeLayer(zonePoly);
+        if (oldZonePoly) gameMap.removeLayer(oldZonePoly);
+        zonePoints = []; tempMarkers = []; zonePoly = null;
+        playing = false;
         drawing = true;
         fb.textContent = 'Haz click para añadir vértices. Con 3 se habilita Start. Haz click en el primer vértice para cerrar.';
         btnDraw.classList.add('hidden');
@@ -228,6 +252,8 @@
         btnUndo.classList.remove('hidden');
         bStart.classList.remove('hidden');
         bStart.disabled = true;
+        bStart.textContent = 'Start';
+        setupStartButton(bStart);
         gameMap.on('click', addVertex);
       }
 
@@ -251,7 +277,7 @@
         tempMarkers.forEach(m=>gameMap.removeLayer(m));
         tempMarkers = [];
         zonePoly.addLatLng(zonePoints[0]);
-        document.getElementById('fb').textContent = 'Zona cerrada.';
+        document.getElementById('fb').textContent = 'Zona cerrada. Pulsa Start para buscar calles.';
         document.getElementById('undoPoint').classList.add('hidden');
         document.getElementById('start').disabled = false;
       }
@@ -272,18 +298,21 @@
 
       async function repeatLastZone() {
         if (lastGameZonePoints.length < 3) return;
-        if (oldZonePoly) gameMap.removeLayer(oldZonePoly);
+        startDrawing(); // Llama a startDrawing para resetear el estado
+        drawing = false; // Pero no estamos dibujando
+        gameMap.off('click', addVertex);
+
         zonePoints = [...lastGameZonePoints];
         zonePoly = L.polygon(zonePoints, { color: COL_ZONE, weight: 2, fillOpacity: 0.1 }).addTo(gameMap);
+        const bStart = document.getElementById('start');
         document.getElementById('drawZone').classList.add('hidden');
         document.getElementById('repeatZone').classList.add('hidden');
-        const bStart = document.getElementById('start');
+        document.getElementById('undoPoint').classList.add('hidden');
         bStart.classList.remove('hidden');
-        bStart.disabled = true;
-        bStart.textContent = 'Cargando zona anterior...';
-        await preloadStreets(); 
+        bStart.disabled = false;
+        bStart.textContent = 'Start';
         setupStartButton(bStart);
-        if (totalQuestions > 0) bStart.disabled = false;
+        document.getElementById('fb').textContent = 'Zona anterior cargada. Pulsa Start.';
       }
 
       function onMapClick(e){
@@ -320,8 +349,49 @@
         userMk = guide = streetGrp = null; 
       }
 
+      // === CÓDIGO RESTAURADO Y CORREGIDO PARA LA CARGA DE CALLES ===
       async function preloadStreets() {
-        // Tu lógica para cargar calles (fetch a la API de Vercel) va aquí
+          const fb = document.getElementById('fb');
+          const loaderContainer = document.getElementById('loader-container');
+          const loadingText = document.getElementById('loading-text');
+          const progressBar = document.getElementById('progress-bar');
+          const scoreEl = document.getElementById('score');
+
+          fb.textContent = '';
+          fb.classList.add('hidden');
+          loaderContainer.classList.remove('hidden');
+          progressBar.style.width = '0%';
+          loadingText.innerHTML = `Identificando calles en la zona...`;
+
+          try {
+              // CAMBIO A MÉTODO GET
+              const zoneParam = zonePoints.map(p => `${p.lat},${p.lng}`).join(';');
+              const response = await fetch(`/api/getStreets?zone=${encodeURIComponent(zoneParam)}`);
+
+              if (!response.ok) {
+                  const errorData = await response.json();
+                  throw new Error(errorData.error || 'Server error while loading streets.');
+              }
+
+              const data = await response.json();
+              streetList = data.streets;
+              totalQuestions = streetList.length;
+              streetList.sort(() => Math.random() - 0.5);
+
+              if (totalQuestions > 0) {
+                  fb.textContent = `Se han encontrado y validado ${totalQuestions} lugares. ¡Listo para jugar!`;
+              } else {
+                  fb.textContent = 'No se han encontrado lugares válidos en la zona. Dibuja un polígono más grande.';
+              }
+              scoreEl.textContent = `0 / ${totalQuestions}`;
+
+          } catch (error) {
+              console.error(error);
+              fb.textContent = `Hubo un error al cargar las calles. ${error.message}`;
+          } finally {
+              loaderContainer.classList.add('hidden');
+              fb.classList.remove('hidden');
+          }
       }
       
       function drawStreet(){
@@ -413,4 +483,4 @@
     });
   </script>
 </body>
-</html>```
+</html>

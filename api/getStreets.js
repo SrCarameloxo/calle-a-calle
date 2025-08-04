@@ -37,15 +37,15 @@ function extractNameParts(name) {
 }
 
 export default async function handler(request, response) {
-  // === LA CORRECCIÓN ESTÁ AQUÍ ===
-  // Leemos el parámetro 'zone' de la URL, no del body.
+  // AÑADIMOS ESTA LÍNEA PARA DEPURAR
+  console.log("--- EJECUTANDO VERSIÓN CORREGIDA DE GETSTREETS ---");
+
   const { zone } = request.query; 
 
   if (!zone) {
     return response.status(400).json({ error: 'Faltan los puntos de la zona.' });
   }
 
-  // Convertimos el texto de la URL de vuelta a un array de puntos que el código entiende.
   const zonePoints = zone.split(';').map(pair => {
     const [lat, lng] = pair.split(',');
     return { lat: parseFloat(lat), lng: parseFloat(lng) };
@@ -54,7 +54,6 @@ export default async function handler(request, response) {
   if (zonePoints.length < 3) {
     return response.status(400).json({ error: 'Se necesitan al menos 3 puntos para la zona.' });
   }
-  // === FIN DE LA CORRECCIÓN ===
 
   try {
     const coords = zonePoints.map(p => `${p.lat} ${p.lng}`).join(' ');
@@ -128,4 +127,3 @@ export default async function handler(request, response) {
     response.status(500).json({ error: 'Error al procesar las calles.', details: error.message });
   }
 }
-// Versión final

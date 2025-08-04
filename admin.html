@@ -81,17 +81,12 @@
             let adminMap;
             let selectedIncident = null;
 
-            async function checkAdminAccess() {
-                const { data: { session } } = await supabase.auth.getSession();
-                if (!session || !session.user) {
-                    window.location.href = '/';
-                    return;
-                }
-
+            // ESTA ES LA FUNCIÓN QUE CAMBIA Y SE VUELVE MÁS ROBUSTA
+            async function checkAdminAccess(user) {
                 const { data: profile, error } = await supabase
                     .from('profiles')
                     .select('role')
-                    .eq('id', session.user.id)
+                    .eq('id', user.id)
                     .single();
 
                 if (error || !profile || profile.role !== 'admin') {
@@ -103,21 +98,15 @@
                     initAdminPanel();
                 }
             }
-
+            
+            // EL RESTO DE FUNCIONES (fetchIncidents, selectIncident, etc.) se mantienen igual
             async function fetchIncidents() {
                 incidentsList.innerHTML = '<div class="flex justify-center items-center"><div class="spinner"></div></div>';
                 const { data: incidents, error } = await supabase
-                    .from('incidents')
-                    .select('*')
-                    .eq('status', 'nuevo')
-                    .order('created_at', { ascending: true });
-
+                    .from('incidents').select('*').eq('status', 'nuevo').order('created_at', { ascending: true });
                 if (error) {
-                    console.error('Error fetching incidents:', error);
-                    incidentsList.innerHTML = '<p class="text-red-500">Error al cargar incidencias.</p>';
-                    return;
+                    incidentsList.innerHTML = '<p class="text-red-500">Error al cargar incidencias.</p>'; return;
                 }
-
                 incidentsList.innerHTML = '';
                 if (incidents.length === 0) {
                      incidentsList.innerHTML = '<p>¡No hay incidencias nuevas pendientes!</p>';
@@ -126,10 +115,7 @@
                     const item = document.createElement('div');
                     item.className = 'incident-item p-3 rounded-lg cursor-pointer hover:bg-gray-700 transition-colors';
                     item.dataset.incidentId = incident.id;
-                    item.innerHTML = `
-                        <p class="font-semibold truncate">${incident.description}</p>
-                        <p class="text-sm text-gray-400">Ciudad: ${incident.city || 'Desconocida'}</p>
-                    `;
+                    item.innerHTML = `<p class="font-semibold truncate">${incident.description}</p><p class="text-sm text-gray-400">Ciudad: ${incident.city || 'Desconocida'}</p>`;
                     item.addEventListener('click', () => selectIncident(incident));
                     incidentsList.appendChild(item);
                 });
@@ -139,80 +125,54 @@
                 selectedIncident = incident;
                 approveBtn.disabled = false;
                 rejectBtn.disabled = false;
-
                 document.querySelectorAll('.incident-item').forEach(item => {
                     item.classList.toggle('selected', item.dataset.incidentId == incident.id);
                 });
-
                 detailsTitle.classList.add('hidden');
                 detailsContent.classList.remove('hidden');
-                
                 incidentDescription.textContent = incident.description;
-                
                 const match = incident.description.match(/["'](.*?)["']/) || incident.description.match(/calle (.*?)(?:\s|$)/i);
                 const guessedName = match ? (match[1].startsWith('C.') ? match[1].replace('C. ', 'Calle ') : `Calle ${match[1]}`) : '';
                 osmNameInput.value = guessedName;
                 displayNameInput.value = guessedName.toUpperCase();
-
                 const points = incident.zone_points.split(';').map(p => {
                     const [lat, lng] = p.split(',');
                     return [parseFloat(lat), parseFloat(lng)];
                 });
-
-                if(adminMap.drawnItems) {
-                    adminMap.drawnItems.clearLayers();
-                } else {
+                if(adminMap.drawnItems) adminMap.drawnItems.clearLayers();
+                else {
                     adminMap.drawnItems = new L.FeatureGroup();
                     adminMap.addLayer(adminMap.drawnItems);
                 }
-                
                 const polygon = L.polygon(points, {color: '#3b82f6'}).addTo(adminMap.drawnItems);
                 adminMap.fitBounds(polygon.getBounds(), {padding: [50, 50]});
             }
             
             async function resolveIncident(action) {
                 if (!selectedIncident) return;
-
                 const osmName = osmNameInput.value.trim();
                 const displayName = displayNameInput.value.trim();
-
                 if (action === 'approve' && (osmName === '' || displayName === '')) {
-                    alert('Por favor, completa ambos nombres de calle para aprobar.');
-                    return;
+                    alert('Por favor, completa ambos nombres de calle para aprobar.'); return;
                 }
-                
                 approveBtn.disabled = true;
                 rejectBtn.disabled = true;
                 approveBtn.innerHTML = '<div class="spinner"></div>';
-
                 try {
                     const { data: { session } } = await supabase.auth.getSession();
                     const response = await fetch('/api/resolveIncident', {
                         method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'Authorization': `Bearer ${session.access_token}`
-                        },
+                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
                         body: JSON.stringify({
-                            incidentId: selectedIncident.id,
-                            action: action,
-                            osmName: osmName,
-                            displayName: displayName,
-                            city: selectedIncident.city
+                            incidentId: selectedIncident.id, action: action,
+                            osmName: osmName, displayName: displayName, city: selectedIncident.city
                         })
                     });
-
-                    if (!response.ok) {
-                        const errorData = await response.json();
-                        throw new Error(errorData.error || 'Error del servidor');
-                    }
-                    
+                    if (!response.ok) { const errorData = await response.json(); throw new Error(errorData.error || 'Error del servidor'); }
                     alert(`Incidencia marcada como ${action === 'approve' ? 'resuelta' : 'rechazada'}.`);
                     resetDetailsPanel();
                     fetchIncidents();
-
                 } catch (error) {
-                    console.error('Error resolving incident:', error);
                     alert('Error al procesar la incidencia: ' + error.message);
                 } finally {
                     approveBtn.disabled = false;
@@ -229,9 +189,7 @@
                 detailsContent.classList.add('hidden');
                 osmNameInput.value = '';
                 displayNameInput.value = '';
-                if(adminMap.drawnItems) {
-                    adminMap.drawnItems.clearLayers();
-                }
+                if(adminMap.drawnItems) adminMap.drawnItems.clearLayers();
             }
 
             function initAdminPanel() {
@@ -240,12 +198,26 @@
                     attribution: '© OpenStreetMap contributors, © CARTO'
                 }).addTo(adminMap);
                 fetchIncidents();
-                
                 approveBtn.addEventListener('click', () => resolveIncident('approve'));
                 rejectBtn.addEventListener('click', () => resolveIncident('reject'));
             }
 
-            checkAdminAccess();
+            // --- PUNTO DE ENTRADA PRINCIPAL ---
+            // Esperamos a que Supabase confirme el estado de la sesión
+            supabase.auth.onAuthStateChange((event, session) => {
+                // Nos interesa el primer evento que nos da una sesión, o cuando el usuario inicia sesión
+                if (event === 'INITIAL_SESSION' || event === 'SIGNED_IN') {
+                    if (session) {
+                        // Solo cuando estamos seguros de tener la sesión, verificamos el rol
+                        checkAdminAccess(session.user);
+                    } else {
+                        // Si no hay sesión, redirigimos al inicio
+                        window.location.href = '/';
+                    }
+                } else if (event === 'SIGNED_OUT') {
+                    window.location.href = '/';
+                }
+            });
         });
     </script>
 </body>

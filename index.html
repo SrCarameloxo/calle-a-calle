@@ -150,6 +150,30 @@
     .delete-zone-btn:hover {
       color: #dc2626;
     }
+
+    /* ===== INICIO: NUEVOS ESTILOS DE ANIMACIÓN ===== */
+    @keyframes pulseAndFlash {
+        0% {
+            stroke-width: 8;
+            stroke: #007a2f; /* Color normal */
+            opacity: 0.8;
+        }
+        50% {
+            stroke-width: 14; /* Más gruesa (pulso) */
+            stroke: #66ffb3;  /* Color brillante (parpadeo) */
+            opacity: 1;
+        }
+        100% {
+            stroke-width: 8;
+            stroke: #007a2f; /* Vuelta a la normalidad */
+            opacity: 0.8;
+        }
+    }
+
+    .street-reveal-animation path {
+        animation: pulseAndFlash 0.8s ease-out;
+    }
+    /* ===== FIN: NUEVOS ESTILOS DE ANIMACIÓN ===== */
   </style>
 </head>
 <body>
@@ -223,6 +247,8 @@
     <div id="game-map-container"></div>
   </div>
 
+  <audio id="correct-sound" src="/sounds/correct.mp3" preload="auto"></audio>
+  <audio id="incorrect-sound" src="/sounds/incorrect.mp3" preload="auto"></audio>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script>
     window.addEventListener('DOMContentLoaded', () => {
@@ -292,11 +318,35 @@
         }
       }
 
+      // ===== INICIO: NUEVA FUNCIÓN PARA EL FONDO DINÁMICO =====
+      function startDynamicBackground(bMap) {
+          const initialCenter = bMap.getCenter();
+          const startTime = Date.now();
+          const freqX = 0.00005;
+          const freqY = 0.0001;
+          const ampX = 0.008;
+          const ampY = 0.004;
+
+          setInterval(() => {
+              const elapsedTime = Date.now() - startTime;
+              const dx = Math.sin(elapsedTime * freqX) * ampX;
+              const dy = Math.cos(elapsedTime * freqY) * ampY;
+              bMap.panTo([initialCenter.lat + dy, initialCenter.lng + dx], {
+                  animate: true,
+                  duration: 1,
+                  noMoveStart: true
+              });
+          }, 100);
+      }
+      // ===== FIN: NUEVA FUNCIÓN PARA EL FONDO DINÁMICO =====
+
       function initBackgroundMap() {
           if (backgroundMap) return;
           backgroundMap = L.map('background-map', { zoomControl: false, dragging: false, scrollWheelZoom: false, doubleClickZoom: false, touchZoom: false });
           L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager_nolabels/{z}/{x}/{y}{r}.png', { attribution: '', maxZoom: 19 }).addTo(backgroundMap);
           backgroundMap.setView([38.88, -6.97], 15);
+          // Llamamos a la nueva función para que el fondo se mueva
+          startDynamicBackground(backgroundMap);
       }
       
       function setupMenu() {
@@ -456,13 +506,28 @@
         userMk = L.marker(e.latlng).addTo(gameMap);
         streetGrp = drawStreet(); 
         if(streetGrp){
+          // ===== INICIO: MEJORA DE ANIMACIÓN Y SONIDO =====
+          // Aplicamos la animación de CSS
+          try {
+            streetGrp.getLayers().forEach(layer => {
+                const element = layer.getElement();
+                if (element) {
+                    // El elemento SVG necesita la clase para la animación
+                    element.classList.add('street-reveal-animation');
+                }
+            });
+          } catch(e) { console.warn("No se pudo aplicar la animación a la calle."); }
+
           const streetCheck = getDistanceToStreet(userMk.getLatLng(), streetGrp);
           if (streetCheck.distance <= 30) {
             streetsGuessedCorrectly++;
             document.getElementById('fb').textContent = `¡Correcto! Has acertado.`;
+            document.getElementById('correct-sound').play(); // Sonido de acierto
           } else {
             document.getElementById('fb').textContent = `Casi, pero no has hecho clic sobre el lugar (a ${Math.round(streetCheck.distance)} metros).`;
+            document.getElementById('incorrect-sound').play(); // Sonido de fallo
           }
+          // ===== FIN: MEJORA DE ANIMACIÓN Y SONIDO =====
           document.getElementById('score').textContent = `${streetsGuessedCorrectly} / ${totalQuestions}`;
           if (streetCheck.point) {
             guide = L.polyline([userMk.getLatLng(), streetCheck.point], { dashArray:'6 4', color:COL_DASH }).addTo(gameMap);
@@ -560,7 +625,21 @@
         gameMap.off('click', onMapClick);
       }
 
+      // ===== INICIO: NUEVA FUNCIÓN DE RE-CENTRADO =====
+      function checkAndRecenterMap() {
+          if (!gameMap || !zonePoly) return;
+          const mapBounds = gameMap.getBounds();
+          const polyBounds = zonePoly.getBounds();
+          if (!mapBounds.contains(polyBounds)) {
+              gameMap.flyToBounds(polyBounds, { padding: [50, 50], duration: 1.2 });
+          }
+      }
+      // ===== FIN: NUEVA FUNCIÓN DE RE-CENTRADO =====
+
       function nextQ(){
+        // Llamamos a la función de re-centrado aquí
+        checkAndRecenterMap();
+        
         clear();
         if(qIdx >= totalQuestions){ endGame(); return; }
         gameMap.on('click', onMapClick);
@@ -590,7 +669,6 @@
 
             const zoneString = lastGameZonePoints.map(p => `${p.lat},${p.lng}`).join(';');
             
-            // Llamada a nuestra nueva API segura
             const response = await fetch('/api/reportIncident', {
                 method: 'POST',
                 headers: {

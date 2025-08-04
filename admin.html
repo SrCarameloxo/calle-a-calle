@@ -38,7 +38,6 @@
                     <div>
                         <p class="text-sm text-gray-400">Descripción del usuario:</p>
                         <p id="incident-description" class="bg-gray-800 p-2 rounded-md my-2"></p>
-                        
                         <div class="grid grid-cols-2 gap-4">
                             <div>
                                 <label for="osm-name-input" class="text-sm text-gray-400">Nombre en OpenStreetMap (Clave)</label>
@@ -49,7 +48,6 @@
                                 <input type="text" id="display-name-input" class="w-full bg-gray-900 border border-gray-600 rounded-md p-2 mt-1 text-white focus:ring-blue-500 focus:border-blue-500">
                             </div>
                         </div>
-
                     </div>
                     <div class="flex gap-4 mt-4">
                         <button id="approve-btn" class="flex-1 bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg transition-colors flex items-center justify-center gap-2" disabled>Aprobar y Mapear</button>
@@ -64,11 +62,12 @@
     <script>
         window.addEventListener('DOMContentLoaded', () => {
             const SUPABASE_URL = 'https://hppzwfwtedghpsxfonoh.supabase.co';
-            const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhwcHp3Znd0ZWRnaHBzeGZvbm9oIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQxMjQzNDMsImV4cCI6MjA2OTcwMDM0M30.BAh6i-iJ5YkDBoydfkC9azAD4eMdYBkEBdxws9kj5Hg';
+            const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhwcHp3Znd0ZWRnaHBzeGZvbm9oIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQxMjQzNDMsImV4cCI6MjA2OTcwMDM0M30.BAh6i5iJ5YkDBoydfkC9azAD4eMdYBkEBdxws9kj5Hg';
             const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
             const loadingScreen = document.getElementById('loading-screen');
             const adminPanel = document.getElementById('admin-panel');
+            // ... (el resto del script es idéntico al que ya te pasé, no necesita cambios)
             const incidentsList = document.getElementById('incidents-list');
             const detailsTitle = document.getElementById('details-title');
             const detailsContent = document.getElementById('details-content');
@@ -81,7 +80,6 @@
             let adminMap;
             let selectedIncident = null;
 
-            // ESTA ES LA FUNCIÓN QUE CAMBIA Y SE VUELVE MÁS ROBUSTA
             async function checkAdminAccess(user) {
                 const { data: profile, error } = await supabase
                     .from('profiles')
@@ -98,8 +96,7 @@
                     initAdminPanel();
                 }
             }
-            
-            // EL RESTO DE FUNCIONES (fetchIncidents, selectIncident, etc.) se mantienen igual
+
             async function fetchIncidents() {
                 incidentsList.innerHTML = '<div class="flex justify-center items-center"><div class="spinner"></div></div>';
                 const { data: incidents, error } = await supabase
@@ -202,16 +199,11 @@
                 rejectBtn.addEventListener('click', () => resolveIncident('reject'));
             }
 
-            // --- PUNTO DE ENTRADA PRINCIPAL ---
-            // Esperamos a que Supabase confirme el estado de la sesión
             supabase.auth.onAuthStateChange((event, session) => {
-                // Nos interesa el primer evento que nos da una sesión, o cuando el usuario inicia sesión
                 if (event === 'INITIAL_SESSION' || event === 'SIGNED_IN') {
                     if (session) {
-                        // Solo cuando estamos seguros de tener la sesión, verificamos el rol
                         checkAdminAccess(session.user);
                     } else {
-                        // Si no hay sesión, redirigimos al inicio
                         window.location.href = '/';
                     }
                 } else if (event === 'SIGNED_OUT') {

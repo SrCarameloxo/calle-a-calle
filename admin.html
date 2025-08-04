@@ -10,17 +10,24 @@
     <style>
         body { background-color: #111827; color: #d1d5db; }
         .incident-item.selected { background-color: #3b82f6; color: white; }
+        /* Simple spinner for loading states */
+        .spinner { border: 4px solid rgba(255, 255, 255, 0.3); border-left-color: #fff; border-radius: 50%; width: 24px; height: 24px; animation: spin 1s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
     </style>
 </head>
 <body class="font-sans">
 
     <div id="loading-screen" class="fixed inset-0 bg-gray-900 flex items-center justify-center z-50">
-        <p>Verificando acceso...</p>
+        <div class="spinner"></div>
+        <p class="ml-4">Verificando acceso de administrador...</p>
     </div>
 
     <div id="admin-panel" class="hidden h-screen w-screen grid grid-cols-1 md:grid-cols-3 gap-4 p-4">
         <div class="flex flex-col bg-gray-800 rounded-lg p-4 overflow-y-auto">
-            <h1 class="text-2xl font-bold mb-4 border-b border-gray-700 pb-2">Incidencias Reportadas</h1>
+            <div class="flex justify-between items-center mb-4 border-b border-gray-700 pb-2">
+                <h1 class="text-2xl font-bold">Incidencias Pendientes</h1>
+                <a href="/" class="text-sm text-blue-400 hover:underline">Volver al Juego</a>
+            </div>
             <div id="incidents-list" class="space-y-2">
                 </div>
         </div>
@@ -33,12 +40,22 @@
                     <div>
                         <p class="text-sm text-gray-400">Descripción del usuario:</p>
                         <p id="incident-description" class="bg-gray-800 p-2 rounded-md my-2"></p>
-                        <label for="street-name-input" class="text-sm text-gray-400">Nombre Oficial de la Calle (de OSM):</label>
-                        <input type="text" id="street-name-input" class="w-full bg-gray-900 border border-gray-600 rounded-md p-2 mt-1 text-white focus:ring-blue-500 focus:border-blue-500">
+                        
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label for="osm-name-input" class="text-sm text-gray-400">Nombre en OpenStreetMap (Clave)</label>
+                                <input type="text" id="osm-name-input" class="w-full bg-gray-900 border border-gray-600 rounded-md p-2 mt-1 text-white focus:ring-blue-500 focus:border-blue-500">
+                            </div>
+                            <div>
+                                <label for="display-name-input" class="text-sm text-gray-400">Nombre para el Juego (de Google Maps)</label>
+                                <input type="text" id="display-name-input" class="w-full bg-gray-900 border border-gray-600 rounded-md p-2 mt-1 text-white focus:ring-blue-500 focus:border-blue-500">
+                            </div>
+                        </div>
+
                     </div>
                     <div class="flex gap-4 mt-4">
-                        <button id="approve-btn" class="flex-1 bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg transition-colors">Aprobar e Incluir</button>
-                        <button id="reject-btn" class="flex-1 bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg transition-colors">Rechazar Incidencia</button>
+                        <button id="approve-btn" class="flex-1 bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg transition-colors flex items-center justify-center gap-2" disabled>Aprobar y Mapear</button>
+                        <button id="reject-btn" class="flex-1 bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg transition-colors flex items-center justify-center gap-2" disabled>Rechazar Incidencia</button>
                     </div>
                 </div>
             </div>
@@ -48,7 +65,7 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
         const SUPABASE_URL = 'https://hppzwfwtedghpsxfonoh.supabase.co';
-        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhwcHp3Znd0ZWRnaHBzeGZvbm9oIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQxMjQzNDMsImV4cCI6MjA2OTcwMDM0M30.BAh6i5iJ5YkDBoydfkC9azAD4eMdYBkEBdxws9kj5Hg';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhwcHp3Znd0ZWRnaHBzeGZvbm9oIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQxMjQzNDMsImV4cCI6MjA2OTcwMDM0M30.BAh6i-iJ5YkDBoydfkC9azAD4eMdYBkEBdxws9kj5Hg';
         const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
         const loadingScreen = document.getElementById('loading-screen');
@@ -58,7 +75,8 @@
         const detailsTitle = document.getElementById('details-title');
         const detailsContent = document.getElementById('details-content');
         const incidentDescription = document.getElementById('incident-description');
-        const streetNameInput = document.getElementById('street-name-input');
+        const osmNameInput = document.getElementById('osm-name-input');
+        const displayNameInput = document.getElementById('display-name-input');
         const approveBtn = document.getElementById('approve-btn');
         const rejectBtn = document.getElementById('reject-btn');
         
@@ -68,7 +86,7 @@
         async function checkAdminAccess() {
             const { data: { session } } = await supabase.auth.getSession();
             if (!session) {
-                window.location.href = '/'; // Redirigir si no hay sesión
+                window.location.href = '/';
                 return;
             }
 
@@ -89,6 +107,7 @@
         }
 
         async function fetchIncidents() {
+            incidentsList.innerHTML = '<div class="flex justify-center items-center"><div class="spinner"></div></div>';
             const { data: incidents, error } = await supabase
                 .from('incidents')
                 .select('*')
@@ -103,11 +122,11 @@
 
             incidentsList.innerHTML = '';
             if (incidents.length === 0) {
-                 incidentsList.innerHTML = '<p>¡No hay incidencias nuevas!</p>';
+                 incidentsList.innerHTML = '<p>¡No hay incidencias nuevas pendientes!</p>';
             }
             incidents.forEach(incident => {
                 const item = document.createElement('div');
-                item.className = 'incident-item p-3 rounded-lg cursor-pointer hover:bg-gray-700';
+                item.className = 'incident-item p-3 rounded-lg cursor-pointer hover:bg-gray-700 transition-colors';
                 item.dataset.incidentId = incident.id;
                 item.innerHTML = `
                     <p class="font-semibold truncate">${incident.description}</p>
@@ -120,8 +139,9 @@
 
         function selectIncident(incident) {
             selectedIncident = incident;
-            
-            // Marcar como seleccionado en la lista
+            approveBtn.disabled = false;
+            rejectBtn.disabled = false;
+
             document.querySelectorAll('.incident-item').forEach(item => {
                 item.classList.toggle('selected', item.dataset.incidentId == incident.id);
             });
@@ -131,48 +151,61 @@
             
             incidentDescription.textContent = incident.description;
             
-            // Auto-rellenado inteligente (simple)
             const match = incident.description.match(/["'](.*?)["']/) || incident.description.match(/calle (.*?)(?:\s|$)/i);
-            streetNameInput.value = match ? (match[1].startsWith('C.') ? match[1].replace('C. ', 'Calle ') : `Calle ${match[1]}`) : '';
-
+            const guessedName = match ? (match[1].startsWith('C.') ? match[1].replace('C. ', 'Calle ') : `Calle ${match[1]}`) : '';
+            osmNameInput.value = guessedName;
+            displayNameInput.value = guessedName.toUpperCase();
 
             const points = incident.zone_points.split(';').map(p => {
                 const [lat, lng] = p.split(',');
                 return [parseFloat(lat), parseFloat(lng)];
             });
-            
-            const polygon = L.polygon(points);
-            adminMap.fitBounds(polygon.getBounds());
-            polygon.addTo(adminMap);
-        }
 
+            adminMap.eachLayer(layer => {
+                if (layer instanceof L.Polygon) adminMap.removeLayer(layer);
+            });
+            
+            const polygon = L.polygon(points, {color: '#3b82f6'}).addTo(adminMap);
+            adminMap.fitBounds(polygon.getBounds(), {padding: [50, 50]});
+        }
+        
+        // Esta función llamará a una API segura en el backend
         async function resolveIncident(action) {
             if (!selectedIncident) return;
-            const streetName = streetNameInput.value.trim();
 
-            if (action === 'approve' && streetName === '') {
-                alert('Por favor, introduce el nombre oficial de la calle.');
+            const osmName = osmNameInput.value.trim();
+            const displayName = displayNameInput.value.trim();
+
+            if (action === 'approve' && (osmName === '' || displayName === '')) {
+                alert('Por favor, completa ambos nombres de calle para aprobar.');
                 return;
             }
             
             approveBtn.disabled = true;
             rejectBtn.disabled = true;
+            approveBtn.innerHTML = '<div class="spinner"></div>';
 
             try {
-                if (action === 'approve') {
-                    const { error: overrideError } = await supabase.from('street_overrides').insert({
-                        osm_name: streetName,
-                        city: selectedIncident.city,
-                        action: 'force_include'
-                    });
-                    if (overrideError) throw overrideError;
-                }
+                const { data: { session } } = await supabase.auth.getSession();
+                const response = await fetch('/api/resolveIncident', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${session.access_token}`
+                    },
+                    body: JSON.stringify({
+                        incidentId: selectedIncident.id,
+                        action: action,
+                        osmName: osmName,
+                        displayName: displayName,
+                        city: selectedIncident.city
+                    })
+                });
 
-                const { error: updateError } = await supabase
-                    .from('incidents')
-                    .update({ status: action === 'approve' ? 'resuelta' : 'rechazada' })
-                    .eq('id', selectedIncident.id);
-                if (updateError) throw updateError;
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || 'Error del servidor');
+                }
                 
                 alert(`Incidencia marcada como ${action === 'approve' ? 'resuelta' : 'rechazada'}.`);
                 resetDetailsPanel();
@@ -180,23 +213,24 @@
 
             } catch (error) {
                 console.error('Error resolving incident:', error);
-                alert('Error al procesar la incidencia.');
+                alert('Error al procesar la incidencia: ' + error.message);
             } finally {
                 approveBtn.disabled = false;
                 rejectBtn.disabled = false;
+                approveBtn.innerHTML = 'Aprobar y Mapear';
             }
         }
         
         function resetDetailsPanel() {
             selectedIncident = null;
+            approveBtn.disabled = true;
+            rejectBtn.disabled = true;
             detailsTitle.classList.remove('hidden');
             detailsContent.classList.add('hidden');
-            streetNameInput.value = '';
-            // Limpiar el mapa
+            osmNameInput.value = '';
+            displayNameInput.value = '';
             adminMap.eachLayer(layer => {
-                if (layer instanceof L.Polygon || layer instanceof L.Marker) {
-                    adminMap.removeLayer(layer);
-                }
+                if (layer instanceof L.Polygon) adminMap.removeLayer(layer);
             });
         }
 

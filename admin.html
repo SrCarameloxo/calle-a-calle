@@ -10,7 +10,6 @@
     <style>
         body { background-color: #111827; color: #d1d5db; }
         .incident-item.selected { background-color: #3b82f6; color: white; }
-        /* Simple spinner for loading states */
         .spinner { border: 4px solid rgba(255, 255, 255, 0.3); border-left-color: #fff; border-radius: 50%; width: 24px; height: 24px; animation: spin 1s linear infinite; }
         @keyframes spin { to { transform: rotate(360deg); } }
     </style>
@@ -28,8 +27,7 @@
                 <h1 class="text-2xl font-bold">Incidencias Pendientes</h1>
                 <a href="/" class="text-sm text-blue-400 hover:underline">Volver al Juego</a>
             </div>
-            <div id="incidents-list" class="space-y-2">
-                </div>
+            <div id="incidents-list" class="space-y-2"></div>
         </div>
 
         <div id="details-panel" class="md:col-span-2 flex flex-col bg-gray-800 rounded-lg p-4">
@@ -64,216 +62,191 @@
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
-        const SUPABASE_URL = 'https://hppzwfwtedghpsxfonoh.supabase.co';
-        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhwcHp3Znd0ZWRnaHBzeGZvbm9oIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQxMjQzNDMsImV4cCI6MjA2OTcwMDM0M30.BAh6i-iJ5YkDBoydfkC9azAD4eMdYBkEBdxws9kj5Hg';
-        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        window.addEventListener('DOMContentLoaded', () => {
+            const SUPABASE_URL = 'https://hppzwfwtedghpsxfonoh.supabase.co';
+            const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhwcHp3Znd0ZWRnaHBzeGZvbm9oIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQxMjQzNDMsImV4cCI6MjA2OTcwMDM0M30.BAh6i-iJ5YkDBoydfkC9azAD4eMdYBkEBdxws9kj5Hg';
+            const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-        const loadingScreen = document.getElementById('loading-screen');
-        const adminPanel = document.getElementById('admin-panel');
-        const incidentsList = document.getElementById('incidents-list');
-        const detailsPanel = document.getElementById('details-panel');
-        const detailsTitle = document.getElementById('details-title');
-        const detailsContent = document.getElementById('details-content');
-        const incidentDescription = document.getElementById('incident-description');
-        const osmNameInput = document.getElementById('osm-name-input');
-        const displayNameInput = document.getElementById('display-name-input');
-        const approveBtn = document.getElementById('approve-btn');
-        const rejectBtn = document.getElementById('reject-btn');
-        
-        let adminMap;
-        let selectedIncident = null;
-
-        aasync function checkAdminAccess() {
-    console.log("Iniciando verificación de acceso de administrador...");
-    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-
-    if (sessionError) {
-        console.error("Error GRAVE al obtener la sesión:", sessionError);
-        loadingScreen.innerHTML = '<p class="text-red-500">Error al obtener sesión.</p>';
-        return;
-    }
-    if (!session || !session.user) {
-        console.log("No se ha encontrado una sesión de usuario válida. Redirigiendo al inicio.");
-        window.location.href = '/';
-        return;
-    }
-
-    console.log("Sesión encontrada. ID de usuario a verificar:", session.user.id);
-
-    const { data: profile, error: profileError } = await supabase
-        .from('profiles')
-        .select('role')
-        .eq('id', session.user.id)
-        .single();
-
-    // --- ¡ESTOS SON LOS CHIVATOS IMPORTANTES! ---
-    console.log("Resultado de la consulta a la tabla 'profiles':", profile);
-    console.log("Error de la consulta a la tabla 'profiles':", profileError);
-
-    if (profile) {
-        console.log("Perfil encontrado. El rol es:", profile.role);
-        console.log("¿El rol es 'admin'?", profile.role === 'admin');
-    } else {
-        console.log("ATENCIÓN: No se encontró ningún perfil en la base de datos para este ID de usuario.");
-    }
-
-    // Lógica original de acceso
-    if (profileError || !profile || profile.role !== 'admin') {
-        console.warn("Acceso DENEGADO. Condiciones:", {
-            "Hay error?": !!profileError,
-            "Existe el perfil?": !!profile,
-            "Es admin?": profile ? profile.role === 'admin' : false
-        });
-        loadingScreen.innerHTML = '<p class="text-red-500">Acceso Denegado. Debes ser administrador.</p>';
-        // No redirigimos para poder ver los logs
-        // setTimeout(() => window.location.href = '/', 3000); 
-    } else {
-        console.log("¡Acceso CONCEDIDO! Cargando panel...");
-        loadingScreen.classList.add('hidden');
-        adminPanel.classList.remove('hidden');
-        initAdminPanel();
-    }
-}
-        async function fetchIncidents() {
-            incidentsList.innerHTML = '<div class="flex justify-center items-center"><div class="spinner"></div></div>';
-            const { data: incidents, error } = await supabase
-                .from('incidents')
-                .select('*')
-                .eq('status', 'nuevo')
-                .order('created_at', { ascending: true });
-
-            if (error) {
-                console.error('Error fetching incidents:', error);
-                incidentsList.innerHTML = '<p class="text-red-500">Error al cargar incidencias.</p>';
-                return;
-            }
-
-            incidentsList.innerHTML = '';
-            if (incidents.length === 0) {
-                 incidentsList.innerHTML = '<p>¡No hay incidencias nuevas pendientes!</p>';
-            }
-            incidents.forEach(incident => {
-                const item = document.createElement('div');
-                item.className = 'incident-item p-3 rounded-lg cursor-pointer hover:bg-gray-700 transition-colors';
-                item.dataset.incidentId = incident.id;
-                item.innerHTML = `
-                    <p class="font-semibold truncate">${incident.description}</p>
-                    <p class="text-sm text-gray-400">Ciudad: ${incident.city || 'Desconocida'}</p>
-                `;
-                item.addEventListener('click', () => selectIncident(incident));
-                incidentsList.appendChild(item);
-            });
-        }
-
-        function selectIncident(incident) {
-            selectedIncident = incident;
-            approveBtn.disabled = false;
-            rejectBtn.disabled = false;
-
-            document.querySelectorAll('.incident-item').forEach(item => {
-                item.classList.toggle('selected', item.dataset.incidentId == incident.id);
-            });
-
-            detailsTitle.classList.add('hidden');
-            detailsContent.classList.remove('hidden');
+            const loadingScreen = document.getElementById('loading-screen');
+            const adminPanel = document.getElementById('admin-panel');
+            const incidentsList = document.getElementById('incidents-list');
+            const detailsTitle = document.getElementById('details-title');
+            const detailsContent = document.getElementById('details-content');
+            const incidentDescription = document.getElementById('incident-description');
+            const osmNameInput = document.getElementById('osm-name-input');
+            const displayNameInput = document.getElementById('display-name-input');
+            const approveBtn = document.getElementById('approve-btn');
+            const rejectBtn = document.getElementById('reject-btn');
             
-            incidentDescription.textContent = incident.description;
-            
-            const match = incident.description.match(/["'](.*?)["']/) || incident.description.match(/calle (.*?)(?:\s|$)/i);
-            const guessedName = match ? (match[1].startsWith('C.') ? match[1].replace('C. ', 'Calle ') : `Calle ${match[1]}`) : '';
-            osmNameInput.value = guessedName;
-            displayNameInput.value = guessedName.toUpperCase();
+            let adminMap;
+            let selectedIncident = null;
 
-            const points = incident.zone_points.split(';').map(p => {
-                const [lat, lng] = p.split(',');
-                return [parseFloat(lat), parseFloat(lng)];
-            });
-
-            adminMap.eachLayer(layer => {
-                if (layer instanceof L.Polygon) adminMap.removeLayer(layer);
-            });
-            
-            const polygon = L.polygon(points, {color: '#3b82f6'}).addTo(adminMap);
-            adminMap.fitBounds(polygon.getBounds(), {padding: [50, 50]});
-        }
-        
-        // Esta función llamará a una API segura en el backend
-        async function resolveIncident(action) {
-            if (!selectedIncident) return;
-
-            const osmName = osmNameInput.value.trim();
-            const displayName = displayNameInput.value.trim();
-
-            if (action === 'approve' && (osmName === '' || displayName === '')) {
-                alert('Por favor, completa ambos nombres de calle para aprobar.');
-                return;
-            }
-            
-            approveBtn.disabled = true;
-            rejectBtn.disabled = true;
-            approveBtn.innerHTML = '<div class="spinner"></div>';
-
-            try {
+            async function checkAdminAccess() {
                 const { data: { session } } = await supabase.auth.getSession();
-                const response = await fetch('/api/resolveIncident', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${session.access_token}`
-                    },
-                    body: JSON.stringify({
-                        incidentId: selectedIncident.id,
-                        action: action,
-                        osmName: osmName,
-                        displayName: displayName,
-                        city: selectedIncident.city
-                    })
-                });
-
-                if (!response.ok) {
-                    const errorData = await response.json();
-                    throw new Error(errorData.error || 'Error del servidor');
+                if (!session || !session.user) {
+                    window.location.href = '/';
+                    return;
                 }
-                
-                alert(`Incidencia marcada como ${action === 'approve' ? 'resuelta' : 'rechazada'}.`);
-                resetDetailsPanel();
-                fetchIncidents();
 
-            } catch (error) {
-                console.error('Error resolving incident:', error);
-                alert('Error al procesar la incidencia: ' + error.message);
-            } finally {
+                const { data: profile, error } = await supabase
+                    .from('profiles')
+                    .select('role')
+                    .eq('id', session.user.id)
+                    .single();
+
+                if (error || !profile || profile.role !== 'admin') {
+                    loadingScreen.innerHTML = '<p class="text-red-500">Acceso Denegado. Debes ser administrador.</p>';
+                    setTimeout(() => window.location.href = '/', 2000);
+                } else {
+                    loadingScreen.classList.add('hidden');
+                    adminPanel.classList.remove('hidden');
+                    initAdminPanel();
+                }
+            }
+
+            async function fetchIncidents() {
+                incidentsList.innerHTML = '<div class="flex justify-center items-center"><div class="spinner"></div></div>';
+                const { data: incidents, error } = await supabase
+                    .from('incidents')
+                    .select('*')
+                    .eq('status', 'nuevo')
+                    .order('created_at', { ascending: true });
+
+                if (error) {
+                    console.error('Error fetching incidents:', error);
+                    incidentsList.innerHTML = '<p class="text-red-500">Error al cargar incidencias.</p>';
+                    return;
+                }
+
+                incidentsList.innerHTML = '';
+                if (incidents.length === 0) {
+                     incidentsList.innerHTML = '<p>¡No hay incidencias nuevas pendientes!</p>';
+                }
+                incidents.forEach(incident => {
+                    const item = document.createElement('div');
+                    item.className = 'incident-item p-3 rounded-lg cursor-pointer hover:bg-gray-700 transition-colors';
+                    item.dataset.incidentId = incident.id;
+                    item.innerHTML = `
+                        <p class="font-semibold truncate">${incident.description}</p>
+                        <p class="text-sm text-gray-400">Ciudad: ${incident.city || 'Desconocida'}</p>
+                    `;
+                    item.addEventListener('click', () => selectIncident(incident));
+                    incidentsList.appendChild(item);
+                });
+            }
+
+            function selectIncident(incident) {
+                selectedIncident = incident;
                 approveBtn.disabled = false;
                 rejectBtn.disabled = false;
-                approveBtn.innerHTML = 'Aprobar y Mapear';
+
+                document.querySelectorAll('.incident-item').forEach(item => {
+                    item.classList.toggle('selected', item.dataset.incidentId == incident.id);
+                });
+
+                detailsTitle.classList.add('hidden');
+                detailsContent.classList.remove('hidden');
+                
+                incidentDescription.textContent = incident.description;
+                
+                const match = incident.description.match(/["'](.*?)["']/) || incident.description.match(/calle (.*?)(?:\s|$)/i);
+                const guessedName = match ? (match[1].startsWith('C.') ? match[1].replace('C. ', 'Calle ') : `Calle ${match[1]}`) : '';
+                osmNameInput.value = guessedName;
+                displayNameInput.value = guessedName.toUpperCase();
+
+                const points = incident.zone_points.split(';').map(p => {
+                    const [lat, lng] = p.split(',');
+                    return [parseFloat(lat), parseFloat(lng)];
+                });
+
+                if(adminMap.drawnItems) {
+                    adminMap.drawnItems.clearLayers();
+                } else {
+                    adminMap.drawnItems = new L.FeatureGroup();
+                    adminMap.addLayer(adminMap.drawnItems);
+                }
+                
+                const polygon = L.polygon(points, {color: '#3b82f6'}).addTo(adminMap.drawnItems);
+                adminMap.fitBounds(polygon.getBounds(), {padding: [50, 50]});
             }
-        }
-        
-        function resetDetailsPanel() {
-            selectedIncident = null;
-            approveBtn.disabled = true;
-            rejectBtn.disabled = true;
-            detailsTitle.classList.remove('hidden');
-            detailsContent.classList.add('hidden');
-            osmNameInput.value = '';
-            displayNameInput.value = '';
-            adminMap.eachLayer(layer => {
-                if (layer instanceof L.Polygon) adminMap.removeLayer(layer);
-            });
-        }
-
-        function initAdminPanel() {
-            adminMap = L.map('admin-map');
-            L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-                attribution: '© OpenStreetMap contributors, © CARTO'
-            }).addTo(adminMap);
-            fetchIncidents();
             
-            approveBtn.addEventListener('click', () => resolveIncident('approve'));
-            rejectBtn.addEventListener('click', () => resolveIncident('reject'));
-        }
+            async function resolveIncident(action) {
+                if (!selectedIncident) return;
 
-        checkAdminAccess();
+                const osmName = osmNameInput.value.trim();
+                const displayName = displayNameInput.value.trim();
+
+                if (action === 'approve' && (osmName === '' || displayName === '')) {
+                    alert('Por favor, completa ambos nombres de calle para aprobar.');
+                    return;
+                }
+                
+                approveBtn.disabled = true;
+                rejectBtn.disabled = true;
+                approveBtn.innerHTML = '<div class="spinner"></div>';
+
+                try {
+                    const { data: { session } } = await supabase.auth.getSession();
+                    const response = await fetch('/api/resolveIncident', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${session.access_token}`
+                        },
+                        body: JSON.stringify({
+                            incidentId: selectedIncident.id,
+                            action: action,
+                            osmName: osmName,
+                            displayName: displayName,
+                            city: selectedIncident.city
+                        })
+                    });
+
+                    if (!response.ok) {
+                        const errorData = await response.json();
+                        throw new Error(errorData.error || 'Error del servidor');
+                    }
+                    
+                    alert(`Incidencia marcada como ${action === 'approve' ? 'resuelta' : 'rechazada'}.`);
+                    resetDetailsPanel();
+                    fetchIncidents();
+
+                } catch (error) {
+                    console.error('Error resolving incident:', error);
+                    alert('Error al procesar la incidencia: ' + error.message);
+                } finally {
+                    approveBtn.disabled = false;
+                    rejectBtn.disabled = false;
+                    approveBtn.innerHTML = 'Aprobar y Mapear';
+                }
+            }
+            
+            function resetDetailsPanel() {
+                selectedIncident = null;
+                approveBtn.disabled = true;
+                rejectBtn.disabled = true;
+                detailsTitle.classList.remove('hidden');
+                detailsContent.classList.add('hidden');
+                osmNameInput.value = '';
+                displayNameInput.value = '';
+                if(adminMap.drawnItems) {
+                    adminMap.drawnItems.clearLayers();
+                }
+            }
+
+            function initAdminPanel() {
+                adminMap = L.map('admin-map');
+                L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+                    attribution: '© OpenStreetMap contributors, © CARTO'
+                }).addTo(adminMap);
+                fetchIncidents();
+                
+                approveBtn.addEventListener('click', () => resolveIncident('approve'));
+                rejectBtn.addEventListener('click', () => resolveIncident('reject'));
+            }
+
+            checkAdminAccess();
+        });
     </script>
 </body>
 </html>

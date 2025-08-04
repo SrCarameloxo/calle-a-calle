@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin - Calle a Calle</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        body { background-color: #111827; color: #d1d5db; }
+        .incident-item.selected { background-color: #3b82f6; color: white; }
+    </style>
+</head>
+<body class="font-sans">
+
+    <div id="loading-screen" class="fixed inset-0 bg-gray-900 flex items-center justify-center z-50">
+        <p>Verificando acceso...</p>
+    </div>
+
+    <div id="admin-panel" class="hidden h-screen w-screen grid grid-cols-1 md:grid-cols-3 gap-4 p-4">
+        <div class="flex flex-col bg-gray-800 rounded-lg p-4 overflow-y-auto">
+            <h1 class="text-2xl font-bold mb-4 border-b border-gray-700 pb-2">Incidencias Reportadas</h1>
+            <div id="incidents-list" class="space-y-2">
+                </div>
+        </div>
+
+        <div id="details-panel" class="md:col-span-2 flex flex-col bg-gray-800 rounded-lg p-4">
+            <h2 id="details-title" class="text-xl font-semibold text-gray-400">Selecciona una incidencia para revisarla</h2>
+            <div id="details-content" class="hidden flex-grow grid grid-rows-2 gap-4 mt-4">
+                <div id="admin-map" class="bg-gray-700 rounded-md"></div>
+                <div class="bg-gray-700 rounded-md p-4 flex flex-col justify-between">
+                    <div>
+                        <p class="text-sm text-gray-400">Descripción del usuario:</p>
+                        <p id="incident-description" class="bg-gray-800 p-2 rounded-md my-2"></p>
+                        <label for="street-name-input" class="text-sm text-gray-400">Nombre Oficial de la Calle (de OSM):</label>
+                        <input type="text" id="street-name-input" class="w-full bg-gray-900 border border-gray-600 rounded-md p-2 mt-1 text-white focus:ring-blue-500 focus:border-blue-500">
+                    </div>
+                    <div class="flex gap-4 mt-4">
+                        <button id="approve-btn" class="flex-1 bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg transition-colors">Aprobar e Incluir</button>
+                        <button id="reject-btn" class="flex-1 bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg transition-colors">Rechazar Incidencia</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        const SUPABASE_URL = 'https://hppzwfwtedghpsxfonoh.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhwcHp3Znd0ZWRnaHBzeGZvbm9oIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQxMjQzNDMsImV4cCI6MjA2OTcwMDM0M30.BAh6i5iJ5YkDBoydfkC9azAD4eMdYBkEBdxws9kj5Hg';
+        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        const loadingScreen = document.getElementById('loading-screen');
+        const adminPanel = document.getElementById('admin-panel');
+        const incidentsList = document.getElementById('incidents-list');
+        const detailsPanel = document.getElementById('details-panel');
+        const detailsTitle = document.getElementById('details-title');
+        const detailsContent = document.getElementById('details-content');
+        const incidentDescription = document.getElementById('incident-description');
+        const streetNameInput = document.getElementById('street-name-input');
+        const approveBtn = document.getElementById('approve-btn');
+        const rejectBtn = document.getElementById('reject-btn');
+        
+        let adminMap;
+        let selectedIncident = null;
+
+        async function checkAdminAccess() {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (!session) {
+                window.location.href = '/'; // Redirigir si no hay sesión
+                return;
+            }
+
+            const { data: profile, error } = await supabase
+                .from('profiles')
+                .select('role')
+                .eq('id', session.user.id)
+                .single();
+
+            if (error || !profile || profile.role !== 'admin') {
+                loadingScreen.innerHTML = '<p class="text-red-500">Acceso Denegado. Debes ser administrador.</p>';
+                setTimeout(() => window.location.href = '/', 2000);
+            } else {
+                loadingScreen.classList.add('hidden');
+                adminPanel.classList.remove('hidden');
+                initAdminPanel();
+            }
+        }
+
+        async function fetchIncidents() {
+            const { data: incidents, error } = await supabase
+                .from('incidents')
+                .select('*')
+                .eq('status', 'nuevo')
+                .order('created_at', { ascending: true });
+
+            if (error) {
+                console.error('Error fetching incidents:', error);
+                incidentsList.innerHTML = '<p class="text-red-500">Error al cargar incidencias.</p>';
+                return;
+            }
+
+            incidentsList.innerHTML = '';
+            if (incidents.length === 0) {
+                 incidentsList.innerHTML = '<p>¡No hay incidencias nuevas!</p>';
+            }
+            incidents.forEach(incident => {
+                const item = document.createElement('div');
+                item.className = 'incident-item p-3 rounded-lg cursor-pointer hover:bg-gray-700';
+                item.dataset.incidentId = incident.id;
+                item.innerHTML = `
+                    <p class="font-semibold truncate">${incident.description}</p>
+                    <p class="text-sm text-gray-400">Ciudad: ${incident.city || 'Desconocida'}</p>
+                `;
+                item.addEventListener('click', () => selectIncident(incident));
+                incidentsList.appendChild(item);
+            });
+        }
+
+        function selectIncident(incident) {
+            selectedIncident = incident;
+            
+            // Marcar como seleccionado en la lista
+            document.querySelectorAll('.incident-item').forEach(item => {
+                item.classList.toggle('selected', item.dataset.incidentId == incident.id);
+            });
+
+            detailsTitle.classList.add('hidden');
+            detailsContent.classList.remove('hidden');
+            
+            incidentDescription.textContent = incident.description;
+            
+            // Auto-rellenado inteligente (simple)
+            const match = incident.description.match(/["'](.*?)["']/) || incident.description.match(/calle (.*?)(?:\s|$)/i);
+            streetNameInput.value = match ? (match[1].startsWith('C.') ? match[1].replace('C. ', 'Calle ') : `Calle ${match[1]}`) : '';
+
+
+            const points = incident.zone_points.split(';').map(p => {
+                const [lat, lng] = p.split(',');
+                return [parseFloat(lat), parseFloat(lng)];
+            });
+            
+            const polygon = L.polygon(points);
+            adminMap.fitBounds(polygon.getBounds());
+            polygon.addTo(adminMap);
+        }
+
+        async function resolveIncident(action) {
+            if (!selectedIncident) return;
+            const streetName = streetNameInput.value.trim();
+
+            if (action === 'approve' && streetName === '') {
+                alert('Por favor, introduce el nombre oficial de la calle.');
+                return;
+            }
+            
+            approveBtn.disabled = true;
+            rejectBtn.disabled = true;
+
+            try {
+                if (action === 'approve') {
+                    const { error: overrideError } = await supabase.from('street_overrides').insert({
+                        osm_name: streetName,
+                        city: selectedIncident.city,
+                        action: 'force_include'
+                    });
+                    if (overrideError) throw overrideError;
+                }
+
+                const { error: updateError } = await supabase
+                    .from('incidents')
+                    .update({ status: action === 'approve' ? 'resuelta' : 'rechazada' })
+                    .eq('id', selectedIncident.id);
+                if (updateError) throw updateError;
+                
+                alert(`Incidencia marcada como ${action === 'approve' ? 'resuelta' : 'rechazada'}.`);
+                resetDetailsPanel();
+                fetchIncidents();
+
+            } catch (error) {
+                console.error('Error resolving incident:', error);
+                alert('Error al procesar la incidencia.');
+            } finally {
+                approveBtn.disabled = false;
+                rejectBtn.disabled = false;
+            }
+        }
+        
+        function resetDetailsPanel() {
+            selectedIncident = null;
+            detailsTitle.classList.remove('hidden');
+            detailsContent.classList.add('hidden');
+            streetNameInput.value = '';
+            // Limpiar el mapa
+            adminMap.eachLayer(layer => {
+                if (layer instanceof L.Polygon || layer instanceof L.Marker) {
+                    adminMap.removeLayer(layer);
+                }
+            });
+        }
+
+        function initAdminPanel() {
+            adminMap = L.map('admin-map');
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+                attribution: '© OpenStreetMap contributors, © CARTO'
+            }).addTo(adminMap);
+            fetchIncidents();
+            
+            approveBtn.addEventListener('click', () => resolveIncident('approve'));
+            rejectBtn.addEventListener('click', () => resolveIncident('reject'));
+        }
+
+        checkAdminAccess();
+    </script>
+</body>
+</html>

@@ -1,11 +1,19 @@
-import { createClient } from '@vercel/kv';
+import { createClient } from '@supabase/supabase-js';
+import { createClient as createKvClient } from '@vercel/kv';
 
-const kv = createClient({
+// --- Clientes de Servicios ---
+const kv = createKvClient({
   url: process.env.KV_REST_API_URL,
   token: process.env.KV_REST_API_TOKEN,
 });
 
-// ===== FUNCIONES AUXILIARES (COMPLETAS) =====
+const supabaseAdmin = createClient(
+    process.env.SUPABASE_URL,
+    process.env.SUPABASE_SERVICE_ROLE_KEY
+);
+
+
+// --- Funciones Auxiliares ---
 
 function calculateOptimalSearch(zonePoints) {
   if (zonePoints.length === 0) return { center: { lat: 0, lng: 0 }, radius: 1500 };
@@ -40,27 +48,32 @@ function levenshtein(a, b) {
   return matrix[a.length][b.length];
 }
 
-async function geocode(pt) {
-  const apiKey = process.env.GOOGLE_API_KEY;
+async function geocode(pt, apiKey) {
   const res = await fetch(`https://maps.googleapis.com/maps/api/geocode/json?latlng=${pt.lat},${pt.lng}&key=${apiKey}`);
   const js = await res.json();
   if (js.status !== 'OK' || js.results.length === 0) return null;
   const result = js.results[0];
   const routeComp = result.address_components.find(c => c.types.includes('route'));
-  if (routeComp) return { name: routeComp.long_name.toUpperCase(), loc: result.geometry.location };
+  if (routeComp) return { name: routeComp.long_name.toUpperCase(), city: getCityFromResult(result) };
+  
   const nameFromAddress = result.formatted_address.split(',')[0].toUpperCase();
   const forbiddenNames = ['BADAJOZ', 'ESPAÑA', '06001', '06002', '06003', '06004', '06005', '06006', '06007', '06008', '06009', '06010', '06011', '06012'];
   if (nameFromAddress && !forbiddenNames.some(fn => nameFromAddress.includes(fn))) {
-     return { name: nameFromAddress, loc: result.geometry.location };
+     return { name: nameFromAddress, city: getCityFromResult(result) };
   }
   return null;
+}
+
+function getCityFromResult(result) {
+    const cityComponent = result.address_components.find(c => c.types.includes('locality'));
+    return cityComponent ? cityComponent.long_name : null;
 }
 
 function extractNameParts(name) {
     const streetTypeWords = new Set(['AV', 'AV.', 'AVDA', 'AVENIDA', 'CALLE', 'C', 'C.', 'C/', 'PASEO', 'Pº', 'P°', 'PLAZA', 'PL.', 'PZ', 'PUENTE', 'CAMINO', 'CAÑADA', 'CALLEJA', 'CALLEJON', 'PARQUE', 'JARDIN', 'POLIGONO', 'URBANIZACION', 'RONDA']);
     const typeSynonymMap = { 'C': 'CALLE', 'C.': 'CALLE', 'C/': 'CALLE', 'AV': 'AVENIDA', 'AV.': 'AVENIDA', 'AVDA': 'AVENIDA', 'Pº': 'PASEO', 'P°': 'PASEO', 'PL': 'PLAZA', 'PL.': 'PLAZA', 'PZ': 'PLAZA' };
     const stopWords = new Set(['DE', 'DEL', 'LA', 'LAS', 'LOS', 'EL', 'Y']);
-    const normalized = name.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase();
+    const normalized = name.normalize('NFD').replace(/[\u0300-\u36f]/g, '').toUpperCase();
     const words = normalized.split(/[^A-Z0-9]+/).filter(Boolean);
     const foundType = words.find(w => streetTypeWords.has(w)) || null;
     let canonicalType = foundType;
@@ -71,36 +84,64 @@ function extractNameParts(name) {
     return { type: canonicalType, baseName: baseWords.join(' ') };
 }
 
-// --- Handler principal con la nueva lógica de depuración ---
+// --- Handler Principal ---
 export default async function handler(request, response) {
-  const { zone } = request.query;
-  if (!zone) return response.status(400).json({ error: 'Faltan los puntos de la zona.' });
-  
-  const zonePoints = zone.split(';').map(pair => {
-    const [lat, lng] = pair.split(',');
-    return { lat: parseFloat(lat), lng: parseFloat(lng) };
-  });
-
   try {
+    const { zone } = request.query;
+    if (!zone) return response.status(400).json({ error: 'Faltan los puntos de la zona.' });
+    
+    const zonePoints = zone.split(';').map(pair => {
+      const [lat, lng] = pair.split(',');
+      return { lat: parseFloat(lat), lng: parseFloat(lng) };
+    });
+
     const { center, radius } = calculateOptimalSearch(zonePoints);
 
+    // 1. Determinar la ciudad de la zona
+    const geoResult = await geocode(center, process.env.GOOGLE_API_KEY);
+    const currentCity = geoResult ? geoResult.city : null;
+
+    // 2. Cargar las reglas de anulación de la base de datos
+    let overrideRules = new Map();
+    if (currentCity) {
+        const { data: overrides, error } = await supabaseAdmin.from('street_overrides').select('osm_name, action').eq('city', currentCity);
+        if (error) console.warn("No se pudieron cargar las reglas de anulación:", error.message);
+        else overrides.forEach(rule => overrideRules.set(rule.osm_name, rule.action));
+    }
+
+    // 3. Obtener calles de OpenStreetMap
     const coords = zonePoints.map(p => `${p.lat} ${p.lng}`).join(' ');
     let query = `[out:json][timeout:25]; way(poly:"${coords}")["name"]; out tags;`;
     let res = await fetch('https://overpass-api.de/api/interpreter', { method: 'POST', body: query });
+    if (!res.ok) throw new Error(`Overpass API error 1: ${res.statusText}`);
     let js = await res.json();
     const streetNamesInPoly = new Set(js.elements.map(el => el.tags.name));
     
-    console.log('Calles encontradas en OSM:', Array.from(streetNamesInPoly));
-
     let streetList = [];
     const seenGoogleNames = new Set();
     const allOsmBaseNames = new Set(Array.from(streetNamesInPoly).map(name => extractNameParts(name).baseName));
 
+    // 4. Procesar cada calle
     for (const osmName of streetNamesInPoly) {
-      // ===== CAMBIO: AHORA ESPIAMOS A MARIPOSA Y GORRIÓN =====
-      const isTargetStreet = osmName.toUpperCase().includes('MARIPOSA') || osmName.toUpperCase().includes('GORRIÓN');
-      if (isTargetStreet) console.log(`\n--- PROCESANDO AHORA: ${osmName} ---`);
+      const rule = overrideRules.get(osmName);
 
+      if (rule === 'force_exclude') {
+          continue; // Saltar esta calle por regla
+      }
+
+      const cacheKey = `street:${osmName.toUpperCase().replace(/\s/g, '_')}`;
+      if (rule !== 'force_include') { // Solo usar caché si no forzamos la inclusión (para poder actualizarla)
+        let cachedStreet = await kv.get(cacheKey);
+        if (cachedStreet) {
+            if (!seenGoogleNames.has(cachedStreet.googleName)) {
+                seenGoogleNames.add(cachedStreet.googleName);
+                streetList.push(cachedStreet);
+            }
+            continue; // Ir a la siguiente calle
+        }
+      }
+
+      // Obtener geometría de la calle completa
       query = `[out:json][timeout:25]; way["name"="${osmName}"](around:${radius}, ${center.lat}, ${center.lng}); out body; >; out skel qt;`;
       res = await fetch('https://overpass-api.de/api/interpreter', { method: 'POST', body: query });
       js = await res.json();
@@ -111,53 +152,63 @@ export default async function handler(request, response) {
           return { points: nodes.map(n => [n.lat, n.lon]), isClosed: nodes.length > 2 && nodes[0]?.id === nodes[nodes.length - 1]?.id };
       }).filter(g => g.points.length > 1);
 
-      if (isTargetStreet) console.log(`[${osmName.toUpperCase()}] Geometría encontrada: ${geometries.length > 0 ? 'Sí' : 'No'}`);
+      if (geometries.length === 0) continue;
 
-      if (geometries.length > 0) {
-          const samplePoints = geometries.flatMap(g => g.points).filter((_, i, arr) => i % Math.max(1, Math.floor(arr.length / 5)) === 0).map(p => ({ lat: p[0], lng: p[1] }));
-          const geocodedResults = await Promise.all(samplePoints.map(pt => geocode(pt)));
-          const geocodedNames = geocodedResults.filter(Boolean).map(geo => geo.name);
+      // Si la regla es forzar inclusión, confiamos en OSM y nos saltamos la validación de Google
+      if (rule === 'force_include') {
+          if (!seenGoogleNames.has(osmName)) {
+              const newStreet = { googleName: osmName.toUpperCase(), geometries: geometries };
+              seenGoogleNames.add(osmName.toUpperCase());
+              streetList.push(newStreet);
+              await kv.set(cacheKey, newStreet, { ex: 60 * 60 * 24 * 30 });
+          }
+          continue;
+      }
+      
+      // Proceso de validación normal con Google
+      const samplePoints = geometries.flatMap(g => g.points).filter((_, i, arr) => i % Math.max(1, Math.floor(arr.length / 5)) === 0).map(p => ({ lat: p[0], lng: p[1] }));
+      const geocodedResults = await Promise.all(samplePoints.map(pt => geocode(pt, process.env.GOOGLE_API_KEY)));
+      const geocodedNames = geocodedResults.filter(Boolean).map(geo => geo.name);
 
-          if (geocodedNames.length > 0) {
-              const nameCounts = geocodedNames.reduce((acc, name) => { acc[name] = (acc[name] || 0) + 1; return acc; }, {});
-              const mostCommonGoogleName = Object.keys(nameCounts).reduce((a, b) => nameCounts[a] > nameCounts[b] ? a : b);
-              
-              if (isTargetStreet) console.log(`[${osmName.toUpperCase()}] Nombre más común según Google:`, mostCommonGoogleName);
+      if (geocodedNames.length > 0) {
+          const nameCounts = geocodedNames.reduce((acc, name) => { acc[name] = (acc[name] || 0) + 1; return acc; }, {});
+          const mostCommonGoogleName = Object.keys(nameCounts).reduce((a, b) => nameCounts[a] > nameCounts[b] ? a : b);
+          
+          const osmParts = extractNameParts(osmName);
+          const googleParts = extractNameParts(mostCommonGoogleName);
+          
+          let isMatch = false;
+          let finalName = mostCommonGoogleName;
 
-              const osmParts = extractNameParts(osmName);
-              const googleParts = extractNameParts(mostCommonGoogleName);
-              
-              let isMatch = false;
-              let finalName = mostCommonGoogleName;
+          // Nivel 1: Coincidencia Exacta
+          if (osmParts.baseName && osmParts.baseName === googleParts.baseName) {
+              isMatch = true;
+          } 
+          // Nivel 2: Coincidencia por Similitud (> 85%)
+          else if (osmParts.baseName && googleParts.baseName) {
+              const distance = levenshtein(osmParts.baseName, googleParts.baseName);
+              const similarity = 1 - distance / Math.max(osmParts.baseName.length, googleParts.baseName.length);
+              if (similarity > 0.85) isMatch = true;
+          }
+          
+          // Nivel 3: Verificación de Confusión en Intersección
+          if (!isMatch && allOsmBaseNames.has(googleParts.baseName)) {
+              isMatch = true;
+              finalName = osmName.toUpperCase();
+          }
 
-              if (osmParts.baseName && osmParts.baseName === googleParts.baseName) isMatch = true;
-              else if (osmParts.baseName && googleParts.baseName) {
-                  const distance = levenshtein(osmParts.baseName, googleParts.baseName);
-                  const similarity = 1 - distance / Math.max(osmParts.baseName.length, googleParts.baseName.length);
-                  if (similarity > 0.85) isMatch = true;
-              }
-              
-              if (!isMatch && allOsmBaseNames.has(googleParts.baseName)) {
-                  isMatch = true;
-                  finalName = osmName;
-              }
-
-              if (isTargetStreet) console.log(`[${osmName.toUpperCase()}] Comparación final: OSM ('${osmParts.baseName}') vs Google ('${googleParts.baseName}'). ¿Coinciden? ${isMatch}`);
-
-              if (isMatch && !seenGoogleNames.has(finalName)) {
-                  const newStreet = { googleName: finalName, geometries: geometries };
-                  seenGoogleNames.add(finalName);
-                  streetList.push(newStreet);
-              }
-          } else {
-              if (isTargetStreet) console.log(`[${osmName.toUpperCase()}] Fallo: Google no devolvió ningún nombre válido para sus coordenadas.`);
+          if (isMatch && !seenGoogleNames.has(finalName)) {
+              const newStreet = { googleName: finalName, geometries: geometries };
+              seenGoogleNames.add(finalName);
+              streetList.push(newStreet);
+              await kv.set(cacheKey, newStreet, { ex: 60 * 60 * 24 * 30 });
           }
       }
     }
     
     response.status(200).json({ streets: streetList });
   } catch (error) {
-    console.error(error);
-    response.status(500).json({ error: 'Error al procesar las calles.', details: error.message });
+    console.error('Error en getStreets:', error.message);
+    response.status(500).json({ error: 'Error interno del servidor.', details: error.message });
   }
 }

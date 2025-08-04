@@ -170,7 +170,7 @@
         }
     }
 
-    .street-reveal-animation path {
+    .street-reveal-animation {
         animation: pulseAndFlash 0.8s ease-out;
     }
     /* ===== FIN: NUEVOS ESTILOS DE ANIMACIÓN ===== */
@@ -249,6 +249,7 @@
 
   <audio id="correct-sound" src="/sounds/correct.mp3" preload="auto"></audio>
   <audio id="incorrect-sound" src="/sounds/incorrect.mp3" preload="auto"></audio>
+
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script>
     window.addEventListener('DOMContentLoaded', () => {
@@ -318,7 +319,6 @@
         }
       }
 
-      // ===== INICIO: NUEVA FUNCIÓN PARA EL FONDO DINÁMICO =====
       function startDynamicBackground(bMap) {
           const initialCenter = bMap.getCenter();
           const startTime = Date.now();
@@ -331,6 +331,7 @@
               const elapsedTime = Date.now() - startTime;
               const dx = Math.sin(elapsedTime * freqX) * ampX;
               const dy = Math.cos(elapsedTime * freqY) * ampY;
+
               bMap.panTo([initialCenter.lat + dy, initialCenter.lng + dx], {
                   animate: true,
                   duration: 1,
@@ -338,15 +339,15 @@
               });
           }, 100);
       }
-      // ===== FIN: NUEVA FUNCIÓN PARA EL FONDO DINÁMICO =====
 
       function initBackgroundMap() {
           if (backgroundMap) return;
           backgroundMap = L.map('background-map', { zoomControl: false, dragging: false, scrollWheelZoom: false, doubleClickZoom: false, touchZoom: false });
           L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager_nolabels/{z}/{x}/{y}{r}.png', { attribution: '', maxZoom: 19 }).addTo(backgroundMap);
           backgroundMap.setView([38.88, -6.97], 15);
-          // Llamamos a la nueva función para que el fondo se mueva
-          startDynamicBackground(backgroundMap);
+          setTimeout(() => {
+              startDynamicBackground(backgroundMap);
+          }, 1000);
       }
       
       function setupMenu() {
@@ -506,28 +507,32 @@
         userMk = L.marker(e.latlng).addTo(gameMap);
         streetGrp = drawStreet(); 
         if(streetGrp){
-          // ===== INICIO: MEJORA DE ANIMACIÓN Y SONIDO =====
-          // Aplicamos la animación de CSS
           try {
-            streetGrp.getLayers().forEach(layer => {
-                const element = layer.getElement();
-                if (element) {
-                    // El elemento SVG necesita la clase para la animación
-                    element.classList.add('street-reveal-animation');
-                }
-            });
-          } catch(e) { console.warn("No se pudo aplicar la animación a la calle."); }
+              streetGrp.eachLayer(layer => {
+                  const element = layer.getElement();
+                  if (element) {
+                      element.classList.add('street-reveal-animation');
+                  }
+              });
+          } catch (e) {
+              console.warn("No se pudo aplicar la animación a la calle.");
+          }
 
           const streetCheck = getDistanceToStreet(userMk.getLatLng(), streetGrp);
           if (streetCheck.distance <= 30) {
             streetsGuessedCorrectly++;
             document.getElementById('fb').textContent = `¡Correcto! Has acertado.`;
-            document.getElementById('correct-sound').play(); // Sonido de acierto
+            const correctSound = document.getElementById('correct-sound');
+            if (correctSound) {
+                correctSound.play().catch(error => console.error("Error al reproducir sonido de acierto:", error));
+            }
           } else {
             document.getElementById('fb').textContent = `Casi, pero no has hecho clic sobre el lugar (a ${Math.round(streetCheck.distance)} metros).`;
-            document.getElementById('incorrect-sound').play(); // Sonido de fallo
+            const incorrectSound = document.getElementById('incorrect-sound');
+            if (incorrectSound) {
+                incorrectSound.play().catch(error => console.error("Error al reproducir sonido de fallo:", error));
+            }
           }
-          // ===== FIN: MEJORA DE ANIMACIÓN Y SONIDO =====
           document.getElementById('score').textContent = `${streetsGuessedCorrectly} / ${totalQuestions}`;
           if (streetCheck.point) {
             guide = L.polyline([userMk.getLatLng(), streetCheck.point], { dashArray:'6 4', color:COL_DASH }).addTo(gameMap);
@@ -625,7 +630,6 @@
         gameMap.off('click', onMapClick);
       }
 
-      // ===== INICIO: NUEVA FUNCIÓN DE RE-CENTRADO =====
       function checkAndRecenterMap() {
           if (!gameMap || !zonePoly) return;
           const mapBounds = gameMap.getBounds();
@@ -634,10 +638,8 @@
               gameMap.flyToBounds(polyBounds, { padding: [50, 50], duration: 1.2 });
           }
       }
-      // ===== FIN: NUEVA FUNCIÓN DE RE-CENTRADO =====
 
       function nextQ(){
-        // Llamamos a la función de re-centrado aquí
         checkAndRecenterMap();
         
         clear();

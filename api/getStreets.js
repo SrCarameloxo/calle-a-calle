@@ -1,5 +1,5 @@
-import { createClient } from '@supabase/supabase-js';
-import { createClient as createKvClient } from '@vercel/kv';
+const { createClient } = require('@supabase/supabase-js');
+const { createClient: createKvClient } = require('@vercel/kv');
 
 // --- Clientes de Servicios ---
 const kv = createKvClient({
@@ -31,7 +31,7 @@ function calculateOptimalSearch(zonePoints) {
   };
   let maxDistance = 0;
   zonePoints.forEach(p => { maxDistance = Math.max(maxDistance, getDistance(center, p)); });
-  return { center, radius: Math.round(maxDistance + 200) }; // Radio máximo + 200m de margen
+  return { center, radius: Math.round(maxDistance + 200) };
 }
 
 function levenshtein(a, b) {
@@ -62,7 +62,6 @@ async function geocode(pt, apiKey) {
   if (routeComp) return { name: routeComp.long_name.toUpperCase(), city: getCityFromResult(result) };
   
   const nameFromAddress = result.formatted_address.split(',')[0].toUpperCase();
-  // Esta lista de nombres prohibidos puede que ya no sea necesaria, pero se mantiene por seguridad
   const forbiddenNames = ['BADAJOZ', 'ESPAÑA', '06001', '06002', '06003', '06004', '06005', '06006', '06007', '06008', '06009', '06010', '06011', '06012'];
   if (nameFromAddress && !forbiddenNames.some(fn => nameFromAddress.includes(fn))) {
      return { name: nameFromAddress, city: getCityFromResult(result) };
@@ -86,7 +85,7 @@ function extractNameParts(name) {
 }
 
 // --- Handler Principal ---
-export default async function handler(request, response) {
+module.exports = async (request, response) => {
   try {
     const { zone } = request.query;
     if (!zone) return response.status(400).json({ error: 'Faltan los puntos de la zona.' });
@@ -98,19 +97,16 @@ export default async function handler(request, response) {
 
     const { center, radius } = calculateOptimalSearch(zonePoints);
 
-    // 1. Determinar la ciudad de la zona para aplicar las reglas correctas
     const geoResult = await geocode(center, process.env.GOOGLE_API_KEY);
     const currentCity = geoResult ? geoResult.city : null;
 
-    // 2. Cargar las reglas de anulación desde Supabase
     const overrideRules = new Map();
     if (currentCity) {
-        const { data: overrides, error } = await supabaseAdmin.from('street_overrides').select('osm_name, display_name, action').eq('city', currentCity);
+        const { data: overrides, error } = await supabaseAdmin.from('street_overrides').select('osm_name, display_name').eq('city', currentCity);
         if (error) console.warn("No se pudieron cargar las reglas de anulación:", error.message);
         else overrides.forEach(rule => overrideRules.set(rule.osm_name, rule));
     }
 
-    // 3. Obtener calles de OpenStreetMap
     const coords = zonePoints.map(p => `${p.lat} ${p.lng}`).join(' ');
     let query = `[out:json][timeout:25]; way(poly:"${coords}")["name"]; out tags;`;
     let res = await fetch('https://overpass-api.de/api/interpreter', { method: 'POST', body: query });
@@ -122,18 +118,13 @@ export default async function handler(request, response) {
     const seenFinalNames = new Set();
     const allOsmBaseNames = new Set(Array.from(streetNamesInPoly).map(name => extractNameParts(name).baseName));
 
-    // 4. Procesar cada calle
     for (const osmName of streetNamesInPoly) {
       const rule = overrideRules.get(osmName);
-
-      if (rule && rule.action === 'force_exclude') {
-          continue; // Saltar esta calle por regla de exclusión
-      }
-
-      const cacheKey = `street_v2:${osmName.toUpperCase().replace(/\s/g, '_')}`;
+      
+      const cacheKey = `street_v3:${osmName.toUpperCase().replace(/\s/g, '_')}`;
       let cachedStreet = await kv.get(cacheKey);
 
-      if (cachedStreet && !rule) { // Solo usar caché si no hay una regla para esta calle
+      if (cachedStreet && !rule) {
         if (!seenFinalNames.has(cachedStreet.googleName)) {
             seenFinalNames.add(cachedStreet.googleName);
             streetList.push(cachedStreet);
@@ -141,7 +132,6 @@ export default async function handler(request, response) {
         continue;
       }
       
-      // Obtener geometría de la calle completa desde OSM
       query = `[out:json][timeout:25]; way["name"="${osmName}"](around:${radius}, ${center.lat}, ${center.lng}); out body; >; out skel qt;`;
       res = await fetch('https://overpass-api.de/api/interpreter', { method: 'POST', body: query });
       js = await res.json();
@@ -155,10 +145,9 @@ export default async function handler(request, response) {
 
       let finalStreet = null;
 
-      if (rule && rule.action === 'force_include') {
+      if (rule) {
           finalStreet = { googleName: rule.display_name.toUpperCase(), geometries: geometries };
       } else {
-          // Proceso de validación normal con Google
           const samplePoints = geometries.flatMap(g => g.points).filter((_, i, arr) => i % Math.max(1, Math.floor(arr.length / 5)) === 0).map(p => ({ lat: p[0], lng: p[1] }));
           const geocodedResults = await Promise.all(samplePoints.map(pt => geocode(pt, process.env.GOOGLE_API_KEY)));
           const geocodedNames = geocodedResults.filter(Boolean).map(geo => geo.name);
@@ -171,20 +160,26 @@ export default async function handler(request, response) {
               const googleParts = extractNameParts(mostCommonGoogleName);
               
               let isMatch = false;
+              let finalNameToUse = mostCommonGoogleName;
 
               // Nivel 1: Coincidencia Exacta
-              if (osmParts.baseName && osmParts.baseName === googleParts.baseName) isMatch = true;
-              // Nivel 2: Coincidencia por Similitud (> 85%)
+              if (osmParts.baseName && osmParts.baseName === googleParts.baseName) {
+                isMatch = true;
+              }
+              // Nivel 2: Coincidencia por Similitud
               else if (osmParts.baseName && googleParts.baseName) {
                   const distance = levenshtein(osmParts.baseName, googleParts.baseName);
                   const similarity = 1 - distance / Math.max(osmParts.baseName.length, googleParts.baseName.length);
                   if (similarity > 0.85) isMatch = true;
               }
-              // Nivel 3: Confusión en Intersección -> RECHAZAR para evitar enseñar datos incorrectos
-              // (Esta lógica ahora es implícita: si no hay match, se rechaza, a menos que un admin lo fuerce)
+              // Nivel 3: Confusión en Intersección
+              if (!isMatch && allOsmBaseNames.has(googleParts.baseName)) {
+                  isMatch = true;
+                  finalNameToUse = osmName.toUpperCase();
+              }
 
               if (isMatch) {
-                  finalStreet = { googleName: mostCommonGoogleName, geometries: geometries };
+                  finalStreet = { googleName: finalNameToUse, geometries: geometries };
               }
           }
       }
@@ -192,7 +187,7 @@ export default async function handler(request, response) {
       if (finalStreet && !seenFinalNames.has(finalStreet.googleName)) {
           seenFinalNames.add(finalStreet.googleName);
           streetList.push(finalStreet);
-          await kv.set(cacheKey, finalStreet, { ex: 60 * 60 * 24 * 30 }); // Cache por 30 días
+          await kv.set(cacheKey, finalStreet, { ex: 60 * 60 * 24 * 30 });
       }
     }
     
@@ -201,4 +196,4 @@ export default async function handler(request, response) {
     console.error('Error en getStreets:', error);
     response.status(500).json({ error: 'Error interno del servidor.', details: error.message });
   }
-}
+};

@@ -1,7 +1,7 @@
-import { createClient } from '@supabase/supabase-js';
+const { createClient } = require('@supabase/supabase-js');
 
 // Esta función se encarga de recibir un reporte de incidencia de forma segura.
-export default async function handler(request, response) {
+module.exports = async (request, response) => {
     // Solo permitimos que esta función se llame con el método POST.
     if (request.method !== 'POST') {
         response.setHeader('Allow', ['POST']);
@@ -12,41 +12,13 @@ export default async function handler(request, response) {
         const { zone_points, description } = request.body;
         
         // --- Verificación de seguridad: Obtener el usuario a partir del token ---
-        const authHeader = request.headers.get('authorization');
+        const authHeader = request.headers.authorization;
         if (!authHeader) {
             return response.status(401).json({ error: 'Authorization header required' });
         }
         const token = authHeader.split('Bearer ')[1];
         
-        // Creamos un cliente de Supabase específico para el servidor, usando la clave de servicio
-        // que SÍ se puede usar de forma segura en el backend.
-        const supabaseAdmin = createClient(
-            process.env.SUPABASE_URL,
-            process.env.SUPABASE_SERVICE_ROLE_KEY
-        );
-
-        const { data: { user }, error: userError } = await import { createClient } from '@supabase/supabase-js';
-
-// Esta función se encarga de recibir un reporte de incidencia de forma segura.
-export default async function handler(request, response) {
-    // Solo permitimos que esta función se llame con el método POST.
-    if (request.method !== 'POST') {
-        response.setHeader('Allow', ['POST']);
-        return response.status(405).json({ error: `Method ${request.method} Not Allowed` });
-    }
-
-    try {
-        const { zone_points, description } = request.body;
-        
-        // --- Verificación de seguridad: Obtener el usuario a partir del token ---
-        const authHeader = request.headers.get('authorization');
-        if (!authHeader) {
-            return response.status(401).json({ error: 'Authorization header required' });
-        }
-        const token = authHeader.split('Bearer ')[1];
-        
-        // Creamos un cliente de Supabase específico para el servidor, usando la clave de servicio
-        // que SÍ se puede usar de forma segura en el backend.
+        // Creamos un cliente de Supabase específico para el servidor
         const supabaseAdmin = createClient(
             process.env.SUPABASE_URL,
             process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -96,4 +68,4 @@ export default async function handler(request, response) {
         console.error('Error en la API reportIncident:', error.message);
         return response.status(500).json({ error: 'Error interno del servidor.' });
     }
-}
+};

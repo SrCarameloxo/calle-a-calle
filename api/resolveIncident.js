@@ -1,8 +1,8 @@
-import { createClient } from '@supabase/supabase-js';
+const { createClient } = require('@supabase/supabase-js');
 
 // Esta API segura solo puede ser llamada por administradores.
 // Su trabajo es actualizar una incidencia y, si es necesario, crear una regla de anulación.
-export default async function handler(request, response) {
+module.exports = async (request, response) => {
     if (request.method !== 'POST') {
         response.setHeader('Allow', ['POST']);
         return response.status(405).json({ error: `Method ${request.method} Not Allowed` });
@@ -15,7 +15,7 @@ export default async function handler(request, response) {
 
     try {
         // --- 1. Verificación de Seguridad: ¿Es el usuario un administrador? ---
-        const authHeader = request.headers.get('authorization');
+        const authHeader = request.headers.authorization;
         if (!authHeader) {
             return response.status(401).json({ error: 'Authorization header required' });
         }
@@ -71,4 +71,4 @@ export default async function handler(request, response) {
         console.error('Error en la API resolveIncident:', error.message);
         return response.status(500).json({ error: 'Error interno del servidor.', details: error.message });
     }
-}
+};

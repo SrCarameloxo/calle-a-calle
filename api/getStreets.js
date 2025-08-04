@@ -5,47 +5,29 @@ const kv = createClient({
   token: process.env.KV_REST_API_TOKEN,
 });
 
-// ===== INICIO: NUEVAS FUNCIONES AUXILIARES =====
+// ===== FUNCIONES AUXILIARES (COMPLETAS) =====
 
-// Función para calcular el radio de búsqueda óptimo
 function calculateOptimalSearch(zonePoints) {
   if (zonePoints.length === 0) return { center: { lat: 0, lng: 0 }, radius: 1500 };
-
   let minLat = Infinity, maxLat = -Infinity, minLng = Infinity, maxLng = -Infinity;
   zonePoints.forEach(p => {
-    minLat = Math.min(minLat, p.lat);
-    maxLat = Math.max(maxLat, p.lat);
-    minLng = Math.min(minLng, p.lng);
-    maxLng = Math.max(maxLng, p.lng);
+    minLat = Math.min(minLat, p.lat); maxLat = Math.max(maxLat, p.lat);
+    minLng = Math.min(minLng, p.lng); maxLng = Math.max(maxLng, p.lng);
   });
-
-  const center = {
-    lat: minLat + (maxLat - minLat) / 2,
-    lng: minLng + (maxLng - minLng) / 2
-  };
-
+  const center = { lat: minLat + (maxLat - minLat) / 2, lng: minLng + (maxLng - minLng) / 2 };
   const getDistance = (p1, p2) => {
-    const R = 6371e3; // Radio de la Tierra en metros
-    const φ1 = p1.lat * Math.PI / 180;
-    const φ2 = p2.lat * Math.PI / 180;
+    const R = 6371e3;
+    const φ1 = p1.lat * Math.PI / 180, φ2 = p2.lat * Math.PI / 180;
     const Δλ = (p2.lng - p1.lng) * Math.PI / 180;
     return Math.acos(Math.sin(φ1) * Math.sin(φ2) + Math.cos(φ1) * Math.cos(φ2) * Math.cos(Δλ)) * R;
   };
-  
   let maxDistance = 0;
-  zonePoints.forEach(p => {
-    const distance = getDistance(center, p);
-    maxDistance = Math.max(maxDistance, distance);
-  });
-
-  const radius = Math.round(maxDistance + 200); // Radio máximo + 200m de margen
-  return { center, radius };
+  zonePoints.forEach(p => { maxDistance = Math.max(maxDistance, getDistance(center, p)); });
+  return { center, radius: Math.round(maxDistance + 200) };
 }
 
-// Función para calcular la similitud entre dos textos (Distancia de Levenshtein)
 function levenshtein(a, b) {
-  if (a.length === 0) return b.length;
-  if (b.length === 0) return a.length;
+  if (a.length === 0) return b.length; if (b.length === 0) return a.length;
   const matrix = Array(a.length + 1).fill(null).map(() => Array(b.length + 1).fill(null));
   for (let i = 0; i <= b.length; i++) matrix[0][i] = i;
   for (let j = 0; j <= a.length; j++) matrix[j][0] = j;
@@ -58,10 +40,6 @@ function levenshtein(a, b) {
   return matrix[a.length][b.length];
 }
 
-// ===== FIN: NUEVAS FUNCIONES AUXILIARES =====
-
-
-// --- Funciones existentes (geocode y extractNameParts) ---
 async function geocode(pt) {
   const apiKey = process.env.GOOGLE_API_KEY;
   const res = await fetch(`https://maps.googleapis.com/maps/api/geocode/json?latlng=${pt.lat},${pt.lng}&key=${apiKey}`);
@@ -93,8 +71,7 @@ function extractNameParts(name) {
     return { type: canonicalType, baseName: baseWords.join(' ') };
 }
 
-
-// --- Handler principal con la nueva lógica ---
+// --- Handler principal con la nueva lógica de depuración ---
 export default async function handler(request, response) {
   const { zone } = request.query;
   if (!zone) return response.status(400).json({ error: 'Faltan los puntos de la zona.' });
@@ -110,85 +87,77 @@ export default async function handler(request, response) {
     const coords = zonePoints.map(p => `${p.lat} ${p.lng}`).join(' ');
     let query = `[out:json][timeout:25]; way(poly:"${coords}")["name"]; out tags;`;
     let res = await fetch('https://overpass-api.de/api/interpreter', { method: 'POST', body: query });
-    if (!res.ok) throw new Error(`Overpass API error 1: ${res.statusText}`);
     let js = await res.json();
     const streetNamesInPoly = new Set(js.elements.map(el => el.tags.name));
     
+    console.log('Calles encontradas en OSM:', Array.from(streetNamesInPoly));
+
     let streetList = [];
     const seenGoogleNames = new Set();
     const allOsmBaseNames = new Set(Array.from(streetNamesInPoly).map(name => extractNameParts(name).baseName));
 
     for (const osmName of streetNamesInPoly) {
-      const cacheKey = `street:${osmName.toUpperCase().replace(/\s/g, '_')}`;
-      let cachedStreet = await kv.get(cacheKey);
+      // ===== CAMBIO: AHORA ESPIAMOS A MARIPOSA Y GORRIÓN =====
+      const isTargetStreet = osmName.toUpperCase().includes('MARIPOSA') || osmName.toUpperCase().includes('GORRIÓN');
+      if (isTargetStreet) console.log(`\n--- PROCESANDO AHORA: ${osmName} ---`);
 
-      if (cachedStreet) {
-        if (!seenGoogleNames.has(cachedStreet.googleName)) {
-          seenGoogleNames.add(cachedStreet.googleName);
-          streetList.push(cachedStreet);
-        }
-      } else {
-        query = `[out:json][timeout:25]; way["name"="${osmName}"](around:${radius}, ${center.lat}, ${center.lng}); out body; >; out skel qt;`;
-        res = await fetch('https://overpass-api.de/api/interpreter', { method: 'POST', body: query });
-        if (!res.ok) throw new Error(`Overpass API error 2: ${res.statusText}`);
-        js = await res.json();
-        
-        const elementsById = js.elements.reduce((acc, el) => { acc[el.id] = el; return acc; }, {});
-        const geometries = js.elements.filter(el => el.type === 'way').map(el => {
-            const nodes = (el.nodes || []).map(id => elementsById[id]).filter(Boolean);
-            const points = nodes.map(n => [n.lat, n.lon]);
-            const isClosed = nodes.length > 2 && nodes[0]?.id === nodes[nodes.length - 1]?.id;
-            return { points, isClosed };
-        }).filter(g => g.points.length > 1);
+      query = `[out:json][timeout:25]; way["name"="${osmName}"](around:${radius}, ${center.lat}, ${center.lng}); out body; >; out skel qt;`;
+      res = await fetch('https://overpass-api.de/api/interpreter', { method: 'POST', body: query });
+      js = await res.json();
+      
+      const elementsById = js.elements.reduce((acc, el) => { acc[el.id] = el; return acc; }, {});
+      const geometries = js.elements.filter(el => el.type === 'way').map(el => {
+          const nodes = (el.nodes || []).map(id => elementsById[id]).filter(Boolean);
+          return { points: nodes.map(n => [n.lat, n.lon]), isClosed: nodes.length > 2 && nodes[0]?.id === nodes[nodes.length - 1]?.id };
+      }).filter(g => g.points.length > 1);
 
-        if (geometries.length > 0) {
-            const samplePoints = geometries.flatMap(g => g.points).filter((_, i, arr) => i % Math.max(1, Math.floor(arr.length / 5)) === 0).map(p => ({ lat: p[0], lng: p[1] }));
-            const geocodedResults = await Promise.all(samplePoints.map(pt => geocode(pt)));
-            const geocodedNames = geocodedResults.filter(Boolean).map(geo => geo.name);
+      if (isTargetStreet) console.log(`[${osmName.toUpperCase()}] Geometría encontrada: ${geometries.length > 0 ? 'Sí' : 'No'}`);
 
-            if (geocodedNames.length > 0) {
-                const nameCounts = geocodedNames.reduce((acc, name) => { acc[name] = (acc[name] || 0) + 1; return acc; }, {});
-                const mostCommonGoogleName = Object.keys(nameCounts).reduce((a, b) => nameCounts[a] > nameCounts[b] ? a : b);
-                
-                const osmParts = extractNameParts(osmName);
-                const googleParts = extractNameParts(mostCommonGoogleName);
-                
-                let isMatch = false;
-                let finalName = mostCommonGoogleName;
+      if (geometries.length > 0) {
+          const samplePoints = geometries.flatMap(g => g.points).filter((_, i, arr) => i % Math.max(1, Math.floor(arr.length / 5)) === 0).map(p => ({ lat: p[0], lng: p[1] }));
+          const geocodedResults = await Promise.all(samplePoints.map(pt => geocode(pt)));
+          const geocodedNames = geocodedResults.filter(Boolean).map(geo => geo.name);
 
-                // Nivel 1: Coincidencia Exacta
-                if (osmParts.baseName && osmParts.baseName === googleParts.baseName) {
-                    isMatch = true;
-                }
-                // Nivel 2: Coincidencia por Similitud (> 85%)
-                else if (osmParts.baseName && googleParts.baseName) {
-                    const distance = levenshtein(osmParts.baseName, googleParts.baseName);
-                    const similarity = 1 - distance / Math.max(osmParts.baseName.length, googleParts.baseName.length);
-                    if (similarity > 0.85) {
-                        isMatch = true;
-                    }
-                }
-                
-                // Nivel 3: Verificación de Confusión en Intersección
-                if (!isMatch && allOsmBaseNames.has(googleParts.baseName)) {
-                    isMatch = true;
-                    finalName = osmName; // Confusión detectada, confiamos en el nombre de OSM
-                }
+          if (geocodedNames.length > 0) {
+              const nameCounts = geocodedNames.reduce((acc, name) => { acc[name] = (acc[name] || 0) + 1; return acc; }, {});
+              const mostCommonGoogleName = Object.keys(nameCounts).reduce((a, b) => nameCounts[a] > nameCounts[b] ? a : b);
+              
+              if (isTargetStreet) console.log(`[${osmName.toUpperCase()}] Nombre más común según Google:`, mostCommonGoogleName);
 
-                if (isMatch && !seenGoogleNames.has(finalName)) {
-                    const newStreet = { googleName: finalName, geometries: geometries };
-                    seenGoogleNames.add(finalName);
-                    streetList.push(newStreet);
-                    await kv.set(cacheKey, newStreet, { ex: 60 * 60 * 24 * 30 });
-                }
-            }
-        }
+              const osmParts = extractNameParts(osmName);
+              const googleParts = extractNameParts(mostCommonGoogleName);
+              
+              let isMatch = false;
+              let finalName = mostCommonGoogleName;
+
+              if (osmParts.baseName && osmParts.baseName === googleParts.baseName) isMatch = true;
+              else if (osmParts.baseName && googleParts.baseName) {
+                  const distance = levenshtein(osmParts.baseName, googleParts.baseName);
+                  const similarity = 1 - distance / Math.max(osmParts.baseName.length, googleParts.baseName.length);
+                  if (similarity > 0.85) isMatch = true;
+              }
+              
+              if (!isMatch && allOsmBaseNames.has(googleParts.baseName)) {
+                  isMatch = true;
+                  finalName = osmName;
+              }
+
+              if (isTargetStreet) console.log(`[${osmName.toUpperCase()}] Comparación final: OSM ('${osmParts.baseName}') vs Google ('${googleParts.baseName}'). ¿Coinciden? ${isMatch}`);
+
+              if (isMatch && !seenGoogleNames.has(finalName)) {
+                  const newStreet = { googleName: finalName, geometries: geometries };
+                  seenGoogleNames.add(finalName);
+                  streetList.push(newStreet);
+              }
+          } else {
+              if (isTargetStreet) console.log(`[${osmName.toUpperCase()}] Fallo: Google no devolvió ningún nombre válido para sus coordenadas.`);
+          }
       }
     }
     
     response.status(200).json({ streets: streetList });
   } catch (error) {
-    console.error(error); // Mantenemos el log de errores para depuración
+    console.error(error);
     response.status(500).json({ error: 'Error al procesar las calles.', details: error.message });
   }
 }

@@ -83,29 +83,57 @@
         let adminMap;
         let selectedIncident = null;
 
-        async function checkAdminAccess() {
-            const { data: { session } } = await supabase.auth.getSession();
-            if (!session) {
-                window.location.href = '/';
-                return;
-            }
+        aasync function checkAdminAccess() {
+    console.log("Iniciando verificación de acceso de administrador...");
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
 
-            const { data: profile, error } = await supabase
-                .from('profiles')
-                .select('role')
-                .eq('id', session.user.id)
-                .single();
+    if (sessionError) {
+        console.error("Error GRAVE al obtener la sesión:", sessionError);
+        loadingScreen.innerHTML = '<p class="text-red-500">Error al obtener sesión.</p>';
+        return;
+    }
+    if (!session || !session.user) {
+        console.log("No se ha encontrado una sesión de usuario válida. Redirigiendo al inicio.");
+        window.location.href = '/';
+        return;
+    }
 
-            if (error || !profile || profile.role !== 'admin') {
-                loadingScreen.innerHTML = '<p class="text-red-500">Acceso Denegado. Debes ser administrador.</p>';
-                setTimeout(() => window.location.href = '/', 2000);
-            } else {
-                loadingScreen.classList.add('hidden');
-                adminPanel.classList.remove('hidden');
-                initAdminPanel();
-            }
-        }
+    console.log("Sesión encontrada. ID de usuario a verificar:", session.user.id);
 
+    const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', session.user.id)
+        .single();
+
+    // --- ¡ESTOS SON LOS CHIVATOS IMPORTANTES! ---
+    console.log("Resultado de la consulta a la tabla 'profiles':", profile);
+    console.log("Error de la consulta a la tabla 'profiles':", profileError);
+
+    if (profile) {
+        console.log("Perfil encontrado. El rol es:", profile.role);
+        console.log("¿El rol es 'admin'?", profile.role === 'admin');
+    } else {
+        console.log("ATENCIÓN: No se encontró ningún perfil en la base de datos para este ID de usuario.");
+    }
+
+    // Lógica original de acceso
+    if (profileError || !profile || profile.role !== 'admin') {
+        console.warn("Acceso DENEGADO. Condiciones:", {
+            "Hay error?": !!profileError,
+            "Existe el perfil?": !!profile,
+            "Es admin?": profile ? profile.role === 'admin' : false
+        });
+        loadingScreen.innerHTML = '<p class="text-red-500">Acceso Denegado. Debes ser administrador.</p>';
+        // No redirigimos para poder ver los logs
+        // setTimeout(() => window.location.href = '/', 3000); 
+    } else {
+        console.log("¡Acceso CONCEDIDO! Cargando panel...");
+        loadingScreen.classList.add('hidden');
+        adminPanel.classList.remove('hidden');
+        initAdminPanel();
+    }
+}
         async function fetchIncidents() {
             incidentsList.innerHTML = '<div class="flex justify-center items-center"><div class="spinner"></div></div>';
             const { data: incidents, error } = await supabase

@@ -145,38 +145,72 @@
                 adminMap.fitBounds(polygon.getBounds(), {padding: [50, 50]});
             }
             
-            async function resolveIncident(action) {
-                if (!selectedIncident) return;
-                const osmName = osmNameInput.value.trim();
-                const displayName = displayNameInput.value.trim();
-                if (action === 'approve' && (osmName === '' || displayName === '')) {
-                    alert('Por favor, completa ambos nombres de calle para aprobar.'); return;
-                }
-                approveBtn.disabled = true;
-                rejectBtn.disabled = true;
-                approveBtn.innerHTML = '<div class="spinner"></div>';
-                try {
-                    const { data: { session } } = await supabase.auth.getSession();
-                    const response = await fetch('/api/resolveIncident', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
-                        body: JSON.stringify({
-                            incidentId: selectedIncident.id, action: action,
-                            osmName: osmName, displayName: displayName, city: selectedIncident.city
-                        })
-                    });
-                    if (!response.ok) { const errorData = await response.json(); throw new Error(errorData.error || 'Error del servidor'); }
-                    alert(`Incidencia marcada como ${action === 'approve' ? 'resuelta' : 'rechazada'}.`);
-                    resetDetailsPanel();
-                    fetchIncidents();
-                } catch (error) {
-                    alert('Error al procesar la incidencia: ' + error.message);
-                } finally {
-                    approveBtn.disabled = false;
-                    rejectBtn.disabled = false;
-                    approveBtn.innerHTML = 'Aprobar y Mapear';
-                }
+           async function resolveIncident(action) {
+    if (!selectedIncident) return;
+
+    const osmName = osmNameInput.value.trim();
+    const displayName = displayNameInput.value.trim();
+
+    // Guardamos la ciudad de la incidencia en una variable
+    let city = selectedIncident.city;
+
+    if (action === 'approve') {
+        if (osmName === '' || displayName === '') {
+            alert('Por favor, completa ambos nombres de calle para aprobar.');
+            return;
+        }
+
+        // --- INICIO DE LA NUEVA LÓGICA ---
+        // Si la ciudad no existe, se la pedimos al administrador
+        if (!city) {
+            city = prompt("La ciudad no fue detectada automáticamente. Por favor, introduce la ciudad para esta incidencia (ej. 'Badajoz'):");
+            if (!city || city.trim() === '') {
+                alert('La ciudad es necesaria para aprobar la incidencia.');
+                return; // Detenemos la ejecución si no se introduce una ciudad
             }
+        }
+        // --- FIN DE LA NUEVA LÓGICA ---
+    }
+
+    approveBtn.disabled = true;
+    rejectBtn.disabled = true;
+    approveBtn.innerHTML = '<div class="spinner"></div>';
+
+    try {
+        const { data: { session } } = await supabase.auth.getSession();
+        const response = await fetch('/api/resolveIncident', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${session.access_token}`
+            },
+            body: JSON.stringify({
+                incidentId: selectedIncident.id,
+                action: action,
+                osmName: osmName,
+                displayName: displayName,
+                city: city // Usamos la variable 'city' que puede haber sido rellenada por el admin
+            })
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || 'Error del servidor');
+        }
+
+        alert(`Incidencia marcada como ${action === 'approve' ? 'resuelta' : 'rechazada'}.`);
+        resetDetailsPanel();
+        fetchIncidents();
+
+    } catch (error) {
+        console.error('Error resolving incident:', error);
+        alert('Error al procesar la incidencia: ' + error.message);
+    } finally {
+        approveBtn.disabled = false;
+        rejectBtn.disabled = false;
+        approveBtn.innerHTML = 'Aprobar y Mapear';
+    }
+}
             
             function resetDetailsPanel() {
                 selectedIncident = null;

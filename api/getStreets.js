@@ -128,3 +128,4 @@ export default async function handler(request, response) {
     response.status(500).json({ error: 'Error al procesar las calles.', details: error.message });
   }
 }
+// Versión final

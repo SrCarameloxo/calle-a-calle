@@ -1,2 +1,8 @@
+# Ignorar dependencias de Node.js
 node_modules
+
+# Ignorar la carpeta de configuración local de Vercel
 .vercel
+
+# Ignorar el archivo con claves secretas
+.env.local

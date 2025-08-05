@@ -87,10 +87,10 @@ function extractNameParts(name) {
 // --- Handler Principal ---
 module.exports = async (request, response) => {
   try {
-    const { zone, includePOI } = request.query; // <- 1. LEEMOS EL NUEVO PARÁMETRO
+    const { zone, includePOI } = request.query;
     if (!zone) return response.status(400).json({ error: 'Faltan los puntos de la zona.' });
     
-    const POIsAllowed = includePOI === 'true'; // Convertimos el string a booleano
+    const POIsAllowed = includePOI === 'true';
 
     const zonePoints = zone.split(';').map(pair => {
       const [lat, lng] = pair.split(',');
@@ -126,12 +126,17 @@ module.exports = async (request, response) => {
       const cacheKey = `street_v4:${osmName.toUpperCase().replace(/\s/g, '_')}`;
       let cachedStreet = await kv.get(cacheKey);
 
-      if (cachedStreet && !rule) {
-        if (!seenFinalNames.has(cachedStreet.googleName)) {
-            seenFinalNames.add(cachedStreet.googleName);
-            streetList.push(cachedStreet);
-        }
-        continue;
+      // APLICAREMOS LA LÓGICA DE FILTRADO TAMBIÉN A LOS RESULTADOS DE LA CACHÉ
+      if (cachedStreet) {
+          const hasClosedAreaInCache = cachedStreet.geometries.some(g => g.isClosed);
+          if (!POIsAllowed && hasClosedAreaInCache) {
+              continue; // Descartamos el resultado de la caché si no cumple el filtro
+          }
+          if (!seenFinalNames.has(cachedStreet.googleName)) {
+              seenFinalNames.add(cachedStreet.googleName);
+              streetList.push(cachedStreet);
+          }
+          continue;
       }
       
       query = `[out:json][timeout:25]; way["name"="${osmName}"](around:${radius}, ${center.lat}, ${center.lng}); out body; >; out skel qt;`;
@@ -140,36 +145,32 @@ module.exports = async (request, response) => {
       const elementsById = js.elements.reduce((acc, el) => { acc[el.id] = el; return acc; }, {});
       const geometries = js.elements.filter(el => el.type === 'way').map(el => {
           const nodes = (el.nodes || []).map(id => elementsById[id]).filter(Boolean);
-          return { points: nodes.map(n => [n.lat, n.lon]), isClosed: nodes.length > 2 && nodes[0]?.id === nodes[nodes.length - 1]?.id };
+          return { points: nodes.map(n => [n.lat, n.lon]), isClosed: nodes.length > 2 && nodes[0]?.id === nodes[nodes.length - 1]?.id, tags: el.tags };
       }).filter(g => g.points.length > 1);
 
       if (geometries.length === 0) continue;
-
-      // --- INICIO: REGLA DE SELECCIÓN (FILTRO POR MODO DE JUEGO) ---
+      
       const hasClosedArea = geometries.some(g => g.isClosed);
-      // Si el modo es "solo calles" (POIsAllowed = false) y el lugar contiene un área cerrada, lo descartamos.
+      
+      // REGLA DE SELECCIÓN: Si el modo es "solo calles" y el lugar contiene un área cerrada, lo descartamos.
       if (!POIsAllowed && hasClosedArea) {
           continue;
       }
-      // --- FIN: REGLA DE SELECCIÓN ---
 
-
-      // --- INICIO: REGLA DE VISUALIZACIÓN (FILTRO "PASEO FLUVIAL") ---
+      // REGLA DE VISUALIZACIÓN: Si un lugar tiene a la vez líneas y áreas, usamos solo las líneas.
       let geometriesToUse = geometries;
       const hasLines = geometries.some(g => !g.isClosed);
-      // Si un lugar tiene a la vez líneas y áreas, usamos solo las líneas para dibujarlo.
       if (hasLines && hasClosedArea) {
           geometriesToUse = geometries.filter(g => !g.isClosed);
       }
-      // --- FIN: REGLA DE VISUALIZACIÓN ---
-
 
       let finalStreet = null;
 
       if (rule) {
           finalStreet = { googleName: rule.display_name.toUpperCase(), geometries: geometriesToUse };
       } else {
-          const samplePoints = geometries.flatMap(g => g.points).filter((_, i, arr) => i % Math.max(1, Math.floor(arr.length / 5)) === 0).map(p => ({ lat: p[0], lng: p[1] }));
+          // <-- CAMBIO CLAVE: Usamos 'geometriesToUse' para la validación, no 'geometries'
+          const samplePoints = geometriesToUse.flatMap(g => g.points).filter((_, i, arr) => i % Math.max(1, Math.floor(arr.length / 5)) === 0).map(p => ({ lat: p[0], lng: p[1] }));
           const geocodedResults = await Promise.all(samplePoints.map(pt => geocode(pt, process.env.GOOGLE_API_KEY)));
           const geocodedNames = geocodedResults.filter(Boolean).map(geo => geo.name);
 

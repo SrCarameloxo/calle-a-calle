@@ -124,92 +124,92 @@ module.exports = async (request, response) => {
       const rule = overrideRules.get(osmName);
       
       const cacheKey = `street_v4:${osmName.toUpperCase().replace(/\s/g, '_')}`;
-      let cachedStreet = await kv.get(cacheKey);
+      let streetData = await kv.get(cacheKey);
 
-      // APLICAREMOS LA LÓGICA DE FILTRADO TAMBIÉN A LOS RESULTADOS DE LA CACHÉ
-      if (cachedStreet) {
-          const hasClosedAreaInCache = cachedStreet.geometries.some(g => g.isClosed);
-          if (!POIsAllowed && hasClosedAreaInCache) {
-              continue; // Descartamos el resultado de la caché si no cumple el filtro
-          }
-          if (!seenFinalNames.has(cachedStreet.googleName)) {
-              seenFinalNames.add(cachedStreet.googleName);
-              streetList.push(cachedStreet);
-          }
-          continue;
+      if (!streetData) {
+        query = `[out:json][timeout:25]; way["name"="${osmName}"](around:${radius}, ${center.lat}, ${center.lng}); out body; >; out skel qt;`;
+        res = await fetch('https://overpass-api.de/api/interpreter', { method: 'POST', body: query });
+        js = await res.json();
+        const elementsById = js.elements.reduce((acc, el) => { acc[el.id] = el; return acc; }, {});
+        const geometries = js.elements.filter(el => el.type === 'way').map(el => {
+            const nodes = (el.nodes || []).map(id => elementsById[id]).filter(Boolean);
+            return { points: nodes.map(n => [n.lat, n.lon]), isClosed: nodes.length > 2 && nodes[0]?.id === nodes[nodes.length - 1]?.id, tags: el.tags };
+        }).filter(g => g.points.length > 1);
+
+        if (geometries.length === 0) continue;
+
+        let processedStreet = {
+            googleName: osmName.toUpperCase(), // Nombre temporal
+            geometries: geometries
+        };
+
+        if (rule) {
+            processedStreet.googleName = rule.display_name.toUpperCase();
+        } else {
+            // Se usa 'geometries' aquí porque necesitamos validar el nombre original antes de simplificarlo
+            const samplePoints = geometries.flatMap(g => g.points).filter((_, i, arr) => i % Math.max(1, Math.floor(arr.length / 5)) === 0).map(p => ({ lat: p[0], lng: p[1] }));
+            const geocodedResults = await Promise.all(samplePoints.map(pt => geocode(pt, process.env.GOOGLE_API_KEY)));
+            const geocodedNames = geocodedResults.filter(Boolean).map(geo => geo.name);
+
+            if (geocodedNames.length > 0) {
+                const nameCounts = geocodedNames.reduce((acc, name) => { acc[name] = (acc[name] || 0) + 1; return acc; }, {});
+                const mostCommonGoogleName = Object.keys(nameCounts).reduce((a, b) => nameCounts[a] > nameCounts[b] ? a : b);
+                
+                const osmParts = extractNameParts(osmName);
+                const googleParts = extractNameParts(mostCommonGoogleName);
+                
+                let isMatch = false;
+                let finalNameToUse = mostCommonGoogleName;
+
+                if (osmParts.baseName && osmParts.baseName === googleParts.baseName) isMatch = true;
+                else if (osmParts.baseName && googleParts.baseName) {
+                    const distance = levenshtein(osmParts.baseName, googleParts.baseName);
+                    const similarity = 1 - distance / Math.max(osmParts.baseName.length, googleParts.baseName.length);
+                    if (similarity > 0.85) isMatch = true;
+                }
+                if (!isMatch && allOsmBaseNames.has(googleParts.baseName)) {
+                    isMatch = true;
+                    finalNameToUse = osmName.toUpperCase();
+                }
+
+                if (isMatch) {
+                    processedStreet.googleName = finalNameToUse;
+                } else {
+                    processedStreet = null; // La validación falló
+                }
+            } else {
+                processedStreet = null; // No se pudo geocodificar
+            }
+        }
+        
+        streetData = processedStreet;
+        if(streetData) await kv.set(cacheKey, streetData, { ex: 60 * 60 * 24 * 30 });
+      }
+
+      if (!streetData) continue; // Si después de todo el proceso no hay datos, saltamos
+
+      // --- INICIO: LÓGICA DE FILTRADO UNIFICADA Y CORREGIDA ---
+
+      // 1. REGLA DE VISUALIZACIÓN: Se aplica siempre. Simplifica la geometría si es necesario.
+      const hasLines = streetData.geometries.some(g => !g.isClosed);
+      const hasAreas = streetData.geometries.some(g => g.isClosed);
+      
+      if (hasLines && hasAreas) {
+        streetData.geometries = streetData.geometries.filter(g => !g.isClosed);
       }
       
-      query = `[out:json][timeout:25]; way["name"="${osmName}"](around:${radius}, ${center.lat}, ${center.lng}); out body; >; out skel qt;`;
-      res = await fetch('https://overpass-api.de/api/interpreter', { method: 'POST', body: query });
-      js = await res.json();
-      const elementsById = js.elements.reduce((acc, el) => { acc[el.id] = el; return acc; }, {});
-      const geometries = js.elements.filter(el => el.type === 'way').map(el => {
-          const nodes = (el.nodes || []).map(id => elementsById[id]).filter(Boolean);
-          return { points: nodes.map(n => [n.lat, n.lon]), isClosed: nodes.length > 2 && nodes[0]?.id === nodes[nodes.length - 1]?.id, tags: el.tags };
-      }).filter(g => g.points.length > 1);
-
-      if (geometries.length === 0) continue;
+      // 2. REGLA DE SELECCIÓN: Se aplica sobre la geometría ya simplificada.
+      const finalGeomHasArea = streetData.geometries.some(g => g.isClosed);
+      if (!POIsAllowed && finalGeomHasArea) {
+        continue; // Descartamos si es modo "solo calles" y todavía contiene un área.
+      }
       
-      const hasClosedArea = geometries.some(g => g.isClosed);
-      
-      // REGLA DE SELECCIÓN: Si el modo es "solo calles" y el lugar contiene un área cerrada, lo descartamos.
-      if (!POIsAllowed && hasClosedArea) {
-          continue;
-      }
+      // --- FIN: LÓGICA DE FILTRADO ---
 
-      // REGLA DE VISUALIZACIÓN: Si un lugar tiene a la vez líneas y áreas, usamos solo las líneas.
-      let geometriesToUse = geometries;
-      const hasLines = geometries.some(g => !g.isClosed);
-      if (hasLines && hasClosedArea) {
-          geometriesToUse = geometries.filter(g => !g.isClosed);
-      }
-
-      let finalStreet = null;
-
-      if (rule) {
-          finalStreet = { googleName: rule.display_name.toUpperCase(), geometries: geometriesToUse };
-      } else {
-          // <-- CAMBIO CLAVE: Usamos 'geometriesToUse' para la validación, no 'geometries'
-          const samplePoints = geometriesToUse.flatMap(g => g.points).filter((_, i, arr) => i % Math.max(1, Math.floor(arr.length / 5)) === 0).map(p => ({ lat: p[0], lng: p[1] }));
-          const geocodedResults = await Promise.all(samplePoints.map(pt => geocode(pt, process.env.GOOGLE_API_KEY)));
-          const geocodedNames = geocodedResults.filter(Boolean).map(geo => geo.name);
-
-          if (geocodedNames.length > 0) {
-              const nameCounts = geocodedNames.reduce((acc, name) => { acc[name] = (acc[name] || 0) + 1; return acc; }, {});
-              const mostCommonGoogleName = Object.keys(nameCounts).reduce((a, b) => nameCounts[a] > nameCounts[b] ? a : b);
-              
-              const osmParts = extractNameParts(osmName);
-              const googleParts = extractNameParts(mostCommonGoogleName);
-              
-              let isMatch = false;
-              let finalNameToUse = mostCommonGoogleName;
-
-              // Nivel 1: Coincidencia Exacta
-              if (osmParts.baseName && osmParts.baseName === googleParts.baseName) {
-                isMatch = true;
-              }
-              // Nivel 2: Coincidencia por Similitud
-              else if (osmParts.baseName && googleParts.baseName) {
-                  const distance = levenshtein(osmParts.baseName, googleParts.baseName);
-                  const similarity = 1 - distance / Math.max(osmParts.baseName.length, googleParts.baseName.length);
-                  if (similarity > 0.85) isMatch = true;
-              }
-              // Nivel 3: Confusión en Intersección
-              if (!isMatch && allOsmBaseNames.has(googleParts.baseName)) {
-                  isMatch = true;
-                  finalNameToUse = osmName.toUpperCase();
-              }
-
-              if (isMatch) {
-                  finalStreet = { googleName: finalNameToUse, geometries: geometriesToUse };
-              }
-          }
-      }
-
-      if (finalStreet && !seenFinalNames.has(finalStreet.googleName)) {
-          seenFinalNames.add(finalStreet.googleName);
-          streetList.push(finalStreet);
-          await kv.set(cacheKey, finalStreet, { ex: 60 * 60 * 24 * 30 });
+      // Si el lugar ha pasado todos los filtros, lo añadimos a la lista final
+      if (!seenFinalNames.has(streetData.googleName)) {
+          seenFinalNames.add(streetData.googleName);
+          streetList.push(streetData);
       }
     }
     

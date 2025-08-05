@@ -332,7 +332,6 @@
       let playing=false, qIdx=0, target=null, userMk, guide, streetGrp;
       let streetList = [], totalQuestions = 0, streetsGuessedCorrectly = 0, lastGameZonePoints = [];
 
-      // NUEVA VARIABLE GLOBAL: para guardar los datos del perfil y la ciudad.
       let userProfile = { cityData: null, subscribedCity: null, role: null };
 
       async function signInWithGoogle() { 
@@ -343,11 +342,10 @@
       }
       async function signOut() { await supabaseClient.auth.signOut(); }
       
-      // MODIFICADA: Ahora se llama `fetchUserProfile` y obtiene más datos.
       async function fetchUserProfile(user) {
+        console.log("[DEBUG] Iniciando fetchUserProfile para usuario:", user.id);
         if (!user) return;
         try {
-            // Pedimos el rol y la ciudad suscrita del perfil.
             const { data: profile, error } = await supabaseClient
                 .from('profiles')
                 .select('role, subscribed_city')
@@ -355,9 +353,8 @@
                 .single();
 
             if (error) {
-                // Si el perfil no existe aún (puede tardar un segundo en crearse por el trigger), esperamos y reintentamos.
                 if (error.code === 'PGRST116') {
-                    console.warn("El perfil no existe todavía, reintentando en 2 segundos...");
+                    console.warn("[DEBUG] Perfil no encontrado, reintentando...");
                     await new Promise(resolve => setTimeout(resolve, 2000));
                     return fetchUserProfile(user);
                 }
@@ -366,52 +363,71 @@
 
             userProfile.role = profile.role;
             userProfile.subscribedCity = profile.subscribed_city;
+            console.log("[DEBUG] Perfil básico cargado:", { role: userProfile.role, subscribedCity: userProfile.subscribedCity });
 
-            if (profile.role === 'admin') {
-                document.getElementById('admin-panel-btn').classList.remove('hidden');
-            }
-
-            // Si el usuario tiene una ciudad, obtenemos los detalles de esa ciudad.
             if (profile.subscribed_city) {
+                console.log("[DEBUG] Usuario tiene ciudad, buscando datos para:", profile.subscribed_city);
                 const { data: city, error: cityError } = await supabaseClient
                     .from('cities')
                     .select('*')
                     .eq('name', profile.subscribed_city)
                     .single();
                 
-                if (cityError) throw new Error(`No se encontraron los datos para la ciudad: ${profile.subscribed_city}`);
+                if (cityError) throw new Error(`No se encontraron datos para la ciudad: ${profile.subscribed_city}`);
                 userProfile.cityData = city;
+                console.log("[DEBUG] Datos de la ciudad cargados:", { cityData: userProfile.cityData });
+            } else {
+                console.log("[DEBUG] Usuario NO tiene ciudad suscrita.");
             }
 
         } catch (e) {
-            console.error("Error al obtener el perfil y la ciudad del usuario:", e);
+            console.error("[DEBUG] ERROR en fetchUserProfile:", e);
             alert("Hubo un problema al cargar los datos de tu ciudad. Contacta con soporte.");
         }
       }
 
-      // MODIFICADA: `handleAuthStateChange` ahora usa la nueva función.
+      // VERSIÓN 5 (CON CHIVATOS): Reestructuramos la función para que espere a que la animación de login termine.
       async function handleAuthStateChange(event, session) {
+        console.log(`[DEBUG] handleAuthStateChange se ha disparado con evento: ${event}`);
         const user = session ? session.user : null;
+
         if (user) {
+          console.log("[DEBUG] Usuario detectado. Iniciando transición de UI.");
           loginScreen.style.opacity = '0';
-          setTimeout(() => loginScreen.classList.add('hidden'), 500);
           gameScreen.classList.remove('hidden');
           
           document.getElementById('user-info-details').innerHTML = `<p class="text-sm text-gray-400">Conectado como</p><p class="font-semibold text-base truncate">${user.email}</p>`;
           document.getElementById('logout-btn').addEventListener('click', signOut);
-          
-          // Obtenemos todos los datos del perfil antes de iniciar el juego.
-          await fetchUserProfile(user);
 
-          // Si el mapa del juego no existe, lo inicializamos.
-          if (!gameMap) initGame();
-          else setTimeout(() => gameMap.invalidateSize(), 500);
+          console.log("[DEBUG] Programando inicialización del juego en 500ms...");
+          setTimeout(async () => {
+              console.log("[DEBUG] ------------------------------------------");
+              console.log("[DEBUG] El setTimeout de 500ms se ha ejecutado.");
+              loginScreen.classList.add('hidden');
+              console.log("[DEBUG] loginScreen ahora tiene 'display: none'.");
+
+              await fetchUserProfile(user);
+              console.log("[DEBUG] Perfil de usuario final:", { userProfile });
+
+              if (!gameMap) {
+                  console.log("[DEBUG] gameMap no existe, llamando a initGame()...");
+                  initGame();
+              } else {
+                  console.log("[DEBUG] gameMap YA existe, llamando a invalidateSize().");
+                  gameMap.invalidateSize();
+              }
+              console.log("[DEBUG] ------------------------------------------");
+          }, 500);
 
         } else {
+          console.log("[DEBUG] No hay usuario. Mostrando pantalla de login.");
           loginScreen.classList.remove('hidden');
           loginScreen.style.opacity = '1';
           gameScreen.classList.add('hidden');
-          if (!backgroundMap) initBackgroundMap();
+          if (!backgroundMap) {
+            console.log("[DEBUG] Creando mapa de fondo.");
+            initBackgroundMap();
+          }
         }
       }
 
@@ -472,46 +488,55 @@
         });
       }
 
-     // VERSIÓN 3 (CORREGIDA): Cambiamos el orden de inicialización para evitar conflictos.
+     // VERSIÓN 5 (CON CHIVATOS): Simplificada porque la función padre ahora maneja la espera.
       function initGame() {
+        console.log("[DEBUG] ==> INICIANDO initGame...");
+        console.log("[DEBUG] initGame, estado de userProfile:", { userProfile });
+        
         // --- PASO 1: Definir la vista inicial ---
         let initialCoords = [38.88, -6.97];
         let initialZoom = 13;
-        // Si el usuario tiene una ciudad, actualizamos las coordenadas y el zoom.
         if (userProfile.cityData) {
             initialCoords = [userProfile.cityData.center_lat, userProfile.cityData.center_lng];
             initialZoom = userProfile.cityData.default_zoom;
+            console.log("[DEBUG] Vista inicial establecida para la ciudad:", { initialCoords, initialZoom });
+        } else {
+            console.log("[DEBUG] Vista inicial por defecto.");
         }
 
         // --- PASO 2: Crear el mapa con opciones básicas ---
-        // Nota: Ya no pasamos maxBounds aquí en la creación.
+        console.log("[DEBUG] Creando mapa L.map('game-map-container', ...)");
         gameMap = L.map('game-map-container', { zoomSnap: 0.25 });
+        console.log("[DEBUG] Objeto gameMap creado:", gameMap ? "Éxito" : "FALLO");
         
         L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager_nolabels/{z}/{x}/{y}{r}.png',{
           attribution: '© OSM & CARTO', subdomains:'abcd', maxZoom:19,
           minZoom: userProfile.cityData ? initialZoom - 2 : 5 
         }).addTo(gameMap);
+        console.log("[DEBUG] Capa de tiles añadida.");
         
         // --- PASO 3: Establecer la vista del mapa ---
+        console.log("[DEBUG] Estableciendo vista con setView:", { initialCoords, initialZoom });
         gameMap.setView(initialCoords, initialZoom);
         
-        // --- PASO 4: Aplicar los límites (si existen) DESPUÉS de que el mapa está creado y visible ---
+        // --- PASO 4: Aplicar los límites (si existen) ---
         if (userProfile.cityData) {
+            console.log("[DEBUG] Aplicando límites del mapa (maxBounds)...");
             const latOffset = 20 / 111.1;
             const lngOffset = 20 / (111.1 * Math.cos(initialCoords[0] * Math.PI / 180));
             const corner1 = L.latLng(initialCoords[0] - latOffset, initialCoords[1] - lngOffset);
             const corner2 = L.latLng(initialCoords[0] + latOffset, initialCoords[1] + lngOffset);
             const bounds = L.latLngBounds(corner1, corner2);
-            
-            // Usamos el método setMaxBounds() sobre el mapa ya existente.
             gameMap.setMaxBounds(bounds);
+            console.log("[DEBUG] Límites aplicados:", { bounds });
         }
         
-        // --- PASO 5: Forzar el re-cálculo de tamaño como medida de seguridad ---
-        // Volvemos a un tiempo de espera bajo, ya que el orden es ahora más robusto.
-        setTimeout(() => gameMap.invalidateSize(), 100);
+        // --- PASO 5: Forzar el re-cálculo de tamaño ---
+        console.log("[DEBUG] Llamando a invalidateSize() para forzar el redibujado.");
+        gameMap.invalidateSize();
 
         // --- PASO 6: Añadir los listeners de los botones ---
+        console.log("[DEBUG] Añadiendo listeners a los botones...");
         document.getElementById('drawZone').addEventListener('click', startDrawing);
         document.getElementById('undoPoint').addEventListener('click', undoLastPoint);
         document.getElementById('next').addEventListener('click', () => { document.getElementById('next').disabled=true; nextQ(); });
@@ -522,9 +547,8 @@
 
         setupStartButton(document.getElementById('start'));
         setupMenu();
+        console.log("[DEBUG] ==> initGame COMPLETADO.");
       }
-      // --- El resto de funciones se mantienen igual, pero las incluimos todas
-      // para que puedas reemplazar el script completo sin problemas.
 
       function setupStartButton(bStart) {
         const firstClickHandler = async () => {
@@ -975,3 +999,4 @@
   </script>
 </body>
 </html>
+}

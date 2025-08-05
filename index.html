@@ -472,7 +472,7 @@
         });
       }
 
-      // MODIFICADA: `initGame` ahora usa los datos del perfil para configurar el mapa.
+      // MODIFICADA Y CORREGIDA: `initGame` ahora usa los datos del perfil para configurar el mapa.
       function initGame(){
         // Opciones por defecto si el usuario no tiene ciudad.
         let initialCoords = [38.88, -6.97];
@@ -488,7 +488,8 @@
             const latOffset = 20 / 111.1; // ~20km en latitud
             const lngOffset = 20 / (111.1 * Math.cos(initialCoords[0] * Math.PI / 180)); // ~20km en longitud
             const corner1 = L.latLng(initialCoords[0] - latOffset, initialCoords[1] - lngOffset);
-            const corner2 = L.latLng(initialCoords[0] + latOffset, initialCoord.lng + lngOffset);
+            // --- ESTA ES LA LÍNEA QUE SE HA CORREGIDO ---
+            const corner2 = L.latLng(initialCoords[0] + latOffset, initialCoords[1] + lngOffset);
             mapOptions.maxBounds = L.latLngBounds(corner1, corner2);
         }
 

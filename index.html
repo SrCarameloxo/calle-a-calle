@@ -472,52 +472,57 @@
         });
       }
 
-      // MODIFICADA Y CORREGIDA: `initGame` ahora usa los datos del perfil para configurar el mapa.
-      function initGame(){
-        // Opciones por defecto si el usuario no tiene ciudad.
+     // VERSIÓN 3 (CORREGIDA): Cambiamos el orden de inicialización para evitar conflictos.
+      function initGame() {
+        // --- PASO 1: Definir la vista inicial ---
         let initialCoords = [38.88, -6.97];
         let initialZoom = 13;
-        let mapOptions = { zoomSnap: 0.25 };
-
-        // Si tenemos datos de la ciudad del usuario, los usamos.
+        // Si el usuario tiene una ciudad, actualizamos las coordenadas y el zoom.
         if (userProfile.cityData) {
             initialCoords = [userProfile.cityData.center_lat, userProfile.cityData.center_lng];
             initialZoom = userProfile.cityData.default_zoom;
-
-            // ¡La clave para limitar el mapa! Creamos un "cajón" de 20km alrededor del centro.
-            const latOffset = 20 / 111.1; // ~20km en latitud
-            const lngOffset = 20 / (111.1 * Math.cos(initialCoords[0] * Math.PI / 180)); // ~20km en longitud
-            const corner1 = L.latLng(initialCoords[0] - latOffset, initialCoords[1] - lngOffset);
-            // --- ESTA ES LA LÍNEA QUE SE HA CORREGIDO ---
-            const corner2 = L.latLng(initialCoords[0] + latOffset, initialCoords[1] + lngOffset);
-            mapOptions.maxBounds = L.latLngBounds(corner1, corner2);
         }
 
-        gameMap = L.map('game-map-container', mapOptions);
+        // --- PASO 2: Crear el mapa con opciones básicas ---
+        // Nota: Ya no pasamos maxBounds aquí en la creación.
+        gameMap = L.map('game-map-container', { zoomSnap: 0.25 });
         
         L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager_nolabels/{z}/{x}/{y}{r}.png',{
           attribution: '© OSM & CARTO', subdomains:'abcd', maxZoom:19,
-          // Podemos añadir un zoom mínimo para que no se alejen demasiado
           minZoom: userProfile.cityData ? initialZoom - 2 : 5 
         }).addTo(gameMap);
         
+        // --- PASO 3: Establecer la vista del mapa ---
         gameMap.setView(initialCoords, initialZoom);
         
-        setTimeout(() => gameMap.invalidateSize(), 10);
+        // --- PASO 4: Aplicar los límites (si existen) DESPUÉS de que el mapa está creado y visible ---
+        if (userProfile.cityData) {
+            const latOffset = 20 / 111.1;
+            const lngOffset = 20 / (111.1 * Math.cos(initialCoords[0] * Math.PI / 180));
+            const corner1 = L.latLng(initialCoords[0] - latOffset, initialCoords[1] - lngOffset);
+            const corner2 = L.latLng(initialCoords[0] + latOffset, initialCoords[1] + lngOffset);
+            const bounds = L.latLngBounds(corner1, corner2);
+            
+            // Usamos el método setMaxBounds() sobre el mapa ya existente.
+            gameMap.setMaxBounds(bounds);
+        }
+        
+        // --- PASO 5: Forzar el re-cálculo de tamaño como medida de seguridad ---
+        // Volvemos a un tiempo de espera bajo, ya que el orden es ahora más robusto.
+        setTimeout(() => gameMap.invalidateSize(), 100);
 
+        // --- PASO 6: Añadir los listeners de los botones ---
         document.getElementById('drawZone').addEventListener('click', startDrawing);
         document.getElementById('undoPoint').addEventListener('click', undoLastPoint);
         document.getElementById('next').addEventListener('click', () => { document.getElementById('next').disabled=true; nextQ(); });
         document.getElementById('repeatZone').addEventListener('click', repeatLastZone);
         document.getElementById('saveZoneBtn').addEventListener('click', saveCurrentZone);
-        
         document.getElementById('report-btn').addEventListener('click', reportIncident);
         document.getElementById('admin-panel-btn').addEventListener('click', () => { window.location.href = '/admin.html'; });
 
         setupStartButton(document.getElementById('start'));
         setupMenu();
       }
-      
       // --- El resto de funciones se mantienen igual, pero las incluimos todas
       // para que puedas reemplazar el script completo sin problemas.
 

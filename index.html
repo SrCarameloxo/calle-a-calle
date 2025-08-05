@@ -175,19 +175,18 @@
     }
     /* ===== FIN: NUEVOS ESTILOS DE ANIMACIÓN ===== */
 
-    /* --- INICIO: ESTILOS PARA EL NUEVO CHECKBOX --- */
+    /* --- INICIO: ESTILOS PARA EL NUEVO CHECKBOX (CORREGIDO) --- */
     .checkbox-wrapper {
         padding: 10px 0;
     }
     .checkbox-container {
-        display: inline-block;
+        display: flex; /* Usamos flex para alinear el texto verticalmente */
+        align-items: center; /* Centrado vertical */
         position: relative;
-        padding-left: 35px;
-        margin-bottom: 12px;
         cursor: pointer;
         font-size: 16px;
         user-select: none;
-        color: #333; /* Color del texto */
+        color: #333;
     }
     .custom-checkbox {
         position: absolute;
@@ -197,39 +196,34 @@
         width: 0;
     }
     .checkmark {
-        position: absolute;
-        top: 0;
-        left: 0;
+        position: relative; /* Cambiado de absolute */
         height: 25px;
         width: 25px;
-        background-color: #d1d5db; /* Gris claro para estado apagado */
+        min-width: 25px; /* Evita que se encoja */
+        background-color: #d1d5db;
         border-radius: 4px;
         transition: background-color 0.3s;
         box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+        margin-right: 10px; /* Espacio entre el check y el texto */
+        display: flex; /* Usamos flex para centrar el tick */
+        align-items: center;
+        justify-content: center;
     }
     .checkmark:after {
         content: "";
-        position: absolute;
         display: none;
-        left: 9px;
-        top: 5px;
-        width: 5px;
-        height: 10px;
+        width: 6px; /* Ancho del tick */
+        height: 12px; /* Alto del tick */
         border: solid white;
         border-width: 0 3px 3px 0;
         transform: rotate(45deg);
     }
     .custom-checkbox:checked ~ .checkmark {
-        background-color: #3b82f6; /* Azul del tema para estado encendido */
+        background-color: #3b82f6;
         box-shadow: 0 3px 7px rgba(59, 130, 246, 0.3);
     }
     .custom-checkbox:checked ~ .checkmark:after {
         display: block;
-        animation: checkAnim 0.2s forwards;
-    }
-    @keyframes checkAnim {
-        0% { height: 0; }
-        100% { height: 10px; }
     }
     /* --- FIN: ESTILOS PARA EL NUEVO CHECKBOX --- */
   </style>
@@ -259,9 +253,10 @@
           
           <div id="start-options" class="hidden">
             <div class="checkbox-wrapper">
-                <label class="checkbox-container">Incluir Zonas de Interés
+                <label class="checkbox-container">
                     <input id="include-poi-checkbox" class="custom-checkbox" type="checkbox">
                     <span class="checkmark"></span>
+                    Incluir Zonas de Interés
                 </label>
             </div>
             <button id="start" class="game-control-btn" disabled>Start</button>
@@ -466,8 +461,10 @@
         setupMenu();
       }
       
+      // --- LÓGICA DE BOTONES CORREGIDA ---
       function setupStartButton(bStart) {
-        bStart.onclick = async () => {
+        // Este es el handler para el PRIMER clic (Cargar Calles)
+        const firstClickHandler = async () => {
             if (oldZonePoly) gameMap.removeLayer(oldZonePoly);
             if (!zonePoly) return;
             if (drawing) {
@@ -477,23 +474,16 @@
                 tempMarkers = [];
             }
             document.getElementById('undoPoint').classList.add('hidden');
-            document.getElementById('start-options').classList.add('hidden');
-
+            
             bStart.disabled = true;
             bStart.textContent = 'Cargando calles...';
-            
+            document.getElementById('include-poi-checkbox').disabled = true;
+
             await preloadStreets();
             
             bStart.textContent = 'Iniciar juego';
-            bStart.onclick = () => {
-                playing = true; qIdx = 0; streetsGuessedCorrectly = 0;
-                document.getElementById('score-display').classList.remove('hidden');
-                document.getElementById('score').textContent = `0 / ${totalQuestions}`;
-                document.getElementById('start-options').classList.add('hidden');
-                document.getElementById('next').classList.remove('hidden');
-                gameMap.fitBounds(zonePoly.getBounds(), { padding: [50, 50] });
-                nextQ();
-            };
+            bStart.onclick = secondClickHandler; // Asignamos el handler para el SEGUNDO clic
+
             if (totalQuestions > 0) {
               bStart.disabled = false;
             } else {
@@ -502,15 +492,31 @@
               document.getElementById('drawZone').classList.remove('hidden');
             }
         };
+
+        // Este es el handler para el SEGUNDO clic (Iniciar Juego)
+        const secondClickHandler = () => {
+            playing = true; qIdx = 0; streetsGuessedCorrectly = 0;
+            document.getElementById('score-display').classList.remove('hidden');
+            document.getElementById('score').textContent = `0 / ${totalQuestions}`;
+            document.getElementById('start-options').classList.add('hidden'); // Ocultamos los botones aquí
+            document.getElementById('next').classList.remove('hidden');
+            gameMap.fitBounds(zonePoly.getBounds(), { padding: [50, 50] });
+            nextQ();
+        };
+
+        bStart.onclick = firstClickHandler; // Asignamos el handler inicial
       }
+
 
       function startDrawing(){
         document.getElementById('fb').textContent = 'Haz click para añadir vértices. Con 3 se habilita Start. Haz click en el primer vértice para cerrar.';
         ['repeatZone', 'saveZoneBtn', 'drawZone'].forEach(id => document.getElementById(id).classList.add('hidden'));
         ['undoPoint', 'start-options'].forEach(id => document.getElementById(id).classList.remove('hidden'));
         
-        document.getElementById('start').disabled = true;
-        document.getElementById('start').textContent = 'Start';
+        const startButton = document.getElementById('start');
+        startButton.disabled = true;
+        startButton.textContent = 'Start';
+        document.getElementById('include-poi-checkbox').disabled = false;
 
         if (zonePoly) gameMap.removeLayer(zonePoly);
         if (oldZonePoly) gameMap.removeLayer(oldZonePoly);
@@ -518,7 +524,7 @@
         playing = false;
         drawing = true;
         
-        setupStartButton(document.getElementById('start'));
+        setupStartButton(startButton);
         gameMap.on('click', addVertex);
       }
 
@@ -695,7 +701,7 @@
         lastGameZonePoints = [...zonePoints];
         saveGameStats(streetsGuessedCorrectly, totalQuestions);
         
-        ['next', 'start-options'].forEach(id => document.getElementById(id).classList.add('hidden'));
+        ['next'].forEach(id => document.getElementById(id).classList.add('hidden'));
         ['drawZone', 'repeatZone', 'saveZoneBtn'].forEach(id => document.getElementById(id).classList.remove('hidden'));
         document.getElementById('repeatZone').disabled = (lastGameZonePoints.length < 3);
 

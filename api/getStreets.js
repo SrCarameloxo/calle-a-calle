@@ -123,7 +123,7 @@ module.exports = async (request, response) => {
     for (const osmName of streetNamesInPoly) {
       const rule = overrideRules.get(osmName);
       
-      const cacheKey = `street_v3:${osmName.toUpperCase().replace(/\s/g, '_')}`;
+      const cacheKey = `street_v4:${osmName.toUpperCase().replace(/\s/g, '_')}`;
       let cachedStreet = await kv.get(cacheKey);
 
       if (cachedStreet && !rule) {

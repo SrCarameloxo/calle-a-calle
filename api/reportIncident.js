@@ -9,7 +9,8 @@ module.exports = async (request, response) => {
     }
 
     try {
-        const { zone_points, description } = request.body;
+        // Leemos la ciudad directamente de la petición, junto con el resto de datos.
+        const { zone_points, description, city } = request.body;
         
         // --- Verificación de seguridad: Obtener el usuario a partir del token ---
         const authHeader = request.headers.authorization;
@@ -32,36 +33,21 @@ module.exports = async (request, response) => {
         
         // --- Lógica de la función (ya en un entorno seguro) ---
         
-        // 1. Obtener la ciudad haciendo geocodificación inversa
-        const centerPointString = zone_points.split(';')[0];
-        const [lat, lng] = centerPointString.split(',');
-        const apiKey = process.env.GOOGLE_API_KEY;
-
-        const geoResponse = await fetch(`https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${apiKey}`);
-        const geoData = await geoResponse.json();
+        // El paso de geocodificación inversa se ha eliminado porque ya no es necesario.
         
-        let city = null;
-        if (geoData.results && geoData.results[0]) {
-            const addressComponents = geoData.results[0].address_components;
-            const cityComponent = addressComponents.find(c => c.types.includes('locality'));
-            if (cityComponent) {
-                city = cityComponent.long_name;
-            }
-        }
-        
-        // 2. Insertar la incidencia en la base de datos
+        // Insertar la incidencia en la base de datos
         const { error: insertError } = await supabaseAdmin.from('incidents').insert({
             user_id: user.id,
             zone_points: zone_points,
             description: description,
-            city: city 
+            city: city // Usamos la ciudad que nos ha enviado directamente el juego
         });
 
         if (insertError) {
             throw insertError;
         }
 
-        // 3. Devolver una respuesta de éxito
+        // Devolver una respuesta de éxito
         return response.status(200).json({ message: 'Incidencia reportada con éxito.' });
 
     } catch (error) {

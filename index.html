@@ -332,6 +332,9 @@
       let playing=false, qIdx=0, target=null, userMk, guide, streetGrp;
       let streetList = [], totalQuestions = 0, streetsGuessedCorrectly = 0, lastGameZonePoints = [];
 
+      // NUEVA VARIABLE GLOBAL: para guardar los datos del perfil y la ciudad.
+      let userProfile = { cityData: null, subscribedCity: null, role: null };
+
       async function signInWithGoogle() { 
         await supabaseClient.auth.signInWithOAuth({ 
           provider: 'google',
@@ -340,27 +343,54 @@
       }
       async function signOut() { await supabaseClient.auth.signOut(); }
       
-      async function checkUserRole(user) {
+      // MODIFICADA: Ahora se llama `fetchUserProfile` y obtiene más datos.
+      async function fetchUserProfile(user) {
         if (!user) return;
         try {
+            // Pedimos el rol y la ciudad suscrita del perfil.
             const { data: profile, error } = await supabaseClient
                 .from('profiles')
-                .select('role')
+                .select('role, subscribed_city')
                 .eq('id', user.id)
                 .single();
+
             if (error) {
-                console.warn("No se pudo verificar el perfil del usuario, puede que sea nuevo y el perfil aún no se haya creado por el trigger.");
-                return;
+                // Si el perfil no existe aún (puede tardar un segundo en crearse por el trigger), esperamos y reintentamos.
+                if (error.code === 'PGRST116') {
+                    console.warn("El perfil no existe todavía, reintentando en 2 segundos...");
+                    await new Promise(resolve => setTimeout(resolve, 2000));
+                    return fetchUserProfile(user);
+                }
+                throw error;
             }
-            if (profile && profile.role === 'admin') {
+
+            userProfile.role = profile.role;
+            userProfile.subscribedCity = profile.subscribed_city;
+
+            if (profile.role === 'admin') {
                 document.getElementById('admin-panel-btn').classList.remove('hidden');
             }
+
+            // Si el usuario tiene una ciudad, obtenemos los detalles de esa ciudad.
+            if (profile.subscribed_city) {
+                const { data: city, error: cityError } = await supabaseClient
+                    .from('cities')
+                    .select('*')
+                    .eq('name', profile.subscribed_city)
+                    .single();
+                
+                if (cityError) throw new Error(`No se encontraron los datos para la ciudad: ${profile.subscribed_city}`);
+                userProfile.cityData = city;
+            }
+
         } catch (e) {
-            console.error("Error al verificar el rol del usuario:", e);
+            console.error("Error al obtener el perfil y la ciudad del usuario:", e);
+            alert("Hubo un problema al cargar los datos de tu ciudad. Contacta con soporte.");
         }
       }
 
-      function handleAuthStateChange(event, session) {
+      // MODIFICADA: `handleAuthStateChange` ahora usa la nueva función.
+      async function handleAuthStateChange(event, session) {
         const user = session ? session.user : null;
         if (user) {
           loginScreen.style.opacity = '0';
@@ -370,10 +400,13 @@
           document.getElementById('user-info-details').innerHTML = `<p class="text-sm text-gray-400">Conectado como</p><p class="font-semibold text-base truncate">${user.email}</p>`;
           document.getElementById('logout-btn').addEventListener('click', signOut);
           
-          checkUserRole(user);
+          // Obtenemos todos los datos del perfil antes de iniciar el juego.
+          await fetchUserProfile(user);
 
+          // Si el mapa del juego no existe, lo inicializamos.
           if (!gameMap) initGame();
           else setTimeout(() => gameMap.invalidateSize(), 10);
+
         } else {
           loginScreen.classList.remove('hidden');
           loginScreen.style.opacity = '1';
@@ -439,12 +472,35 @@
         });
       }
 
+      // MODIFICADA: `initGame` ahora usa los datos del perfil para configurar el mapa.
       function initGame(){
-        gameMap = L.map('game-map-container',{zoomSnap:0.25});
+        // Opciones por defecto si el usuario no tiene ciudad.
+        let initialCoords = [38.88, -6.97];
+        let initialZoom = 13;
+        let mapOptions = { zoomSnap: 0.25 };
+
+        // Si tenemos datos de la ciudad del usuario, los usamos.
+        if (userProfile.cityData) {
+            initialCoords = [userProfile.cityData.center_lat, userProfile.cityData.center_lng];
+            initialZoom = userProfile.cityData.default_zoom;
+
+            // ¡La clave para limitar el mapa! Creamos un "cajón" de 20km alrededor del centro.
+            const latOffset = 20 / 111.1; // ~20km en latitud
+            const lngOffset = 20 / (111.1 * Math.cos(initialCoords[0] * Math.PI / 180)); // ~20km en longitud
+            const corner1 = L.latLng(initialCoords[0] - latOffset, initialCoords[1] - lngOffset);
+            const corner2 = L.latLng(initialCoords[0] + latOffset, initialCoord.lng + lngOffset);
+            mapOptions.maxBounds = L.latLngBounds(corner1, corner2);
+        }
+
+        gameMap = L.map('game-map-container', mapOptions);
+        
         L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager_nolabels/{z}/{x}/{y}{r}.png',{
-          attribution: '© OSM & CARTO', subdomains:'abcd', maxZoom:19
+          attribution: '© OSM & CARTO', subdomains:'abcd', maxZoom:19,
+          // Podemos añadir un zoom mínimo para que no se alejen demasiado
+          minZoom: userProfile.cityData ? initialZoom - 2 : 5 
         }).addTo(gameMap);
-        gameMap.setView([38.88, -6.97], 13);
+        
+        gameMap.setView(initialCoords, initialZoom);
         
         setTimeout(() => gameMap.invalidateSize(), 10);
 
@@ -461,9 +517,10 @@
         setupMenu();
       }
       
-      // --- LÓGICA DE BOTONES CORREGIDA ---
+      // --- El resto de funciones se mantienen igual, pero las incluimos todas
+      // para que puedas reemplazar el script completo sin problemas.
+
       function setupStartButton(bStart) {
-        // Este es el handler para el PRIMER clic (Cargar Calles)
         const firstClickHandler = async () => {
             if (oldZonePoly) gameMap.removeLayer(oldZonePoly);
             if (!zonePoly) return;
@@ -482,7 +539,7 @@
             await preloadStreets();
             
             bStart.textContent = 'Iniciar juego';
-            bStart.onclick = secondClickHandler; // Asignamos el handler para el SEGUNDO clic
+            bStart.onclick = secondClickHandler;
 
             if (totalQuestions > 0) {
               bStart.disabled = false;
@@ -492,21 +549,17 @@
               document.getElementById('drawZone').classList.remove('hidden');
             }
         };
-
-        // Este es el handler para el SEGUNDO clic (Iniciar Juego)
         const secondClickHandler = () => {
             playing = true; qIdx = 0; streetsGuessedCorrectly = 0;
             document.getElementById('score-display').classList.remove('hidden');
             document.getElementById('score').textContent = `0 / ${totalQuestions}`;
-            document.getElementById('start-options').classList.add('hidden'); // Ocultamos los botones aquí
+            document.getElementById('start-options').classList.add('hidden');
             document.getElementById('next').classList.remove('hidden');
             gameMap.fitBounds(zonePoly.getBounds(), { padding: [50, 50] });
             nextQ();
         };
-
-        bStart.onclick = firstClickHandler; // Asignamos el handler inicial
+        bStart.onclick = firstClickHandler;
       }
-
 
       function startDrawing(){
         document.getElementById('fb').textContent = 'Haz click para añadir vértices. Con 3 se habilita Start. Haz click en el primer vértice para cerrar.';
@@ -735,6 +788,7 @@
         document.getElementById('next').disabled = true;
       }
       
+      // MODIFICACIÓN FINAL: La función reportIncident ahora envía la ciudad del usuario.
       async function reportIncident() {
         if (lastGameZonePoints.length === 0) {
           alert("Debes jugar en una zona primero para poder reportar una incidencia sobre ella.");
@@ -753,16 +807,20 @@
 
             const zoneString = lastGameZonePoints.map(p => `${p.lat},${p.lng}`).join(';');
             
+            // El cuerpo de la petición ahora incluye la ciudad del perfil.
+            const requestBody = {
+                zone_points: zoneString,
+                description: description,
+                city: userProfile.subscribedCity // ¡Aquí está la magia!
+            };
+
             const response = await fetch('/api/reportIncident', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${session.access_token}`
                 },
-                body: JSON.stringify({
-                    zone_points: zoneString,
-                    description: description
-                })
+                body: JSON.stringify(requestBody)
             });
 
             if (!response.ok) {

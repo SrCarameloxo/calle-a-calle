@@ -87,9 +87,11 @@ function extractNameParts(name) {
 // --- Handler Principal ---
 module.exports = async (request, response) => {
   try {
-    const { zone } = request.query;
+    const { zone, includePOI } = request.query; // <- 1. LEEMOS EL NUEVO PARÁMETRO
     if (!zone) return response.status(400).json({ error: 'Faltan los puntos de la zona.' });
     
+    const POIsAllowed = includePOI === 'true'; // Convertimos el string a booleano
+
     const zonePoints = zone.split(';').map(pair => {
       const [lat, lng] = pair.split(',');
       return { lat: parseFloat(lat), lng: parseFloat(lng) };
@@ -143,10 +145,29 @@ module.exports = async (request, response) => {
 
       if (geometries.length === 0) continue;
 
+      // --- INICIO: REGLA DE SELECCIÓN (FILTRO POR MODO DE JUEGO) ---
+      const hasClosedArea = geometries.some(g => g.isClosed);
+      // Si el modo es "solo calles" (POIsAllowed = false) y el lugar contiene un área cerrada, lo descartamos.
+      if (!POIsAllowed && hasClosedArea) {
+          continue;
+      }
+      // --- FIN: REGLA DE SELECCIÓN ---
+
+
+      // --- INICIO: REGLA DE VISUALIZACIÓN (FILTRO "PASEO FLUVIAL") ---
+      let geometriesToUse = geometries;
+      const hasLines = geometries.some(g => !g.isClosed);
+      // Si un lugar tiene a la vez líneas y áreas, usamos solo las líneas para dibujarlo.
+      if (hasLines && hasClosedArea) {
+          geometriesToUse = geometries.filter(g => !g.isClosed);
+      }
+      // --- FIN: REGLA DE VISUALIZACIÓN ---
+
+
       let finalStreet = null;
 
       if (rule) {
-          finalStreet = { googleName: rule.display_name.toUpperCase(), geometries: geometries };
+          finalStreet = { googleName: rule.display_name.toUpperCase(), geometries: geometriesToUse };
       } else {
           const samplePoints = geometries.flatMap(g => g.points).filter((_, i, arr) => i % Math.max(1, Math.floor(arr.length / 5)) === 0).map(p => ({ lat: p[0], lng: p[1] }));
           const geocodedResults = await Promise.all(samplePoints.map(pt => geocode(pt, process.env.GOOGLE_API_KEY)));
@@ -179,7 +200,7 @@ module.exports = async (request, response) => {
               }
 
               if (isMatch) {
-                  finalStreet = { googleName: finalNameToUse, geometries: geometries };
+                  finalStreet = { googleName: finalNameToUse, geometries: geometriesToUse };
               }
           }
       }

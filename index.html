@@ -174,6 +174,64 @@
         animation: pulseAndFlash 0.8s ease-out;
     }
     /* ===== FIN: NUEVOS ESTILOS DE ANIMACIÓN ===== */
+
+    /* --- INICIO: ESTILOS PARA EL NUEVO CHECKBOX --- */
+    .checkbox-wrapper {
+        padding: 10px 0;
+    }
+    .checkbox-container {
+        display: inline-block;
+        position: relative;
+        padding-left: 35px;
+        margin-bottom: 12px;
+        cursor: pointer;
+        font-size: 16px;
+        user-select: none;
+        color: #333; /* Color del texto */
+    }
+    .custom-checkbox {
+        position: absolute;
+        opacity: 0;
+        cursor: pointer;
+        height: 0;
+        width: 0;
+    }
+    .checkmark {
+        position: absolute;
+        top: 0;
+        left: 0;
+        height: 25px;
+        width: 25px;
+        background-color: #d1d5db; /* Gris claro para estado apagado */
+        border-radius: 4px;
+        transition: background-color 0.3s;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+    }
+    .checkmark:after {
+        content: "";
+        position: absolute;
+        display: none;
+        left: 9px;
+        top: 5px;
+        width: 5px;
+        height: 10px;
+        border: solid white;
+        border-width: 0 3px 3px 0;
+        transform: rotate(45deg);
+    }
+    .custom-checkbox:checked ~ .checkmark {
+        background-color: #3b82f6; /* Azul del tema para estado encendido */
+        box-shadow: 0 3px 7px rgba(59, 130, 246, 0.3);
+    }
+    .custom-checkbox:checked ~ .checkmark:after {
+        display: block;
+        animation: checkAnim 0.2s forwards;
+    }
+    @keyframes checkAnim {
+        0% { height: 0; }
+        100% { height: 10px; }
+    }
+    /* --- FIN: ESTILOS PARA EL NUEVO CHECKBOX --- */
   </style>
 </head>
 <body>
@@ -198,7 +256,17 @@
           <h1 class="gradient-text">Calle a Calle</h1>
           <button id="drawZone" class="game-control-btn">Establecer zona</button>
           <button id="undoPoint" class="game-control-btn hidden">Retroceder Punto</button>
-          <button id="start" class="game-control-btn hidden" disabled>Start</button>
+          
+          <div id="start-options" class="hidden">
+            <div class="checkbox-wrapper">
+                <label class="checkbox-container">Incluir Zonas de Interés
+                    <input id="include-poi-checkbox" class="custom-checkbox" type="checkbox">
+                    <span class="checkmark"></span>
+                </label>
+            </div>
+            <button id="start" class="game-control-btn" disabled>Start</button>
+          </div>
+
           <button id="repeatZone" class="game-control-btn hidden" disabled>Repetir Zona</button>
           <button id="saveZoneBtn" class="game-control-btn hidden">Guardar Zona</button>
           <button id="next" class="game-control-btn hidden" disabled>Siguiente</button>
@@ -409,15 +477,19 @@
                 tempMarkers = [];
             }
             document.getElementById('undoPoint').classList.add('hidden');
+            document.getElementById('start-options').classList.add('hidden');
+
             bStart.disabled = true;
             bStart.textContent = 'Cargando calles...';
+            
             await preloadStreets();
+            
             bStart.textContent = 'Iniciar juego';
             bStart.onclick = () => {
                 playing = true; qIdx = 0; streetsGuessedCorrectly = 0;
                 document.getElementById('score-display').classList.remove('hidden');
                 document.getElementById('score').textContent = `0 / ${totalQuestions}`;
-                bStart.classList.add('hidden');
+                document.getElementById('start-options').classList.add('hidden');
                 document.getElementById('next').classList.remove('hidden');
                 gameMap.fitBounds(zonePoly.getBounds(), { padding: [50, 50] });
                 nextQ();
@@ -426,7 +498,7 @@
               bStart.disabled = false;
             } else {
               document.getElementById('fb').textContent = 'No se encontraron calles. Dibuja otra zona.';
-              bStart.classList.add('hidden');
+              document.getElementById('start-options').classList.add('hidden');
               document.getElementById('drawZone').classList.remove('hidden');
             }
         };
@@ -435,7 +507,8 @@
       function startDrawing(){
         document.getElementById('fb').textContent = 'Haz click para añadir vértices. Con 3 se habilita Start. Haz click en el primer vértice para cerrar.';
         ['repeatZone', 'saveZoneBtn', 'drawZone'].forEach(id => document.getElementById(id).classList.add('hidden'));
-        ['undoPoint', 'start'].forEach(id => document.getElementById(id).classList.remove('hidden'));
+        ['undoPoint', 'start-options'].forEach(id => document.getElementById(id).classList.remove('hidden'));
+        
         document.getElementById('start').disabled = true;
         document.getElementById('start').textContent = 'Start';
 
@@ -496,6 +569,7 @@
         zonePoints = [...lastGameZonePoints];
         zonePoly = L.polygon(zonePoints, { color: COL_ZONE, weight: 2, fillOpacity: 0.1 }).addTo(gameMap);
         document.getElementById('undoPoint').classList.add('hidden');
+        document.getElementById('start-options').classList.remove('hidden');
         document.getElementById('start').disabled = false;
         document.getElementById('fb').textContent = 'Zona anterior cargada. Pulsa Start.';
       }
@@ -562,7 +636,9 @@
 
           try {
               const zoneParam = zonePoints.map(p => `${p.lat},${p.lng}`).join(';');
-              const response = await fetch(`/api/getStreets?zone=${encodeURIComponent(zoneParam)}`);
+              const includePOI = document.getElementById('include-poi-checkbox').checked;
+              const response = await fetch(`/api/getStreets?zone=${encodeURIComponent(zoneParam)}&includePOI=${includePOI}`);
+              
               if (!response.ok) {
                   const errorData = await response.json();
                   throw new Error(errorData.error || 'Error del servidor.');
@@ -619,7 +695,7 @@
         lastGameZonePoints = [...zonePoints];
         saveGameStats(streetsGuessedCorrectly, totalQuestions);
         
-        ['next', 'start'].forEach(id => document.getElementById(id).classList.add('hidden'));
+        ['next', 'start-options'].forEach(id => document.getElementById(id).classList.add('hidden'));
         ['drawZone', 'repeatZone', 'saveZoneBtn'].forEach(id => document.getElementById(id).classList.remove('hidden'));
         document.getElementById('repeatZone').disabled = (lastGameZonePoints.length < 3);
 
@@ -817,6 +893,7 @@
         zonePoints = points.map(p => L.latLng(p.lat, p.lng));
         zonePoly = L.polygon(zonePoints, { color: COL_ZONE, weight: 2, fillOpacity: 0.1 }).addTo(gameMap);
         document.getElementById('undoPoint').classList.add('hidden');
+        document.getElementById('start-options').classList.remove('hidden');
         document.getElementById('start').disabled = false;
         document.getElementById('fb').textContent = 'Zona cargada. Pulsa Start.';
         gameMap.fitBounds(zonePoly.getBounds(), { padding: [50, 50] });

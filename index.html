@@ -9,7 +9,7 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     
-    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="style.css">
     
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -43,63 +43,105 @@
             <span id="question-prompt">¿Dónde está...?</span>
             <div id="street-name-box"><span id="street-name-text"></span></div>
         </div>
-
+        
         <div id="progress-bar-container" class="hidden"><div id="progress-bar"></div></div>
-
+        
         <div id="bottom-bar">
-            <div id="info-panel">
-                <span class="logo-text">Calle a Calle</span>
-                <span id="info-text">Dibuja una zona para empezar</span>
-            </div>
-            
-            <button id="menu-btn" aria-label="Abrir menú">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20.33 19.8"><path d="M10.17,0L0,8.85V20.3h5.83v-7.2h8.67v7.2h5.83V8.85L10.17,0Z" transform="translate(0 0)" style="fill: #fff;"/></svg>
-            </button>
-            
-            <div id="poi-switch-container" class="hidden">
-                <label for="poi-checkbox" class="poi-switch"><input type="checkbox" id="poi-checkbox"><span class="slider"></span></label>
-                <span class="poi-label">POIs</span>
-            </div>
-            
-            <button id="main-action-btn" class="action-btn"></button>
+            <svg viewBox="0 0 414.03 191.13" id="bottom-svg">
+                 <g class="cls-1">
+                    <g id="Capa_2" data-name="Capa 2">
+                        <g id="Capa_1-2" data-name="Capa 1">
+                            <path class="cls-12" d="M40.23,0H373.8c22.21,0,40.23,18,40.23,40.23V150.9c0,22.21-18,40.23-40.23,40.23H40.23C18,191.13,0,173.11,0,150.9V40.23C0,18,18,0,40.23,0Z"/>
+                            
+                            <g id="info-panel">
+                                <rect class="cls-13" x="19.01" y="19.5" width="274.45" height="49.03" rx="24.51" ry="24.51"/>
+                                <foreignObject x="30" y="22" width="250" height="45">
+                                    <div xmlns="http://www.w3.org/1999/xhtml" class="info-panel-content">
+                                        <span class="logo-text">Calle a Calle</span>
+                                        <span id="info-text">Dibuja una zona para empezar</span>
+                                    </div>
+                                </foreignObject>
+                            </g>
+
+                            <g id="menu-btn-group" style="cursor: pointer;">
+                                <circle class="cls-11" cx="42.5" cy="144.5" r="24"/>
+                                <g>
+                                    <rect class="cls-14" x="32" y="134" width="21" height="21" />
+                                    <foreignObject x="32" y="134" width="21" height="21">
+                                        <div xmlns="http://www.w3.org/1999/xhtml" class="menu-icon">
+                                            <svg viewBox="0 0 24 24"><path fill="currentColor" d="M3,6H21V8H3V6M3,11H21V13H3V11M3,16H21V18H3V16Z"></path></svg>
+                                        </div>
+                                    </foreignObject>
+                                </g>
+                            </g>
+
+                            <g id="poi-switch-container">
+                                 <foreignObject x="85" y="125" width="150" height="48">
+                                      <div xmlns="http://www.w3.org/1999/xhtml" class="poi-switch-content">
+                                        <label for="poi-checkbox" class="poi-label">Incluir PDI</label>
+                                        <label class="switch">
+                                            <input type="checkbox" id="poi-checkbox">
+                                            <span class="slider round"></span>
+                                        </label>
+                                    </div>
+                                </foreignObject>
+                            </g>
+                            
+                             <g id="main-action-btn-group" style="cursor: pointer;">
+                                <rect class="cls-10" x="240" y="85" width="155" height="85" rx="30" ry="30"/>
+                                 <foreignObject x="240" y="85" width="155" height="85">
+                                    <button xmlns="http://www.w3.org/1999/xhtml" id="main-action-btn" class="action-btn btn-blue">
+                                        Establecer Zona
+                                    </button>
+                                </foreignObject>
+                            </g>
+                            
+                            <g id="user-avatar-group" style="cursor: pointer;">
+                                <circle class="cls-15" cx="351.5" cy="44.5" r="24"/>
+                                <foreignObject x="327.5" y="20.5" width="48" height="48">
+                                     <img xmlns="http://www.w3.org/1999/xhtml" id="user-avatar" class="user-avatar-img" src="https://placehold.co/48x48/2b324c/FFF?text=U" alt="User"/>
+                                </foreignObject>
+                            </g>
+                        </g>
+                    </g>
+                </g>
+            </svg>
         </div>
 
         <div id="feedback-popup"><span id="feedback-text"></span></div>
-
-        <div id="menu-overlay" class="hidden">
-            <div class="menu-content">
-                <button id="close-menu-btn">&times;</button>
-                <h2 class="menu-title">Menú</h2>
-                <div id="menu-tabs">
-                    <button class="menu-tab-btn active" data-panel="profile-content">Perfil</button>
-                    <button class="menu-tab-btn" data-panel="saved-zones-content">Mis Zonas</button>
-                    <button class="menu-tab-btn" data-panel="stats-content">Estadísticas</button>
-                </div>
-                <div class="menu-panels">
-                    <div id="profile-content" class="menu-panel active"></div>
-                    <div id="saved-zones-content" class="menu-panel"></div>
-                    <div id="stats-content" class="menu-panel"></div>
-                </div>
-            </div>
-        </div>
         
-        <div id="report-modal" class="hidden">
+        <div id="report-modal" class="modal-overlay hidden">
             <div class="modal-content">
-                <h3>Reportar una incidencia</h3>
-                <p>Describe el problema que has encontrado. (Ej: "Falta la calle X")</p>
-                <textarea id="report-textarea" rows="4"></textarea>
-                <div class="modal-buttons">
+                <h3 class="modal-title">Reportar una incidencia</h3>
+                <p class="modal-description">¿Has encontrado un error o tienes alguna sugerencia? ¡Cuéntanos!</p>
+                <textarea id="report-textarea" placeholder="Describe el problema o tu idea..."></textarea>
+                <div class="modal-actions">
                     <button id="cancel-report-btn">Cancelar</button>
                     <button id="submit-report-btn">Enviar</button>
                 </div>
             </div>
         </div>
+
+        <div id="menu-overlay" class="modal-overlay hidden">
+            <div id="menu-content" class="menu-panel-container">
+                <button id="close-menu-btn">&times;</button>
+                <div id="menu-tabs">
+                    <button class="menu-tab-btn active" data-panel="profile-content">Perfil</button>
+                    <button class="menu-tab-btn" data-panel="saved-zones-content">Mis Zonas</button>
+                    <button class="menu-tab-btn" data-panel="stats-content">Estadísticas</button>
+                </div>
+                <div id="profile-content" class="menu-panel active"></div>
+                <div id="saved-zones-content" class="menu-panel"></div>
+                <div id="stats-content" class="menu-panel"></div>
+            </div>
+        </div>
+
     </div>
 
-    <audio id="correct-sound" src="/sounds/correct.mp3" preload="auto"></audio>
-    <audio id="incorrect-sound" src="/sounds/incorrect.mp3" preload="auto"></audio>
-
+    <audio id="correct-sound" src="sounds/correct.mp3" preload="auto"></audio>
+    <audio id="incorrect-sound" src="sounds/incorrect.mp3" preload="auto"></audio>
+    
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script defer src="js/main.js"></script>
+    <script src="main.js"></script>
 </body>
 </html>

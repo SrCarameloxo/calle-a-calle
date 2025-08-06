@@ -147,11 +147,9 @@ module.exports = async (request, response) => {
         if (groupTypes.size > 1) {
             const hasAreaType = [...groupTypes].some(type => AREA_TYPES.has(type));
             const hasLineType = [...groupTypes].some(type => LINE_TYPES.has(type) || type === null);
-            // Si en un mismo grupo hay un área (Plaza) y una línea (Calle), SEPARAR.
             if (hasAreaType && hasLineType) {
                 shouldSplit = true;
             }
-            // Si todos son lineales pero de diferente tipo (Calle vs Callejón), SEPARAR.
             if (!hasAreaType && new Set([...groupTypes].filter(t => t !== null)).size > 1) {
                 shouldSplit = true;
             }
@@ -171,14 +169,17 @@ module.exports = async (request, response) => {
         }
         
         for (const entity of entitiesToProcess) {
+            // Se reinician las variables en cada iteración para evitar fugas de estado
+            let streetData = null;
+            let processedStreet = {};
+
             if (seenIds.has(entity.id)) continue;
             
             const mainOsmName = entity.osmNames[0];
-            const cacheKey = `street_v6:${entity.id.replace(/\s/g, '_')}`;
-            let streetData = await kv.get(cacheKey);
+            const cacheKey = `street_v7:${entity.id.replace(/\s/g, '_')}`;
+            streetData = await kv.get(cacheKey);
 
             if (!streetData) {
-                let processedStreet = {};
                 const rule = entity.osmNames.reduce((acc, name) => acc || overrideRules.get(name), null);
 
                 const queryNames = entity.osmNames.map(n => `way["name"="${n}"](around:${radius}, ${center.lat}, ${center.lng});`).join('');
@@ -209,21 +210,29 @@ module.exports = async (request, response) => {
                         const osmParts = extractNameParts(mainOsmName);
                         const googleParts = extractNameParts(mostCommonGoogleName);
                         
+                        // --- INICIO DE LA LÓGICA DE VALIDACIÓN CORREGIDA Y MÁS ESTRICTA ---
                         let isMatch = false;
-                        if (osmParts.baseName === googleParts.baseName) isMatch = true;
-                        else {
-                            const distance = levenshtein(osmParts.baseName, googleParts.baseName);
-                            const similarity = 1 - distance / Math.max(osmParts.baseName.length, googleParts.baseName.length);
-                            if (similarity > 0.85) isMatch = true;
+                        // Para que sea un match, tanto el nombre base como el tipo de vía deben coincidir.
+                        if (osmParts.baseName === googleParts.baseName && osmParts.type === googleParts.type) {
+                            isMatch = true;
                         }
-
-                        // RED DE SEGURIDAD ANTI-SALTO (ANTI-SNAP): Si el nombre de Google no es un buen match,
-                        // Y ADEMÁS corresponde a OTRA calle de la zona, es muy sospechoso. En ese caso, usamos el nombre de OSM.
-                        if (!isMatch && allOsmBaseNamesInPoly.has(googleParts.baseName)) {
-                            processedStreet.displayName = mainOsmName.toUpperCase();
+                        
+                        // Si no es un match perfecto, activamos la red de seguridad.
+                        if (!isMatch) {
+                            // Si el nombre de Google corresponde a OTRA calle de la zona, es un "salto" (snap).
+                            // En ese caso, usamos el nombre de OSM para ser más seguros.
+                            if (allOsmBaseNamesInPoly.has(googleParts.baseName)) {
+                                processedStreet.displayName = mainOsmName.toUpperCase();
+                            } else {
+                                // Si no es un salto, podría ser una simple variación (ej. "Calle Milagros" vs "De los Milagros").
+                                // Aquí podemos usar el nombre de Google, ya que es la mejor conjetura.
+                                processedStreet.displayName = mostCommonGoogleName;
+                            }
                         } else {
+                            // Si es un match perfecto, usamos el nombre de Google.
                             processedStreet.displayName = mostCommonGoogleName;
                         }
+                        // --- FIN DE LA LÓGICA DE VALIDACIÓN CORREGIDA ---
 
                     } else {
                         processedStreet.displayName = mainOsmName.toUpperCase();

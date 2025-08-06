@@ -10,11 +10,8 @@ window.addEventListener('DOMContentLoaded', () => {
     const gameScreen = document.getElementById('game-screen');
     const gameMapContainer = document.getElementById('game-map-container');
     const googleLoginBtn = document.getElementById('google-login-btn');
-    
-    // Nuevos elementos de la UI
     const reportIncidentBtn = document.getElementById('report-incident-btn');
     const questionArea = document.getElementById('question-area');
-    const streetNameBox = document.getElementById('street-name-box');
     const streetNameText = document.getElementById('street-name-text');
     const progressBarContainer = document.getElementById('progress-bar-container');
     const progressBar = document.getElementById('progress-bar');
@@ -27,10 +24,13 @@ window.addEventListener('DOMContentLoaded', () => {
     const menuBtn = document.getElementById('menu-btn');
     const menuOverlay = document.getElementById('menu-overlay');
     const closeMenuBtn = document.getElementById('close-menu-btn');
+    const reportModal = document.getElementById('report-modal');
+    const cancelReportBtn = document.getElementById('cancel-report-btn');
+    const submitReportBtn = document.getElementById('submit-report-btn');
+    const reportTextarea = document.getElementById('report-textarea');
 
     // --- VARIABLES DE ESTADO DEL JUEGO ---
-    let gameMap = null;
-    let backgroundMap = null;
+    let gameMap = null, backgroundMap = null;
     const COL_ZONE = '#663399', COL_TRACE = '#007a2f', COL_DASH = '#1976d2';
     let drawing = false, zonePoly = null, tempMarkers = [], zonePoints = [], oldZonePoly = null;
     let playing = false, qIdx = 0, target = null, userMk, guide, streetGrp;
@@ -50,46 +50,36 @@ window.addEventListener('DOMContentLoaded', () => {
     
     function updateActionButtons(state) {
         actionsContainer.innerHTML = '';
-        actionsContainer.className = '';
+        actionsContainer.className = 'bottom-controls';
         poiSwitchContainer.classList.add('hidden');
     
-        const createButton = (id, icon, color, btnClass, clickHandler) => {
+        const createButton = (id, text, color, btnClass, clickHandler) => {
             const btn = document.createElement('button');
             btn.id = id;
             btn.className = `action-btn ${color} ${btnClass}`;
-            btn.innerHTML = icon;
+            btn.textContent = text;
             btn.onclick = clickHandler;
             actionsContainer.appendChild(btn);
             return btn;
         };
     
-        const icons = {
-            draw: `<svg viewBox="0 0 24 24"><path d="M12 20h9" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>`,
-            undo: `<svg viewBox="0 0 24 24"><path d="M21 7v6h-6" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path><path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3l-3 2.7" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>`,
-            start: `<svg viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></polygon></svg>`,
-            next: `<svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></polyline></svg>`,
-            loading: `<svg class="animate-spin" viewBox="0 0 24 24" style="animation: spin 1s linear infinite;"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>`,
-            repeat: `<svg viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></polyline><path d="M1 20v-6a8 8 0 0 1 8-8 8 8 0 0 1 8 8v1" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path><polyline points="1 14 1 20 7 20" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></polyline><path d="M23 10a8 8 0 0 1-8 8 8 8 0 0 1-8-8v-1" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>`,
-            save: `<svg viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path><polyline points="17 21 17 13 7 13 7 21" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></polyline><polyline points="7 3 7 8 15 8" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></polyline></svg>`
-        };
-    
         switch (state) {
             case 'initial':
-                createButton('drawZoneBtn', icons.draw, 'btn-blue', 'main-btn', startDrawing);
+                createButton('drawZoneBtn', 'Establecer Zona', 'btn-blue', 'main-btn', startDrawing);
                 break;
             case 'drawing':
                 actionsContainer.classList.add('split-2');
                 poiSwitchContainer.classList.remove('hidden');
-                const startBtn = createButton('startBtn', icons.start, 'btn-green', 'btn-2', () => preloadStreets());
+                const startBtn = createButton('startBtn', 'Start', 'btn-green', 'btn-2', () => preloadStreets());
                 startBtn.disabled = zonePoints.length < 3;
                 if(startBtn.disabled) startBtn.classList.add('btn-gray');
-                createButton('undoBtn', icons.undo, 'btn-red', 'btn-1', undoLastPoint);
+                createButton('undoBtn', 'Retroceder', 'btn-red', 'btn-1', undoLastPoint);
                 break;
             case 'loading':
-                createButton('loadingBtn', icons.loading, 'btn-gray', 'main-btn', null).disabled = true;
+                createButton('loadingBtn', 'Cargando...', 'btn-gray', 'main-btn', null).disabled = true;
                 break;
             case 'game_ready':
-                createButton('startGameBtn', icons.start, 'btn-green', 'main-btn', () => {
+                createButton('startGameBtn', 'Iniciar Juego', 'btn-green', 'main-btn', () => {
                     playing = true; qIdx = 0; streetsGuessedCorrectly = 0;
                     progressBar.style.width = '0%';
                     progressBarContainer.classList.remove('hidden');
@@ -98,14 +88,14 @@ window.addEventListener('DOMContentLoaded', () => {
                 });
                 break;
             case 'playing':
-                 const nextBtn = createButton('nextBtn', icons.next, 'btn-blue', 'main-btn', () => nextQ());
+                 const nextBtn = createButton('nextBtn', 'Siguiente', 'btn-blue', 'main-btn', () => nextQ());
                  nextBtn.disabled = true; nextBtn.classList.add('btn-gray');
                  break;
             case 'end_game':
                 actionsContainer.classList.add('split-3');
-                createButton('saveZoneBtn', icons.save, 'btn-yellow', 'btn-1', saveCurrentZone);
-                createButton('repeatZoneBtn', icons.repeat, 'btn-green', 'btn-2', repeatLastZone);
-                createButton('drawZoneBtn', icons.draw, 'btn-blue', 'btn-3', startDrawing);
+                createButton('saveZoneBtn', 'Guardar Zona', 'btn-yellow', 'btn-1', saveCurrentZone);
+                createButton('repeatZoneBtn', 'Repetir Zona', 'btn-green', 'btn-2', repeatLastZone);
+                createButton('drawZoneBtn', 'Nueva Zona', 'btn-blue', 'btn-3', startDrawing);
                 break;
         }
     }
@@ -127,9 +117,7 @@ window.addEventListener('DOMContentLoaded', () => {
                 if (cityError) throw new Error(`No se encontraron datos para la ciudad: ${profile.subscribed_city}`);
                 userProfile.cityData = city;
             }
-        } catch (e) {
-            console.error("Error fetching user profile:", e);
-        }
+        } catch (e) { console.error("Error fetching user profile:", e); }
     }
     
     async function handleAuthStateChange(event, session) {
@@ -155,7 +143,7 @@ window.addEventListener('DOMContentLoaded', () => {
         }
     }
     
-    // --- INICIALIZACIÓN DE MAPAS Y MENÚ ---
+    // --- INICIALIZACIÓN ---
     function initGame() {
         let initialCoords = [38.88, -6.97], initialZoom = 13;
         if (userProfile.cityData) {
@@ -175,7 +163,9 @@ window.addEventListener('DOMContentLoaded', () => {
         
         gameMap.invalidateSize();
         updateActionButtons('initial');
-        reportIncidentBtn.onclick = reportIncident;
+        reportIncidentBtn.onclick = () => reportModal.classList.remove('hidden');
+        cancelReportBtn.onclick = () => reportModal.classList.add('hidden');
+        submitReportBtn.onclick = submitIncidentReport;
     }
 
     function setupMenu(user) {
@@ -253,11 +243,8 @@ window.addEventListener('DOMContentLoaded', () => {
         const startBtn = document.getElementById('startBtn');
         if (startBtn) {
             startBtn.disabled = zonePoints.length < 3;
-            if(startBtn.disabled) {
-                startBtn.classList.add('btn-gray');
-            } else {
-                startBtn.classList.remove('btn-gray');
-            }
+            if(startBtn.disabled) { startBtn.classList.add('btn-gray'); } 
+            else { startBtn.classList.remove('btn-gray'); }
         }
         updateInfoPanel(zonePoints.length > 0 ? 'Punto eliminado' : 'Haz clic para añadir vértices');
     }
@@ -308,16 +295,14 @@ window.addEventListener('DOMContentLoaded', () => {
         target = s.geometries;
         qIdx++;
         
-        // Animación de la pregunta
         questionArea.classList.remove('hidden');
         streetNameText.textContent = s.googleName;
-        streetNameBox.style.width = 'auto';
+        streetNameText.parentElement.style.width = 'auto';
         const newWidth = streetNameText.scrollWidth;
-        streetNameBox.style.width = newWidth + 'px';
-        streetNameBox.classList.add('pulse-animation');
-        setTimeout(() => streetNameBox.classList.remove('pulse-animation'), 500);
+        streetNameText.parentElement.style.width = newWidth + 'px';
+        streetNameText.parentElement.classList.add('pulse-animation');
+        setTimeout(() => streetNameText.parentElement.classList.remove('pulse-animation'), 500);
         
-        // Actualización de la barra de progreso
         const progress = (qIdx / totalQuestions) * 100;
         progressBar.style.width = progress + '%';
 
@@ -335,7 +320,7 @@ window.addEventListener('DOMContentLoaded', () => {
             const style = { color: COL_TRACE, weight: geom.isClosed ? 4 : 8, fillOpacity: 0.2 };
             const layer = geom.isClosed ? L.polygon(geom.points, style) : L.polyline(geom.points, style);
             layer.addTo(streetGrp);
-            if(layer.getElement()) layer.getElement().classList.add('street-reveal-animation');
+            try { if(layer.getElement()) layer.getElement().classList.add('street-reveal-animation'); } catch(e){}
         });
 
         const streetCheck = getDistanceToStreet(userMk.getLatLng(), streetGrp);
@@ -344,7 +329,7 @@ window.addEventListener('DOMContentLoaded', () => {
             showFeedbackPopup('¡Correcto!', 'correct');
             document.getElementById('correct-sound').play().catch(()=>{});
         } else {
-            showFeedbackPopup('Casi...', 'incorrect');
+            showFeedbackPopup(`Casi... a ${Math.round(streetCheck.distance)} metros`, 'incorrect');
             document.getElementById('incorrect-sound').play().catch(()=>{});
         }
 
@@ -385,7 +370,7 @@ window.addEventListener('DOMContentLoaded', () => {
         preloadStreets();
     }
     
-    // --- LÓGICA DE APOYO (Distancia, Guardado, Estadísticas, Reporte) ---
+    // --- LÓGICA DE APOYO ---
     function getDistanceToStreet(userPoint, streetLayer) {
         let minDistance = Infinity, closestPointOnStreet = null;
         streetLayer.eachLayer(layer => {
@@ -465,15 +450,20 @@ window.addEventListener('DOMContentLoaded', () => {
         } catch (e) { container.innerHTML = '<p class="text-red-400">Error al cargar estadísticas.</p>'; }
     }
     
-    async function reportIncident() {
+    async function submitIncidentReport() {
         if (lastGameZonePoints.length === 0) {
             showFeedbackPopup("Juega en una zona para poder reportar", "incorrect");
             return;
         }
-        const description = prompt("Por favor, describe la incidencia (ej. 'Falta la calle X', 'La calle Y no debería estar', etc.):");
-        if (!description?.trim()) return;
+        const description = reportTextarea.value;
+        if (!description?.trim()) {
+            showFeedbackPopup("La descripción no puede estar vacía", "incorrect");
+            return;
+        }
 
         try {
+            submitReportBtn.disabled = true;
+            submitReportBtn.textContent = 'Enviando...';
             const { data: { session } } = await supabaseClient.auth.getSession();
             if (!session) { showFeedbackPopup("Necesitas estar conectado para reportar", "incorrect"); return; }
             const zoneString = lastGameZonePoints.map(p => `${p.lat},${p.lng}`).join(';');
@@ -484,9 +474,14 @@ window.addEventListener('DOMContentLoaded', () => {
             });
             if (!response.ok) throw new Error((await response.json()).error || 'Error del servidor');
             showFeedbackPopup("¡Gracias! Incidencia enviada", "correct");
+            reportModal.classList.add('hidden');
+            reportTextarea.value = '';
         } catch (error) {
             console.error('Error al enviar la incidencia:', error.message);
             showFeedbackPopup(`Error: ${error.message}`, "incorrect");
+        } finally {
+            submitReportBtn.disabled = false;
+            submitReportBtn.textContent = 'Enviar';
         }
     }
 

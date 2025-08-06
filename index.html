@@ -1,104 +1,102 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="utf-8">
-  <title>Calle a Calle</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  
-  <link rel="stylesheet" href="css/style.css">
+    <meta charset="UTF-8">
+    <title>Calle a Calle</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
 
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    
+    <link rel="stylesheet" href="css/style.css">
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@500;700&display=swap" rel="stylesheet">
 </head>
 <body>
-  <div id="background-map"></div>
-  <div id="login-screen">
-    <section class="p-2 bg-gradient-to-r from-blue-800 to-purple-800 rounded-3xl">
-      <div class="p-8 text-white bg-gray-900 border-8 border-transparent rounded-2xl shadow-xl bg-opacity-80 backdrop-blur-sm">
-        <h1 class="text-5xl font-bold text-center cursor-default">Calle a Calle</h1>
-        <p class="mt-2 mb-8 text-center text-gray-300">Inicia sesión para empezar a jugar</p>
-        <div class="flex justify-center">
-          <button id="google-login-btn" class="p-3 bg-white rounded-full shadow-lg login-btn hover:scale-105 transition transform duration-300">
-            <img class="w-10 h-10" loading="lazy" src="https://ucarecdn.com/8f25a2ba-bdcf-4ff1-b596-088f330416ef/" alt="Google" />
-          </button>
+    <div id="background-map"></div>
+    <div id="login-screen">
+      <section class="p-2 bg-gradient-to-r from-blue-800 to-purple-800 rounded-3xl">
+        <div class="p-8 text-white bg-gray-900 border-8 border-transparent rounded-2xl shadow-xl bg-opacity-80 backdrop-blur-sm">
+          <h1 class="text-5xl font-bold text-center cursor-default">Calle a Calle</h1>
+          <p class="mt-2 mb-8 text-center text-gray-300">Inicia sesión para empezar a jugar</p>
+          <div class="flex justify-center">
+            <button id="google-login-btn" class="p-3 bg-white rounded-full shadow-lg login-btn hover:scale-105 transition transform duration-300">
+              <img class="w-10 h-10" loading="lazy" src="https://ucarecdn.com/8f25a2ba-bdcf-4ff1-b596-088f330416ef/" alt="Google" />
+            </button>
+          </div>
         </div>
-      </div>
-    </section>
-  </div>
+      </section>
+    </div>
 
-  <div id="game-screen" class="hidden">
-    <aside>
-      <div id="top-panel">
-          <h1 class="gradient-text">Calle a Calle</h1>
-          <button id="drawZone" class="game-control-btn">Establecer zona</button>
-          <button id="undoPoint" class="game-control-btn hidden">Retroceder Punto</button>
-          
-          <div id="start-options" class="hidden">
-            <div class="checkbox-wrapper">
-                <label class="checkbox-container">
-                    <input id="include-poi-checkbox" class="custom-checkbox" type="checkbox">
-                    <span class="checkmark"></span>
-                    Incluir Zonas de Interés
-                </label>
+    <div id="game-screen" class="hidden">
+        
+        <div id="game-map-container"></div>
+        
+        <button id="report-incident-btn" aria-label="Reportar incidencia">
+            <svg viewBox="0 0 24 24" height="24" width="24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path><line x1="12" y1="9" x2="12" y2="9" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5"></line><line x1="16" y1="9" x2="16" y2="9" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5"></line><line x1="8" y1="9" x2="8" y2="9" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5"></line></svg>
+        </button>
+
+        <div id="question-area" class="hidden">
+            <span id="question-prompt">¿Dónde está...?</span>
+            <div id="street-name-box">
+                <span id="street-name-text"></span>
             </div>
-            <button id="start" class="game-control-btn" disabled>Start</button>
-          </div>
-
-          <button id="repeatZone" class="game-control-btn hidden" disabled>Repetir Zona</button>
-          <button id="saveZoneBtn" class="game-control-btn hidden">Guardar Zona</button>
-          <button id="next" class="game-control-btn hidden" disabled>Siguiente</button>
-          <p id="question"></p>
-          <p id="score-display" class="hidden">Calles acertadas: <span id="score">0 / 0</span></p>
-          <div id="loader-container" class="loader hidden">
-            <div id="loading-text" class="loading-text"></div>
-          </div>
-          <p id="fb"></p>
-      </div>
-      
-      <div id="middle-panel-container">
-        <div id="saved-zones-content" class="content-panel">
-            <h3 class="mb-4 text-xl font-bold">Mis Zonas Guardadas</h3>
-            <div id="saved-zones-list" class="space-y-2"></div>
         </div>
-        <div id="stats-content" class="content-panel">
-            <h3 class="mb-4 text-xl font-bold">Estadísticas</h3>
-            <div id="stats-list"></div>
+
+        <div id="progress-bar-container" class="hidden">
+            <div id="progress-bar"></div>
         </div>
-        <div id="profile-content" class="content-panel">
-            <h3 class="mb-4 text-xl font-bold">Perfil de Usuario</h3>
-            <div id="user-info-details" class="p-4 text-center bg-gray-700 rounded-lg"></div>
-            <button id="admin-panel-btn" class="w-full mt-4 game-control-btn hidden" style="background-color: #6f42c1; color: white;">Panel de Administración</button>
-            <button id="logout-btn" class="w-full mt-4 game-control-btn" style="background-color: #dc3545;">Cerrar Sesión</button>
+
+        <div id="bottom-bar">
+            <div id="info-panel">
+                <div id="logo-container"><img src="https://image.spread.ly/6345b4c5-3330-4665-8cb6-9159d33a1b32/icon.png" alt="Logo"></div>
+                <div id="info-text">Dibuja una zona para empezar</div>
+            </div>
+
+            <div id="menu-button-container">
+                <button id="menu-btn" aria-label="Abrir menú">
+                    <svg viewBox="0 0 24 24" height="28" width="28"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V9z" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path><polyline points="9 22 9 12 15 12 15 22" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></polyline></svg>
+                </button>
+            </div>
+
+            <div id="poi-switch-container" class="hidden">
+                <label for="poi-checkbox" class="poi-switch">
+                    <input type="checkbox" id="poi-checkbox">
+                    <span class="slider"></span>
+                </label>
+                <span class="poi-label">POIs</span>
+            </div>
+
+            <div id="actions-container"></div>
         </div>
-      </div>
 
-      <div id="bottom-menu">
-        <div class="flex items-center justify-center w-auto p-2 bg-gray-100 rounded-2xl">
-          <button class="menu-btn group flex-1 p-3 flex justify-center items-center rounded-xl" data-panel="saved-zones-content">
-            <svg viewBox="0 0 24 24" height="28" width="28" xmlns="http://www.w3.org/2000/svg" class="text-gray-500 group-hover:text-blue-500 group-[.active]:text-blue-500 transition-colors"><path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"></path></svg>
-          </button>
-          <button class="menu-btn group flex-1 p-3 flex justify-center items-center rounded-xl" data-panel="stats-content">
-            <svg viewBox="0 0 24 24" height="28" width="28" xmlns="http://www.w3.org/2000/svg" class="text-gray-500 group-hover:text-blue-500 group-[.active]:text-blue-500 transition-colors"><path d="M3 3v18h18" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path><path d="M18.7 8l-5.1 5.2-2.8-2.7L7 14.3" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
-          </button>
-          <button class="menu-btn group flex-1 p-3 flex justify-center items-center rounded-xl" data-panel="profile-content">
-            <svg viewBox="0 0 24 24" height="28" width="28" xmlns="http://www.w3.org/2000/svg" class="text-gray-500 group-hover:text-blue-500 group-[.active]:text-blue-500 transition-colors"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path><circle cx="12" cy="7" r="4" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></circle></svg>
-          </button>
-          <button id="report-btn" title="Reportar incidencia" class="group flex-1 p-3 flex justify-center items-center rounded-xl">
-            <svg viewBox="0 0 24 24" height="28" width="28" xmlns="http://www.w3.org/2000/svg" class="text-gray-500 group-hover:text-red-500 transition-colors"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1v12zM4 22v-7" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
-          </button>
-          </div>
-      </div>
-    </aside>
-    <div id="game-map-container"></div>
-  </div>
+        <div id="feedback-popup"><span id="feedback-text"></span></div>
 
-  <audio id="correct-sound" src="/sounds/correct.mp3" preload="auto"></audio>
-  <audio id="incorrect-sound" src="/sounds/incorrect.mp3" preload="auto"></audio>
+        <div id="menu-overlay" class="hidden">
+            <div class="menu-content">
+                <button id="close-menu-btn">&times;</button>
+                <h2 class="menu-title">Menú</h2>
+                <div id="menu-tabs">
+                    <button class="menu-tab-btn active" data-panel="profile-content">Perfil</button>
+                    <button class="menu-tab-btn" data-panel="saved-zones-content">Mis Zonas</button>
+                    <button class="menu-tab-btn" data-panel="stats-content">Estadísticas</button>
+                </div>
+                <div class="menu-panels">
+                    <div id="profile-content" class="menu-panel active"></div>
+                    <div id="saved-zones-content" class="menu-panel"></div>
+                    <div id="stats-content" class="menu-panel"></div>
+                </div>
+            </div>
+        </div>
+    </div>
 
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  
-  <script defer src="js/main.js"></script>
+    <audio id="correct-sound" src="/sounds/correct.mp3" preload="auto"></audio>
+    <audio id="incorrect-sound" src="/sounds/incorrect.mp3" preload="auto"></audio>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script defer src="js/main.js"></script>
 </body>
 </html>

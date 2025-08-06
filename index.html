@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <title>Calle a Calle</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0">
 
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://cdn.tailwindcss.com"></script>
@@ -47,23 +47,24 @@
         <div id="progress-bar-container" class="hidden"><div id="progress-bar"></div></div>
 
         <div id="bottom-bar">
-            <div id="info-panel">
-                <div id="logo-container"><span class="logo-text">Calle a Calle</span></div>
-                <div id="info-text">Dibuja una zona para empezar</div>
+            <div class="top-row">
+                <div id="info-panel">
+                    <span class="logo-text">Calle a Calle</span>
+                    <span id="info-text">Dibuja una zona para empezar</span>
+                </div>
             </div>
-
-            <div id="menu-button-container">
+            <div class="bottom-row">
                 <button id="menu-btn" aria-label="Abrir menú">
                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20.33 19.8"><path d="M10.17,0L0,8.85V20.3h5.83v-7.2h8.67v7.2h5.83V8.85L10.17,0Z" transform="translate(0 0)" style="fill: #fff;"/></svg>
                 </button>
+                <div id="controls-container">
+                    <div id="poi-switch-container" class="hidden">
+                        <label for="poi-checkbox" class="poi-switch"><input type="checkbox" id="poi-checkbox"><span class="slider"></span></label>
+                        <span class="poi-label">POIs</span>
+                    </div>
+                    <button id="main-action-btn" class="action-btn"></button>
+                </div>
             </div>
-            
-            <div id="poi-switch-container" class="hidden">
-                <label for="poi-checkbox" class="poi-switch"><input type="checkbox" id="poi-checkbox"><span class="slider"></span></label>
-                <span class="poi-label">POIs</span>
-            </div>
-
-            <div id="actions-container"></div>
         </div>
 
         <div id="feedback-popup"><span id="feedback-text"></span></div>
@@ -88,7 +89,7 @@
         <div id="report-modal" class="hidden">
             <div class="modal-content">
                 <h3>Reportar una incidencia</h3>
-                <p>Describe el problema que has encontrado. (Ej: "Falta la calle X", "La geometría de Y es incorrecta")</p>
+                <p>Describe el problema que has encontrado. (Ej: "Falta la calle X")</p>
                 <textarea id="report-textarea" rows="4"></textarea>
                 <div class="modal-buttons">
                     <button id="cancel-report-btn">Cancelar</button>
@@ -96,7 +97,6 @@
                 </div>
             </div>
         </div>
-
     </div>
 
     <audio id="correct-sound" src="/sounds/correct.mp3" preload="auto"></audio>

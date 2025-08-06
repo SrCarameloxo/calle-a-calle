@@ -18,7 +18,7 @@ window.addEventListener('DOMContentLoaded', () => {
     const infoText = document.getElementById('info-text');
     const poiSwitchContainer = document.getElementById('poi-switch-container');
     const poiCheckbox = document.getElementById('poi-checkbox');
-    const actionsContainer = document.getElementById('actions-container');
+    const mainActionBtn = document.getElementById('main-action-btn');
     const feedbackPopup = document.getElementById('feedback-popup');
     const feedbackText = document.getElementById('feedback-text');
     const menuBtn = document.getElementById('menu-btn');
@@ -48,56 +48,12 @@ window.addEventListener('DOMContentLoaded', () => {
         setTimeout(() => feedbackPopup.classList.remove('visible'), 2500);
     }
     
-    function updateActionButtons(state) {
-        actionsContainer.innerHTML = '';
-        actionsContainer.className = 'bottom-controls';
-        poiSwitchContainer.classList.add('hidden');
-    
-        const createButton = (id, text, color, btnClass, clickHandler) => {
-            const btn = document.createElement('button');
-            btn.id = id;
-            btn.className = `action-btn ${color} ${btnClass}`;
-            btn.textContent = text;
-            btn.onclick = clickHandler;
-            actionsContainer.appendChild(btn);
-            return btn;
-        };
-    
-        switch (state) {
-            case 'initial':
-                createButton('drawZoneBtn', 'Establecer Zona', 'btn-blue', 'main-btn', startDrawing);
-                break;
-            case 'drawing':
-                actionsContainer.classList.add('split-2');
-                poiSwitchContainer.classList.remove('hidden');
-                const startBtn = createButton('startBtn', 'Start', 'btn-green', 'btn-2', () => preloadStreets());
-                startBtn.disabled = zonePoints.length < 3;
-                if(startBtn.disabled) startBtn.classList.add('btn-gray');
-                createButton('undoBtn', 'Retroceder', 'btn-red', 'btn-1', undoLastPoint);
-                break;
-            case 'loading':
-                createButton('loadingBtn', 'Cargando...', 'btn-gray', 'main-btn', null).disabled = true;
-                break;
-            case 'game_ready':
-                createButton('startGameBtn', 'Iniciar Juego', 'btn-green', 'main-btn', () => {
-                    playing = true; qIdx = 0; streetsGuessedCorrectly = 0;
-                    progressBar.style.width = '0%';
-                    progressBarContainer.classList.remove('hidden');
-                    gameMap.fitBounds(zonePoly.getBounds(), { padding: [50, 50] });
-                    nextQ();
-                });
-                break;
-            case 'playing':
-                 const nextBtn = createButton('nextBtn', 'Siguiente', 'btn-blue', 'main-btn', () => nextQ());
-                 nextBtn.disabled = true; nextBtn.classList.add('btn-gray');
-                 break;
-            case 'end_game':
-                actionsContainer.classList.add('split-3');
-                createButton('saveZoneBtn', 'Guardar Zona', 'btn-yellow', 'btn-1', saveCurrentZone);
-                createButton('repeatZoneBtn', 'Repetir Zona', 'btn-green', 'btn-2', repeatLastZone);
-                createButton('drawZoneBtn', 'Nueva Zona', 'btn-blue', 'btn-3', startDrawing);
-                break;
-        }
+    function updateActionBtn(text, color, clickHandler, disabled = false) {
+        mainActionBtn.textContent = text;
+        mainActionBtn.className = `action-btn ${color}`;
+        mainActionBtn.onclick = clickHandler;
+        mainActionBtn.disabled = disabled;
+        if(disabled) mainActionBtn.classList.add('btn-gray');
     }
     
     // --- LÓGICA DE AUTENTICACIÓN Y PERFIL ---
@@ -162,7 +118,7 @@ window.addEventListener('DOMContentLoaded', () => {
         }
         
         gameMap.invalidateSize();
-        updateActionButtons('initial');
+        updateActionBtn('Establecer Zona', 'btn-blue', startDrawing);
         reportIncidentBtn.onclick = () => reportModal.classList.remove('hidden');
         cancelReportBtn.onclick = () => reportModal.classList.add('hidden');
         submitReportBtn.onclick = submitIncidentReport;
@@ -199,7 +155,8 @@ window.addEventListener('DOMContentLoaded', () => {
         playing = false; drawing = true;
         
         updateInfoPanel('Haz clic para añadir vértices');
-        updateActionButtons('drawing');
+        updateActionBtn('Start', 'btn-green', () => preloadStreets(), true);
+        poiSwitchContainer.classList.remove('hidden');
         gameMap.on('click', addVertex);
     }
     
@@ -216,8 +173,7 @@ window.addEventListener('DOMContentLoaded', () => {
         
         if (zonePoints.length >= 3) {
             updateInfoPanel('Cierra la zona o pulsa Start');
-            document.getElementById('startBtn').disabled = false;
-            document.getElementById('startBtn').classList.remove('btn-gray');
+            updateActionBtn('Start', 'btn-green', () => preloadStreets(), false);
         }
     }
 
@@ -230,31 +186,15 @@ window.addEventListener('DOMContentLoaded', () => {
         updateInfoPanel('Zona cerrada. ¡Pulsa Start!');
     }
 
-    function undoLastPoint() {
-        if (!drawing || zonePoints.length === 0) return;
-        zonePoints.pop();
-        const lastMarker = tempMarkers.pop();
-        if (lastMarker) gameMap.removeLayer(lastMarker);
-        if (zonePoly) gameMap.removeLayer(zonePoly);
-        zonePoly = null;
-        if (zonePoints.length >= 2) {
-            zonePoly = L.polygon(zonePoints, { color: COL_ZONE, weight: 2, fillOpacity: 0.1 }).addTo(gameMap);
-        }
-        const startBtn = document.getElementById('startBtn');
-        if (startBtn) {
-            startBtn.disabled = zonePoints.length < 3;
-            if(startBtn.disabled) { startBtn.classList.add('btn-gray'); } 
-            else { startBtn.classList.remove('btn-gray'); }
-        }
-        updateInfoPanel(zonePoints.length > 0 ? 'Punto eliminado' : 'Haz clic para añadir vértices');
-    }
+    function undoLastPoint() { /* Lógica de retroceso no aplica en este diseño simple */ }
 
     async function preloadStreets() {
         if (!zonePoly) return;
         if (drawing) finishPolygon();
         
+        poiSwitchContainer.classList.add('hidden');
         updateInfoPanel('Buscando lugares...');
-        updateActionButtons('loading');
+        updateActionBtn('Cargando...', 'btn-gray', null, true);
 
         try {
             const zoneParam = zonePoints.map(p => `${p.lat},${p.lng}`).join(';');
@@ -269,15 +209,21 @@ window.addEventListener('DOMContentLoaded', () => {
 
             if (totalQuestions > 0) {
                 updateInfoPanel(`¡${totalQuestions} lugares encontrados!`);
-                updateActionButtons('game_ready');
+                updateActionBtn('Iniciar Juego', 'btn-green', () => {
+                    playing = true; qIdx = 0; streetsGuessedCorrectly = 0;
+                    progressBar.style.width = '0%';
+                    progressBarContainer.classList.remove('hidden');
+                    gameMap.fitBounds(zonePoly.getBounds(), { padding: [50, 50] });
+                    nextQ();
+                });
             } else {
                 updateInfoPanel('No se encontraron lugares. Dibuja otra zona.');
-                updateActionButtons('initial');
+                updateActionBtn('Establecer Zona', 'btn-blue', startDrawing);
             }
         } catch (error) {
             console.error(error);
             updateInfoPanel(`Error: ${error.message}`);
-            updateActionButtons('initial');
+            updateActionBtn('Establecer Zona', 'btn-blue', startDrawing);
         }
     }
 
@@ -307,7 +253,7 @@ window.addEventListener('DOMContentLoaded', () => {
         progressBar.style.width = progress + '%';
 
         updateInfoPanel(`Aciertos: <span class="score">${streetsGuessedCorrectly} / ${totalQuestions}</span>`);
-        updateActionButtons('playing');
+        updateActionBtn('Siguiente', 'btn-blue', () => nextQ(), true);
         gameMap.on('click', onMapClick);
     }
     
@@ -338,11 +284,7 @@ window.addEventListener('DOMContentLoaded', () => {
         }
 
         updateInfoPanel(`Aciertos: <span class="score">${streetsGuessedCorrectly} / ${totalQuestions}</span>`);
-        const nextBtn = document.getElementById('nextBtn');
-        if (nextBtn) {
-            nextBtn.disabled = false;
-            nextBtn.classList.remove('btn-gray');
-        }
+        updateActionBtn('Siguiente', 'btn-blue', () => nextQ(), false);
     }
 
     function endGame() {
@@ -357,7 +299,7 @@ window.addEventListener('DOMContentLoaded', () => {
         }
         lastGameZonePoints = [...zonePoints];
         saveGameStats(streetsGuessedCorrectly, totalQuestions);
-        updateActionButtons('end_game');
+        updateActionBtn('Repetir Zona', 'btn-green', repeatLastZone);
     }
     
     function repeatLastZone() {
@@ -370,7 +312,6 @@ window.addEventListener('DOMContentLoaded', () => {
         preloadStreets();
     }
     
-    // --- LÓGICA DE APOYO ---
     function getDistanceToStreet(userPoint, streetLayer) {
         let minDistance = Infinity, closestPointOnStreet = null;
         streetLayer.eachLayer(layer => {
@@ -386,20 +327,7 @@ window.addEventListener('DOMContentLoaded', () => {
         return { distance: Math.sqrt(minDistance), point: closestPointOnStreet };
     }
     
-    async function saveCurrentZone() {
-        const zoneName = prompt("Dale un nombre a esta zona:", "Mi barrio");
-        if (!zoneName?.trim()) return;
-        try {
-            const { data: { session } } = await supabaseClient.auth.getSession();
-            if(!session) return;
-            const zoneString = lastGameZonePoints.map(p => `${p.lat},${p.lng}`).join(';');
-            await supabaseClient.from('saved_zones').insert({ user_id: session.user.id, name: zoneName, zone_points: zoneString });
-            showFeedbackPopup('¡Zona guardada!', 'correct');
-        } catch (error) {
-            showFeedbackPopup('Error al guardar', 'incorrect');
-        }
-    }
-
+    async function saveCurrentZone() { /* Esta función ya no se llama desde la UI principal */ }
     async function saveGameStats(correct, total) {
         if (total === 0) return;
         try {
@@ -408,7 +336,6 @@ window.addEventListener('DOMContentLoaded', () => {
             await supabaseClient.from('game_stats').insert({ user_id: session.user.id, correct_guesses: correct, total_questions: total });
         } catch (error) { console.error('Error saving stats:', error.message); }
     }
-
     async function displaySavedZones() {
         const container = document.getElementById('saved-zones-content');
         container.innerHTML = '<p>Cargando...</p>';
@@ -432,7 +359,6 @@ window.addEventListener('DOMContentLoaded', () => {
             });
         } catch(e) { container.innerHTML = '<p class="text-red-400">Error al cargar zonas.</p>'; }
     }
-    
     async function displayStats() {
         const container = document.getElementById('stats-content');
         container.innerHTML = '<p>Cargando...</p>';
@@ -449,7 +375,6 @@ window.addEventListener('DOMContentLoaded', () => {
             container.innerHTML = `<div class="stats-container"><div class="stats-percentage">${percentage}%</div><div>de aciertos</div><div class="text-sm text-gray-400">(${totalCorrect} de ${totalPlayed} en total)</div></div>`;
         } catch (e) { container.innerHTML = '<p class="text-red-400">Error al cargar estadísticas.</p>'; }
     }
-    
     async function submitIncidentReport() {
         if (lastGameZonePoints.length === 0) {
             showFeedbackPopup("Juega en una zona para poder reportar", "incorrect");
@@ -465,7 +390,7 @@ window.addEventListener('DOMContentLoaded', () => {
             submitReportBtn.disabled = true;
             submitReportBtn.textContent = 'Enviando...';
             const { data: { session } } = await supabaseClient.auth.getSession();
-            if (!session) { showFeedbackPopup("Necesitas estar conectado para reportar", "incorrect"); return; }
+            if (!session) { showFeedbackPopup("Necesitas estar conectado", "incorrect"); return; }
             const zoneString = lastGameZonePoints.map(p => `${p.lat},${p.lng}`).join(';');
             const response = await fetch('/api/reportIncident', {
                 method: 'POST',

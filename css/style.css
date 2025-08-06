@@ -12,53 +12,26 @@
 }
 
 /* --- ESTILOS GENERALES --- */
-body {
-    font-family: 'Poppins', sans-serif;
-    background-color: #1a1a1a;
-    color: var(--color-text-light);
-    overscroll-behavior: none;
-}
+body { font-family: 'Poppins', sans-serif; background-color: #1a1a1a; color: var(--color-text-light); overscroll-behavior: none; }
 html, body { height: 100%; margin: 0; overflow: hidden; }
 .hidden { display: none !important; }
 
 /* --- PANTALLA DE LOGIN --- */
 #background-map { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; filter: blur(4px) brightness(0.7); }
 #login-screen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 20; display: flex; align-items: center; justify-content: center; }
-@keyframes pulse {
-  0%, 100% { transform: scale(1); }
-  50% { transform: scale(1.05); }
-}
+@keyframes pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.05); } }
 #google-login-btn { animation: pulse 2.5s infinite; }
 
 /* --- PANTALLA DE JUEGO Y MAPA --- */
 #game-screen { height: 100%; width: 100%; position: relative; }
-#game-map-container { height: 100%; width: 100%; background-color: #1a1a1a; z-index: 5; }
+#game-map-container { position: absolute; top: 0; left: 0; height: 100%; width: 100%; background-color: #1a1a1a; z-index: 5; }
 .leaflet-control-container { display: none; }
 
-/* --- BOTÓN DE REPORTE DE INCIDENCIA --- */
-#report-incident-btn {
-    position: fixed;
-    top: 20px;
-    right: 20px;
-    z-index: 10;
-    width: 48px;
-    height: 48px;
-    background: var(--color-main-block);
-    border-radius: 50%;
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    box-shadow: 0 0 15px 2px var(--color-icon-gray);
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    cursor: pointer;
-    transition: all 0.2s ease;
-}
+/* --- ELEMENTOS FLOTANTES SUPERIORES --- */
+#report-incident-btn { position: fixed; top: 20px; right: 20px; z-index: 10; width: 48px; height: 48px; background: var(--color-main-block); border-radius: 50%; border: 1px solid rgba(255, 255, 255, 0.1); box-shadow: 0 0 15px 2px var(--color-icon-gray); display: flex; justify-content: center; align-items: center; cursor: pointer; transition: all 0.2s ease; }
 #report-incident-btn svg { width: 26px; height: 25px; }
-#report-incident-btn:hover { transform: scale(1.1); }
 #report-incident-btn:active { transform: scale(0.95); }
 
-
-/* --- BLOQUE DE PREGUNTA ANIMADO --- */
 #question-area { position: fixed; top: 20px; left: 20px; z-index: 10; display: flex; align-items: center; background: rgba(30, 36, 58, 0.8); padding: 8px 16px; border-radius: 16px; backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.1); box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3); }
 #question-prompt { font-size: 1.1rem; font-weight: 500; margin-right: 8px; white-space: nowrap; }
 #street-name-box { background-color: var(--color-accent-blue); color: white; padding: 4px 12px; border-radius: 12px; font-weight: 700; overflow: hidden; white-space: nowrap; transition: width 0.4s cubic-bezier(0.25, 1, 0.5, 1); box-shadow: 0 0 15px var(--color-accent-blue); }
@@ -66,17 +39,17 @@ html, body { height: 100%; margin: 0; overflow: hidden; }
 @keyframes pulse-effect { 0% { transform: scale(1); } 50% { transform: scale(1.05); } 100% { transform: scale(1); } }
 
 /* --- BARRA DE PROGRESO --- */
-#progress-bar-container { position: fixed; bottom: 220px; left: 50%; transform: translateX(-50%); width: calc(100% - 60px); max-width: 395px; height: 8px; background-color: rgba(43, 50, 76, 0.5); z-index: 8; border-radius: 4px; }
+#progress-bar-container { position: fixed; bottom: 221px; /* 191px de la barra + 30px de espacio */ left: 50%; transform: translateX(-50%); width: calc(100% - 60px); max-width: 395px; height: 8px; background-color: rgba(43, 50, 76, 0.5); z-index: 8; border-radius: 4px; }
 #progress-bar { width: 0%; height: 100%; background-color: var(--color-progress-bar); border-radius: 4px; transition: width 0.5s ease-out; box-shadow: 0 0 10px var(--color-progress-bar); }
 
-/* --- BARRA INFERIOR --- */
+/* --- BLOQUE INFERIOR (FIEL AL SVG) --- */
 #bottom-bar {
     position: fixed;
     bottom: 20px;
     left: 50%;
     transform: translateX(-50%);
     width: calc(100% - 40px);
-    max-width: 414px;
+    max-width: 414px; /* Ancho del SVG rect (395) + padding */
     height: 191px;
     background-color: var(--color-main-block);
     border-radius: 40.23px;
@@ -88,57 +61,44 @@ html, body { height: 100%; margin: 0; overflow: hidden; }
     justify-content: space-between;
     border: 1px solid rgba(255, 255, 255, 0.1);
 }
+.top-row { width: 100%; }
+.bottom-row { width: 100%; display: flex; justify-content: space-between; align-items: center; }
 
-/* --- PANEL DE INFO --- */
-#info-panel { display: flex; align-items: center; background-color: var(--color-info-panel); padding: 0 20px; border-radius: 24.5px; height: 49px; width: 100%; max-width: 274px; }
-#logo-container { font-weight: 700; font-size: 18px; }
-#info-text { margin-left: 15px; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;}
+/* --- ELEMENTOS DENTRO DEL BLOQUE INFERIOR --- */
+#info-panel { display: flex; align-items: center; background-color: var(--color-info-panel); padding: 0 20px; border-radius: 24.5px; height: 49px; width: auto; max-width: 274px;}
+.logo-text { font-weight: 700; font-size: 18px; white-space: nowrap; margin-right: 15px;}
+#info-text { font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;}
 #info-text .score { font-weight: 700; font-size: 1.1rem; color: var(--color-accent-green); }
 
-/* --- CONTROLES INFERIORES (MENÚ Y ACCIONES) --- */
-.bottom-controls { display: flex; justify-content: space-between; align-items: center; width: 100%; }
-#menu-button-container { }
 #menu-btn { width: 48px; height: 48px; background: var(--color-info-panel); border-radius: 50%; display: flex; justify-content: center; align-items: center; cursor: pointer; border: none; }
 #menu-btn svg { width: 20px; height: 20px; }
 #menu-btn:active { transform: scale(0.95); }
 
-/* --- INTERRUPTOR DE POIs --- */
-#poi-switch-container { display: flex; align-items: center; transition: opacity 0.3s ease; }
+#controls-container { display: flex; align-items: center; gap: 15px; }
+
+#poi-switch-container { display: flex; flex-direction: column; align-items: center; justify-content: center; transition: opacity 0.3s ease; }
 #poi-switch-container.hidden { opacity: 0; pointer-events: none; }
-.poi-label { font-size: 0.8rem; font-weight: 700; color: #9CA3AF; margin-left: 8px; }
-.poi-switch { position: relative; display: inline-block; width: 50px; height: 28px; }
+.poi-label { font-size: 0.8rem; font-weight: 700; color: #9CA3AF; }
+.poi-switch { position: relative; display: inline-block; width: 50px; height: 28px; margin-bottom: 4px;}
 .poi-switch input { opacity: 0; width: 0; height: 0; }
 .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #4B5563; transition: .4s; border-radius: 28px; }
 .slider:before { position: absolute; content: ""; height: 20px; width: 20px; left: 4px; bottom: 4px; background-color: white; transition: .4s; border-radius: 50%; }
 input:checked + .slider { background-color: var(--color-accent-blue); box-shadow: 0 0 10px var(--color-accent-blue); }
 input:checked + .slider:before { transform: translateX(22px); }
 
-/* --- CONTENEDOR DE ACCIONES Y BOTONES DINÁMICOS --- */
-#actions-container { position: relative; width: 100px; height: 100px; display: flex; justify-content: center; align-items: center; transform: scale(0.9) translateX(10px); }
-.action-btn { position: absolute; border: none; color: var(--color-text-light); font-weight: 700; font-size: 16px; display: flex; justify-content: center; align-items: center; transition: transform 0.4s cubic-bezier(0.25, 1, 0.5, 1), opacity 0.4s ease; opacity: 0; transform: scale(0.5); cursor: pointer; border-radius: 25px; }
-.action-btn:active { transform: scale(0.95) !important; }
-.main-btn { width: 98px; height: 98px; border-radius: 49px; opacity: 1; transform: scale(1); z-index: 10; font-size: 20px; }
-.split-2 .btn-1 { width: 120px; height: 50px; transform: translateX(-65px) scale(1); opacity: 1; }
-.split-2 .btn-2 { width: 120px; height: 50px; transform: translateX(65px) scale(1); opacity: 1; }
-.split-3 .btn-1, .split-3 .btn-2, .split-3 .btn-3 { width: 100px; height: 45px; }
-.split-3 .btn-1 { transform: translate(-110px, -25px) scale(1); opacity: 1; }
-.split-3 .btn-2 { transform: translate(0, -25px) scale(1); opacity: 1; }
-.split-3 .btn-3 { transform: translate(110px, -25px) scale(1); opacity: 1; }
+#main-action-btn { width: 123px; height: 50px; border-radius: 25px; border: none; color: var(--color-text-light); font-weight: 700; font-size: 18px; cursor: pointer; transition: background-color 0.2s, transform 0.1s; }
+#main-action-btn:active { transform: scale(0.97); }
 
-/* --- COLORES Y HALOS DE BOTONES --- */
 .btn-green { background-color: var(--color-accent-green); box-shadow: 0 0 15px var(--color-accent-green); }
 .btn-blue { background-color: var(--color-accent-blue); box-shadow: 0 0 15px var(--color-accent-blue); }
-.btn-red { background-color: var(--color-progress-bar); box-shadow: 0 0 15px var(--color-progress-bar); }
-.btn-yellow { background-color: var(--color-accent-yellow); box-shadow: 0 0 15px var(--color-accent-yellow); color: var(--color-text-dark) }
 .btn-gray { background-color: var(--color-icon-gray); cursor: not-allowed; box-shadow: none; }
 
-/* --- POPUP DE FEEDBACK --- */
+/* --- POPUP Y MODALES --- */
 #feedback-popup { position: fixed; bottom: 250px; left: 50%; transform: translateX(-50%) translateY(200%); z-index: 12; padding: 12px 24px; border-radius: 24px; font-size: 1.2rem; font-weight: 700; color: white; box-shadow: 0 5px 25px rgba(0,0,0,0.5); transition: transform 0.5s cubic-bezier(0.25, 1, 0.5, 1); white-space: nowrap; }
 #feedback-popup.visible { transform: translateX(-50%) translateY(0); }
 #feedback-popup.correct { background-color: var(--color-accent-green); }
 #feedback-popup.incorrect { background-color: var(--color-progress-bar); }
 
-/* --- MODAL DE REPORTE Y MENÚ --- */
 #report-modal, #menu-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0, 0, 0, 0.6); backdrop-filter: blur(8px); z-index: 2000; display: flex; justify-content: center; align-items: center; opacity: 1; transition: opacity 0.3s ease; }
 #report-modal.hidden, #menu-overlay.hidden { opacity: 0; pointer-events: none; }
 .modal-content, .menu-content { background-color: var(--color-main-block); width: 90%; max-width: 500px; padding: 24px; border-radius: 24px; position: relative; border: 1px solid rgba(255, 255, 255, 0.2); }
@@ -147,7 +107,6 @@ input:checked + .slider:before { transform: translateX(22px); }
 .modal-buttons button { padding: 10px 20px; border-radius: 8px; border: none; font-weight: 700; cursor: pointer; }
 #submit-report-btn { background-color: var(--color-accent-green); color: white; }
 #cancel-report-btn { background-color: var(--color-icon-gray); color: white; }
-/* Estilos del menú (tabs, etc.) */
 #close-menu-btn { position: absolute; top: 10px; right: 15px; background: none; border: none; font-size: 2.5rem; color: #A0AEC0; cursor: pointer; }
 .menu-title { text-align: center; font-size: 1.8rem; font-weight: 700; margin-bottom: 24px; }
 #menu-tabs { display: flex; border-bottom: 2px solid #4A5568; margin-bottom: 16px; }

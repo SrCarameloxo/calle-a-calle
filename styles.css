@@ -213,4 +213,35 @@ button.game-control-btn:disabled { opacity: .4; cursor: default; }
 .custom-checkbox:checked ~ .checkmark:after {
     display: block;
 }
+/* --- INICIO: CÓDIGO PARA LA FORMA DE PRUEBA --- */
+
+#test-shape-container {
+  /* Posicionamiento: fijo en la parte inferior y centrado */
+  position: fixed;
+  bottom: 20px; /* Distancia desde abajo */
+  left: 50%;
+  transform: translateX(-50%); /* Truco para centrar perfectamente */
+  z-index: 1000; /* Asegura que esté por encima de todo */
+
+  /* Dimensiones y apariencia del cuadrado redondeado */
+  width: 70px;
+  height: 70px;
+  background: linear-gradient(135deg, #25D3D0, #3B82F6); /* Degradado exacto */
+  border-radius: 22px; /* Redondeo de las esquinas */
+  box-shadow: 0 5px 20px rgba(0, 0, 0, 0.25); /* Sombra para darle profundidad */
+
+  /* Centrado del círculo interior */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#test-shape-circle {
+  /* Dimensiones y apariencia del círculo */
+  width: 32px;
+  height: 32px;
+  background-color: #E5E7EB; /* Color gris claro */
+  border-radius: 50%; /* Esto lo convierte en un círculo perfecto */
+}
+/* --- FIN: CÓDIGO PARA LA FORMA DE PRUEBA --- */
 /* --- FIN: ESTILOS PARA EL NUEVO CHECKBOX --- */

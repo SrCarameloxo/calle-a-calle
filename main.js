@@ -14,7 +14,7 @@ window.addEventListener('DOMContentLoaded', () => {
   let drawing=false, zonePoly=null, tempMarkers=[], zonePoints=[], oldZonePoly=null;
   let playing=false, qIdx=0, target=null, userMk, guide, streetGrp;
   let streetList = [], totalQuestions = 0, streetsGuessedCorrectly = 0, lastGameZonePoints = [];
-  let lastGameStreetList = []; // <--- NUEVA VARIABLE PARA GUARDAR LA LISTA DE CALLES
+  let lastGameStreetList = [];
 
   let userProfile = { cityData: null, subscribedCity: null, role: null };
 
@@ -294,12 +294,9 @@ window.addEventListener('DOMContentLoaded', () => {
     document.getElementById('fb').textContent = zonePoints.length > 0 ? 'Punto eliminado. Sigue añadiendo.' : 'Haz click para añadir vértices.';
   }
 
-  // --- FUNCIÓN MODIFICADA PARA REUTILIZAR LA LISTA DE CALLES ---
   function repeatLastZone() {
-    // Verificamos que tengamos tanto la zona como la lista de calles de la partida anterior.
     if (lastGameZonePoints.length < 3 || lastGameStreetList.length === 0) return;
 
-    // 1. Limpiamos cualquier estado de una partida anterior.
     clear();
     if (zonePoly) gameMap.removeLayer(zonePoly);
     if (oldZonePoly) gameMap.removeLayer(oldZonePoly);
@@ -307,13 +304,11 @@ window.addEventListener('DOMContentLoaded', () => {
     document.getElementById('fb').textContent = '';
     ['drawZone', 'repeatZone', 'saveZoneBtn', 'start-options'].forEach(id => document.getElementById(id).classList.add('hidden'));
 
-    // 2. Restauramos la zona y la lista de calles.
     zonePoints = [...lastGameZonePoints];
     zonePoly = L.polygon(zonePoints, { color: COL_ZONE, weight: 2, fillOpacity: 0.1 }).addTo(gameMap);
     streetList = [...lastGameStreetList];
-    streetList.sort(() => Math.random() - 0.5); // Barajamos para que el orden sea distinto.
+    streetList.sort(() => Math.random() - 0.5); 
 
-    // 3. Preparamos el estado del juego y la UI para empezar.
     playing = true;
     qIdx = 0;
     streetsGuessedCorrectly = 0;
@@ -323,7 +318,6 @@ window.addEventListener('DOMContentLoaded', () => {
     document.getElementById('score').textContent = `0 / ${totalQuestions}`;
     document.getElementById('next').classList.remove('hidden');
     
-    // 4. Centramos el mapa y lanzamos la primera pregunta.
     gameMap.fitBounds(zonePoly.getBounds(), { padding: [50, 50] });
     nextQ();
   }
@@ -400,7 +394,7 @@ window.addEventListener('DOMContentLoaded', () => {
           const data = await response.json();
           streetList = data.streets;
           totalQuestions = streetList.length;
-          streetList.sort(() => Math.random() - 0.5);
+
           if (totalQuestions > 0) fb.textContent = `Se han encontrado ${totalQuestions} lugares. ¡Listo!`;
           else fb.textContent = 'No se han encontrado lugares válidos. Dibuja otra zona.';
           document.getElementById('score').textContent = `0 / ${totalQuestions}`;
@@ -437,7 +431,6 @@ window.addEventListener('DOMContentLoaded', () => {
       return { distance: Math.sqrt(minDistance), point: closestPointOnStreet };
   }
 
-  // --- FUNCIÓN MODIFICADA PARA GUARDAR LA LISTA DE CALLES ---
   function endGame() {
     playing = false;
     document.getElementById('fb').textContent = `¡Juego terminado! Has acertado ${streetsGuessedCorrectly} de ${totalQuestions}.`;
@@ -448,13 +441,12 @@ window.addEventListener('DOMContentLoaded', () => {
         oldZonePoly = zonePoly;
     }
     lastGameZonePoints = [...zonePoints];
-    lastGameStreetList = [...streetList]; // <--- GUARDAMOS LA LISTA DE CALLES
+    lastGameStreetList = [...streetList];
     saveGameStats(streetsGuessedCorrectly, totalQuestions);
     
     ['next'].forEach(id => document.getElementById(id).classList.add('hidden'));
     ['drawZone', 'repeatZone', 'saveZoneBtn'].forEach(id => document.getElementById(id).classList.remove('hidden'));
     
-    // Habilitamos el botón de repetir solo si hay una zona Y una lista de calles guardada.
     document.getElementById('repeatZone').disabled = (lastGameZonePoints.length < 3 || lastGameStreetList.length === 0);
 
     zonePoly = null; 
@@ -532,21 +524,31 @@ window.addEventListener('DOMContentLoaded', () => {
     }
   }
   
+  // --- FUNCIÓN MODIFICADA PARA ARREGLAR EL BUG DE GUARDADO ---
   async function saveCurrentZone() {
     const zoneName = prompt("Dale un nombre a esta zona:", "Mi barrio");
     if (!zoneName || zoneName.trim() === '') return;
-    if (zonePoints.length < 3) {
+    
+    // CORRECCIÓN: Usar lastGameZonePoints en lugar de zonePoints, que se vacía al final del juego.
+    if (lastGameZonePoints.length < 3) {
         alert("La zona es demasiado pequeña para guardarla.");
         return;
-    };
+    }
     try {
         const { data: { session } } = await supabaseClient.auth.getSession();
         if (!session) return;
-        const zoneString = zonePoints.map(p => `${p.lat},${p.lng}`).join(';');
-        const { error } = await supabaseClient.from('saved_zones').insert({ user_id: session.user.id, name: zoneName, zone_points: zoneString });
+
+        // CORRECCIÓN: Usar lastGameZonePoints para crear el string de la zona.
+        const zoneString = lastGameZonePoints.map(p => `${p.lat},${p.lng}`).join(';');
+        const { error } = await supabaseClient.from('saved_zones').insert({ 
+            user_id: session.user.id, 
+            name: zoneName, 
+            zone_points: zoneString 
+        });
+        
         if (error) throw error;
         alert(`¡Zona "${zoneName}" guardada con éxito!`);
-        document.getElementById('saveZoneBtn').classList.add('hidden');
+        document.getElementById('saveZoneBtn').classList.add('hidden'); // Opcional: Ocultar tras guardar
     } catch (error) {
         console.error('Error al guardar la zona:', error.message);
         alert('Hubo un error al guardar la zona.');

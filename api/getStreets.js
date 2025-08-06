@@ -169,17 +169,16 @@ module.exports = async (request, response) => {
         }
         
         for (const entity of entitiesToProcess) {
-            // Se reinician las variables en cada iteración para evitar fugas de estado
             let streetData = null;
-            let processedStreet = {};
 
             if (seenIds.has(entity.id)) continue;
             
             const mainOsmName = entity.osmNames[0];
-            const cacheKey = `street_v7:${entity.id.replace(/\s/g, '_')}`;
+            const cacheKey = `street_v8:${entity.id.replace(/\s/g, '_')}`;
             streetData = await kv.get(cacheKey);
 
             if (!streetData) {
+                let processedStreet = {};
                 const rule = entity.osmNames.reduce((acc, name) => acc || overrideRules.get(name), null);
 
                 const queryNames = entity.osmNames.map(n => `way["name"="${n}"](around:${radius}, ${center.lat}, ${center.lng});`).join('');
@@ -267,6 +266,7 @@ module.exports = async (request, response) => {
         }
     }
     
+    // Barajamos la lista final solo una vez antes de enviarla
     finalStreetList.sort(() => Math.random() - 0.5);
     response.status(200).json({ streets: finalStreetList });
 

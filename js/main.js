@@ -38,28 +38,26 @@ window.addEventListener('DOMContentLoaded', () => {
     let userProfile = { cityData: null, subscribedCity: null, role: null };
 
     // --- LÓGICA DE LA INTERFAZ ---
-
     function updateInfoPanel(htmlContent) { infoText.innerHTML = htmlContent; }
-
     function showFeedbackPopup(message, type) {
         feedbackText.textContent = message;
         feedbackPopup.className = '';
         feedbackPopup.classList.add(type, 'visible');
         setTimeout(() => feedbackPopup.classList.remove('visible'), 2500);
     }
-    
     function updateActionBtn(text, color, clickHandler, disabled = false) {
         mainActionBtn.textContent = text;
         mainActionBtn.className = `action-btn ${color}`;
         mainActionBtn.onclick = clickHandler;
         mainActionBtn.disabled = disabled;
-        if(disabled) mainActionBtn.classList.add('btn-gray');
+        if (disabled) {
+            mainActionBtn.classList.add('btn-gray');
+        }
     }
     
     // --- LÓGICA DE AUTENTICACIÓN Y PERFIL ---
     async function signInWithGoogle() { await supabaseClient.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: window.location.origin } }); }
     async function signOut() { await supabaseClient.auth.signOut(); }
-
     async function fetchUserProfile(user) {
         if (!user) return;
         try {
@@ -67,7 +65,6 @@ window.addEventListener('DOMContentLoaded', () => {
             if (error && error.code === 'PGRST116') return setTimeout(() => fetchUserProfile(user), 1000);
             if (error) throw error;
             userProfile = { ...userProfile, role: profile.role, subscribedCity: profile.subscribed_city };
-
             if (profile.subscribed_city) {
                 const { data: city, error: cityError } = await supabaseClient.from('cities').select('*').eq('name', profile.subscribed_city).single();
                 if (cityError) throw new Error(`No se encontraron datos para la ciudad: ${profile.subscribed_city}`);
@@ -75,7 +72,6 @@ window.addEventListener('DOMContentLoaded', () => {
             }
         } catch (e) { console.error("Error fetching user profile:", e); }
     }
-    
     async function handleAuthStateChange(event, session) {
         const user = session?.user;
         if (user) {
@@ -109,14 +105,12 @@ window.addEventListener('DOMContentLoaded', () => {
         gameMap = L.map(gameMapContainer, { zoomSnap: 0.25, zoomControl: false });
         L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager_nolabels/{z}/{x}/{y}{r}.png', { attribution: '© OSM & CARTO', minZoom: userProfile.cityData ? initialZoom - 2 : 5 }).addTo(gameMap);
         gameMap.setView(initialCoords, initialZoom);
-        
         if (userProfile.cityData) {
             const latOffset = 20 / 111.1;
             const lngOffset = 20 / (111.1 * Math.cos(initialCoords[0] * Math.PI / 180));
             const bounds = L.latLngBounds(L.latLng(initialCoords[0] - latOffset, initialCoords[1] - lngOffset), L.latLng(initialCoords[0] + latOffset, initialCoords[1] + lngOffset));
             gameMap.setMaxBounds(bounds);
         }
-        
         gameMap.invalidateSize();
         updateActionBtn('Establecer Zona', 'btn-blue', startDrawing);
         reportIncidentBtn.onclick = () => reportModal.classList.remove('hidden');
@@ -127,19 +121,15 @@ window.addEventListener('DOMContentLoaded', () => {
     function setupMenu(user) {
         menuBtn.onclick = () => menuOverlay.classList.remove('hidden');
         closeMenuBtn.onclick = () => menuOverlay.classList.add('hidden');
-        
         const profilePanel = document.getElementById('profile-content');
         profilePanel.innerHTML = `<div id="profile-content-container"><p>Conectado como</p><p class="font-bold">${user.email}</p><button id="logout-btn">Cerrar Sesión</button></div>`;
         document.getElementById('logout-btn').onclick = signOut;
-        
         document.querySelectorAll('.menu-tab-btn').forEach(button => {
             button.addEventListener('click', () => {
                 const panelId = button.dataset.panel;
-                document.querySelectorAll('.menu-tab-btn').forEach(b => b.classList.remove('active'));
+                document.querySelectorAll('.menu-tab-btn, .menu-panel').forEach(el => el.classList.remove('active'));
                 button.classList.add('active');
-                document.querySelectorAll('.menu-panel').forEach(p => p.classList.remove('active'));
                 document.getElementById(panelId).classList.add('active');
-
                 if (panelId === 'saved-zones-content') displaySavedZones();
                 if (panelId === 'stats-content') displayStats();
             });
@@ -147,19 +137,16 @@ window.addEventListener('DOMContentLoaded', () => {
     }
 
     // --- LÓGICA DEL JUEGO (PRINCIPAL) ---
-
     function startDrawing() {
         if (zonePoly) gameMap.removeLayer(zonePoly);
         if (oldZonePoly) gameMap.removeLayer(oldZonePoly);
         zonePoints = []; tempMarkers = []; zonePoly = null;
         playing = false; drawing = true;
-        
         updateInfoPanel('Haz clic para añadir vértices');
         updateActionBtn('Start', 'btn-green', () => preloadStreets(), true);
         poiSwitchContainer.classList.remove('hidden');
         gameMap.on('click', addVertex);
     }
-    
     function addVertex(e) {
         if (zonePoints.length > 0 && e.latlng.equals(zonePoints[0]) && zonePoints.length >= 3) {
             finishPolygon();
@@ -170,13 +157,11 @@ window.addEventListener('DOMContentLoaded', () => {
         zonePoints.push(e.latlng);
         if (zonePoly) gameMap.removeLayer(zonePoly);
         zonePoly = L.polygon(zonePoints, { color: COL_ZONE, weight: 2, fillOpacity: 0.1 }).addTo(gameMap);
-        
         if (zonePoints.length >= 3) {
             updateInfoPanel('Cierra la zona o pulsa Start');
             updateActionBtn('Start', 'btn-green', () => preloadStreets(), false);
         }
     }
-
     function finishPolygon() {
         drawing = false;
         gameMap.off('click', addVertex);
@@ -185,28 +170,21 @@ window.addEventListener('DOMContentLoaded', () => {
         zonePoly.addLatLng(zonePoints[0]);
         updateInfoPanel('Zona cerrada. ¡Pulsa Start!');
     }
-
-    function undoLastPoint() { /* Lógica de retroceso no aplica en este diseño simple */ }
-
     async function preloadStreets() {
         if (!zonePoly) return;
         if (drawing) finishPolygon();
-        
         poiSwitchContainer.classList.add('hidden');
         updateInfoPanel('Buscando lugares...');
         updateActionBtn('Cargando...', 'btn-gray', null, true);
-
         try {
             const zoneParam = zonePoints.map(p => `${p.lat},${p.lng}`).join(';');
             const includePOI = poiCheckbox.checked;
             const response = await fetch(`/api/getStreets?zone=${encodeURIComponent(zoneParam)}&includePOI=${includePOI}`);
             if (!response.ok) throw new Error((await response.json()).error || 'Error del servidor.');
-            
             const data = await response.json();
             streetList = data.streets;
             totalQuestions = streetList.length;
             streetList.sort(() => Math.random() - 0.5);
-
             if (totalQuestions > 0) {
                 updateInfoPanel(`¡${totalQuestions} lugares encontrados!`);
                 updateActionBtn('Iniciar Juego', 'btn-green', () => {
@@ -226,21 +204,14 @@ window.addEventListener('DOMContentLoaded', () => {
             updateActionBtn('Establecer Zona', 'btn-blue', startDrawing);
         }
     }
-
     function nextQ() {
         if(gameMap.hasLayer(userMk)) gameMap.removeLayer(userMk);
         if(gameMap.hasLayer(guide)) gameMap.removeLayer(guide);
         if(gameMap.hasLayer(streetGrp)) gameMap.removeLayer(streetGrp);
-
-        if (qIdx >= totalQuestions) {
-            endGame();
-            return;
-        }
-        
+        if (qIdx >= totalQuestions) { endGame(); return; }
         const s = streetList[qIdx];
         target = s.geometries;
         qIdx++;
-        
         questionArea.classList.remove('hidden');
         streetNameText.textContent = s.googleName;
         streetNameText.parentElement.style.width = 'auto';
@@ -248,15 +219,12 @@ window.addEventListener('DOMContentLoaded', () => {
         streetNameText.parentElement.style.width = newWidth + 'px';
         streetNameText.parentElement.classList.add('pulse-animation');
         setTimeout(() => streetNameText.parentElement.classList.remove('pulse-animation'), 500);
-        
         const progress = (qIdx / totalQuestions) * 100;
         progressBar.style.width = progress + '%';
-
         updateInfoPanel(`Aciertos: <span class="score">${streetsGuessedCorrectly} / ${totalQuestions}</span>`);
         updateActionBtn('Siguiente', 'btn-blue', () => nextQ(), true);
         gameMap.on('click', onMapClick);
     }
-    
     function onMapClick(e) {
         if (!playing) return;
         gameMap.off('click', onMapClick);
@@ -268,7 +236,6 @@ window.addEventListener('DOMContentLoaded', () => {
             layer.addTo(streetGrp);
             try { if(layer.getElement()) layer.getElement().classList.add('street-reveal-animation'); } catch(e){}
         });
-
         const streetCheck = getDistanceToStreet(userMk.getLatLng(), streetGrp);
         if (streetCheck.distance <= 30) {
             streetsGuessedCorrectly++;
@@ -278,15 +245,12 @@ window.addEventListener('DOMContentLoaded', () => {
             showFeedbackPopup(`Casi... a ${Math.round(streetCheck.distance)} metros`, 'incorrect');
             document.getElementById('incorrect-sound').play().catch(()=>{});
         }
-
         if (streetCheck.point) {
             guide = L.polyline([userMk.getLatLng(), streetCheck.point], { dashArray: '6 4', color: COL_DASH }).addTo(gameMap);
         }
-
         updateInfoPanel(`Aciertos: <span class="score">${streetsGuessedCorrectly} / ${totalQuestions}</span>`);
         updateActionBtn('Siguiente', 'btn-blue', () => nextQ(), false);
     }
-
     function endGame() {
         playing = false;
         questionArea.classList.add('hidden');
@@ -301,9 +265,11 @@ window.addEventListener('DOMContentLoaded', () => {
         saveGameStats(streetsGuessedCorrectly, totalQuestions);
         updateActionBtn('Repetir Zona', 'btn-green', repeatLastZone);
     }
-    
     function repeatLastZone() {
-        if (lastGameZonePoints.length < 3) return;
+        if (lastGameZonePoints.length < 3) {
+            startDrawing(); // Si no hay zona anterior, empieza una nueva
+            return;
+        };
         startDrawing();
         drawing = false;
         gameMap.off('click', addVertex);
@@ -311,7 +277,6 @@ window.addEventListener('DOMContentLoaded', () => {
         zonePoly = L.polygon(zonePoints, { color: COL_ZONE, weight: 2, fillOpacity: 0.1 }).addTo(gameMap);
         preloadStreets();
     }
-    
     function getDistanceToStreet(userPoint, streetLayer) {
         let minDistance = Infinity, closestPointOnStreet = null;
         streetLayer.eachLayer(layer => {
@@ -326,8 +291,6 @@ window.addEventListener('DOMContentLoaded', () => {
         });
         return { distance: Math.sqrt(minDistance), point: closestPointOnStreet };
     }
-    
-    async function saveCurrentZone() { /* Esta función ya no se llama desde la UI principal */ }
     async function saveGameStats(correct, total) {
         if (total === 0) return;
         try {
@@ -345,7 +308,6 @@ window.addEventListener('DOMContentLoaded', () => {
             const { data: zones, error } = await supabaseClient.from('saved_zones').select('id, name, zone_points').eq('user_id', session.user.id);
             if(error) throw error;
             container.innerHTML = zones.length > 0 ? zones.map(zone => `<div class="saved-zone-item" data-zone-points="${zone.zone_points}"><span>${zone.name}</span><button class="delete-zone-btn" data-zone-id="${zone.id}">&times;</button></div>`).join('') : '<p>No tienes zonas guardadas.</p>';
-            
             container.querySelectorAll('.saved-zone-item').forEach(item => item.onclick = (e) => {
                 if(e.target.classList.contains('delete-zone-btn')) return;
                 menuOverlay.classList.add('hidden');
@@ -368,7 +330,6 @@ window.addEventListener('DOMContentLoaded', () => {
             const { data: stats, error } = await supabaseClient.from('game_stats').select('correct_guesses, total_questions').eq('user_id', session.user.id);
             if (error) throw error;
             if(stats.length === 0) { container.innerHTML = '<p>Juega una partida para ver tus estadísticas.</p>'; return; }
-
             const totalCorrect = stats.reduce((sum, game) => sum + game.correct_guesses, 0);
             const totalPlayed = stats.reduce((sum, game) => sum + game.total_questions, 0);
             const percentage = totalPlayed > 0 ? Math.round((totalCorrect / totalPlayed) * 100) : 0;
@@ -385,7 +346,6 @@ window.addEventListener('DOMContentLoaded', () => {
             showFeedbackPopup("La descripción no puede estar vacía", "incorrect");
             return;
         }
-
         try {
             submitReportBtn.disabled = true;
             submitReportBtn.textContent = 'Enviando...';

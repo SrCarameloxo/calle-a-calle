@@ -1,7 +1,7 @@
 const { createClient } = require('@supabase/supabase-js');
 
 // Esta API segura solo puede ser llamada por administradores.
-// Su trabajo es actualizar una incidencia y, si es necesario, crear una regla de anulación.
+// Su trabajo es actualizar una incidencia y, si es necesario, crear una regla de anulación o bloqueo.
 module.exports = async (request, response) => {
     if (request.method !== 'POST') {
         response.setHeader('Allow', ['POST']);
@@ -37,23 +37,42 @@ module.exports = async (request, response) => {
         }
 
         // --- 2. Lógica de la Función (El usuario ya está verificado como admin) ---
-        const { incidentId, action, osmName, displayName, city } = request.body;
+        // Se añade 'actionType' para diferenciar entre 'override' y 'block'
+        const { incidentId, action, osmName, displayName, city, actionType } = request.body;
         
         if (!incidentId || !action) {
             return response.status(400).json({ error: 'Faltan parámetros (incidentId, action).' });
         }
 
         if (action === 'approve') {
-            if (!osmName || !displayName || !city) {
-                return response.status(400).json({ error: 'Para aprobar, se requieren osmName, displayName y city.' });
+            if (!osmName || !city || !actionType) {
+                return response.status(400).json({ error: 'Para aprobar, se requieren osmName, city y actionType.' });
             }
-            // Insertamos la nueva regla en la tabla de excepciones
-            const { error: overrideError } = await supabaseAdmin.from('street_overrides').insert({
-                osm_name: osmName,
-                display_name: displayName,
-                city: city,
-            });
-            if (overrideError) throw overrideError;
+
+            // --- INICIO DE LA LÓGICA MODIFICADA ---
+            if (actionType === 'override') {
+                if (!displayName) {
+                    return response.status(400).json({ error: 'Para la acción "override", se requiere displayName.' });
+                }
+                // Insertamos la nueva regla en la tabla de excepciones
+                const { error: overrideError } = await supabaseAdmin.from('street_overrides').insert({
+                    osm_name: osmName,
+                    display_name: displayName,
+                    city: city,
+                });
+                if (overrideError) throw overrideError;
+
+            } else if (actionType === 'block') {
+                // Insertamos la nueva regla en la tabla de bloqueo
+                const { error: blockError } = await supabaseAdmin.from('street_blocklist').insert({
+                    osm_name: osmName,
+                    city: city,
+                });
+                if (blockError) throw blockError;
+            } else {
+                return response.status(400).json({ error: 'actionType no válido. Debe ser "override" o "block".' });
+            }
+            // --- FIN DE LA LÓGICA MODIFICADA ---
         }
 
         // 3. Actualizamos el estado de la incidencia a 'resuelta' o 'rechazada'

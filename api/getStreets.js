@@ -103,10 +103,18 @@ module.exports = async (request, response) => {
     const currentCity = geoResult ? geoResult.city : null;
 
     const overrideRules = new Map();
+    const blockedNames = new Set(); // --- NUEVO: Set para calles bloqueadas
+
     if (currentCity) {
+        // Cargar reglas de anulación (sin cambios)
         const { data: overrides, error } = await supabaseAdmin.from('street_overrides').select('osm_name, display_name').eq('city', currentCity);
         if (error) console.warn("No se pudieron cargar las reglas de anulación:", error.message);
         else overrides.forEach(rule => overrideRules.set(rule.osm_name, rule));
+
+        // --- NUEVO: Cargar reglas de bloqueo ---
+        const { data: blocked, error: blockedError } = await supabaseAdmin.from('street_blocklist').select('osm_name').eq('city', currentCity);
+        if (blockedError) console.warn("No se pudieron cargar las reglas de bloqueo:", blockedError.message);
+        else blocked.forEach(rule => blockedNames.add(rule.osm_name));
     }
 
     const coords = zonePoints.map(p => `${p.lat} ${p.lng}`).join(' ');
@@ -114,7 +122,12 @@ module.exports = async (request, response) => {
     let res = await fetch('https://overpass-api.de/api/interpreter', { method: 'POST', body: query });
     if (!res.ok) throw new Error(`Overpass API error 1: ${res.statusText}`);
     let js = await res.json();
-    const streetNamesInPoly = new Set(js.elements.map(el => el.tags.name));
+    
+    // --- LÓGICA MODIFICADA: Filtrar las calles bloqueadas ANTES de procesar ---
+    const initialOsmNames = new Set(js.elements.map(el => el.tags.name));
+    const streetNamesInPoly = new Set(
+        [...initialOsmNames].filter(name => !blockedNames.has(name))
+    );
     
     let streetList = [];
     const seenFinalNames = new Set();

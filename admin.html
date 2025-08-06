@@ -38,12 +38,26 @@
                     <div>
                         <p class="text-sm text-gray-400">Descripción del usuario:</p>
                         <p id="incident-description" class="bg-gray-800 p-2 rounded-md my-2"></p>
+                        
+                        <div class="my-4">
+                            <p class="text-sm text-gray-400">Acción a realizar al aprobar:</p>
+                            <div class="flex gap-4 mt-2">
+                                <label class="flex items-center p-2 bg-gray-900 rounded-md cursor-pointer flex-1">
+                                    <input type="radio" name="resolutionType" value="override" class="mr-2" checked>
+                                    <span>Corregir / Añadir Nombre</span>
+                                </label>
+                                <label class="flex items-center p-2 bg-gray-900 rounded-md cursor-pointer flex-1">
+                                    <input type="radio" name="resolutionType" value="block" class="mr-2">
+                                    <span>Bloquear Calle (no preguntar)</span>
+                                </label>
+                            </div>
+                        </div>
                         <div class="grid grid-cols-2 gap-4">
                             <div>
                                 <label for="osm-name-input" class="text-sm text-gray-400">Nombre en OpenStreetMap (Clave)</label>
                                 <input type="text" id="osm-name-input" class="w-full bg-gray-900 border border-gray-600 rounded-md p-2 mt-1 text-white focus:ring-blue-500 focus:border-blue-500">
                             </div>
-                            <div>
+                            <div id="display-name-wrapper">
                                 <label for="display-name-input" class="text-sm text-gray-400">Nombre para el Juego (de Google Maps)</label>
                                 <input type="text" id="display-name-input" class="w-full bg-gray-900 border border-gray-600 rounded-md p-2 mt-1 text-white focus:ring-blue-500 focus:border-blue-500">
                             </div>
@@ -67,13 +81,14 @@
 
             const loadingScreen = document.getElementById('loading-screen');
             const adminPanel = document.getElementById('admin-panel');
-            // ... (el resto del script es idéntico al que ya te pasé, no necesita cambios)
             const incidentsList = document.getElementById('incidents-list');
             const detailsTitle = document.getElementById('details-title');
             const detailsContent = document.getElementById('details-content');
             const incidentDescription = document.getElementById('incident-description');
             const osmNameInput = document.getElementById('osm-name-input');
             const displayNameInput = document.getElementById('display-name-input');
+            const displayNameWrapper = document.getElementById('display-name-wrapper');
+            const radioButtons = document.querySelectorAll('input[name="resolutionType"]');
             const approveBtn = document.getElementById('approve-btn');
             const rejectBtn = document.getElementById('reject-btn');
             
@@ -146,71 +161,71 @@
             }
             
            async function resolveIncident(action) {
-    if (!selectedIncident) return;
+                if (!selectedIncident) return;
 
-    const osmName = osmNameInput.value.trim();
-    const displayName = displayNameInput.value.trim();
+                const selectedActionType = document.querySelector('input[name="resolutionType"]:checked').value;
+                const osmName = osmNameInput.value.trim();
+                const displayName = displayNameInput.value.trim();
+                let city = selectedIncident.city;
 
-    // Guardamos la ciudad de la incidencia en una variable
-    let city = selectedIncident.city;
+                if (action === 'approve') {
+                    if (!osmName) {
+                        alert('El campo "Nombre en OpenStreetMap" es obligatorio para aprobar.');
+                        return;
+                    }
+                    if (selectedActionType === 'override' && !displayName) {
+                        alert('Para "Corregir / Añadir", el campo "Nombre para el Juego" es obligatorio.');
+                        return;
+                    }
+                    if (!city) {
+                        city = prompt("La ciudad no fue detectada. Por favor, introduce la ciudad para esta incidencia (ej. 'Badajoz'):");
+                        if (!city || city.trim() === '') {
+                            alert('La ciudad es necesaria para aprobar la incidencia.');
+                            return;
+                        }
+                    }
+                }
 
-    if (action === 'approve') {
-        if (osmName === '' || displayName === '') {
-            alert('Por favor, completa ambos nombres de calle para aprobar.');
-            return;
-        }
+                approveBtn.disabled = true;
+                rejectBtn.disabled = true;
+                approveBtn.innerHTML = '<div class="spinner"></div>';
 
-        // --- INICIO DE LA NUEVA LÓGICA ---
-        // Si la ciudad no existe, se la pedimos al administrador
-        if (!city) {
-            city = prompt("La ciudad no fue detectada automáticamente. Por favor, introduce la ciudad para esta incidencia (ej. 'Badajoz'):");
-            if (!city || city.trim() === '') {
-                alert('La ciudad es necesaria para aprobar la incidencia.');
-                return; // Detenemos la ejecución si no se introduce una ciudad
+                try {
+                    const { data: { session } } = await supabase.auth.getSession();
+                    const response = await fetch('/api/resolveIncident', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${session.access_token}`
+                        },
+                        body: JSON.stringify({
+                            incidentId: selectedIncident.id,
+                            action: action, // 'approve' o 'reject'
+                            actionType: selectedActionType, // 'override' o 'block'
+                            osmName: osmName,
+                            displayName: displayName,
+                            city: city
+                        })
+                    });
+
+                    if (!response.ok) {
+                        const errorData = await response.json();
+                        throw new Error(errorData.details || errorData.error || 'Error del servidor');
+                    }
+
+                    alert(`Incidencia marcada como ${action === 'approve' ? 'resuelta' : 'rechazada'}.`);
+                    resetDetailsPanel();
+                    fetchIncidents();
+
+                } catch (error) {
+                    console.error('Error resolving incident:', error);
+                    alert('Error al procesar la incidencia: ' + error.message);
+                } finally {
+                    approveBtn.disabled = false;
+                    rejectBtn.disabled = false;
+                    approveBtn.innerHTML = 'Aprobar y Mapear';
+                }
             }
-        }
-        // --- FIN DE LA NUEVA LÓGICA ---
-    }
-
-    approveBtn.disabled = true;
-    rejectBtn.disabled = true;
-    approveBtn.innerHTML = '<div class="spinner"></div>';
-
-    try {
-        const { data: { session } } = await supabase.auth.getSession();
-        const response = await fetch('/api/resolveIncident', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${session.access_token}`
-            },
-            body: JSON.stringify({
-                incidentId: selectedIncident.id,
-                action: action,
-                osmName: osmName,
-                displayName: displayName,
-                city: city // Usamos la variable 'city' que puede haber sido rellenada por el admin
-            })
-        });
-
-        if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.error || 'Error del servidor');
-        }
-
-        alert(`Incidencia marcada como ${action === 'approve' ? 'resuelta' : 'rechazada'}.`);
-        resetDetailsPanel();
-        fetchIncidents();
-
-    } catch (error) {
-        console.error('Error resolving incident:', error);
-        alert('Error al procesar la incidencia: ' + error.message);
-    } finally {
-        approveBtn.disabled = false;
-        rejectBtn.disabled = false;
-        approveBtn.innerHTML = 'Aprobar y Mapear';
-    }
-}
             
             function resetDetailsPanel() {
                 selectedIncident = null;
@@ -228,6 +243,16 @@
                 L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
                     attribution: '© OpenStreetMap contributors, © CARTO'
                 }).addTo(adminMap);
+                
+                // Listener para los radio buttons que controla la visibilidad del campo 'displayName'
+                radioButtons.forEach(radio => {
+                    radio.addEventListener('change', (event) => {
+                        const isBlockAction = event.target.value === 'block';
+                        displayNameWrapper.style.display = isBlockAction ? 'none' : 'block';
+                    });
+
+                });
+
                 fetchIncidents();
                 approveBtn.addEventListener('click', () => resolveIncident('approve'));
                 rejectBtn.addEventListener('click', () => resolveIncident('reject'));

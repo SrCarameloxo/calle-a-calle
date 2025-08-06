@@ -14,6 +14,7 @@ window.addEventListener('DOMContentLoaded', () => {
   let drawing=false, zonePoly=null, tempMarkers=[], zonePoints=[], oldZonePoly=null;
   let playing=false, qIdx=0, target=null, userMk, guide, streetGrp;
   let streetList = [], totalQuestions = 0, streetsGuessedCorrectly = 0, lastGameZonePoints = [];
+  let lastGameStreetList = []; // <--- NUEVA VARIABLE PARA GUARDAR LA LISTA DE CALLES
 
   let userProfile = { cityData: null, subscribedCity: null, role: null };
 
@@ -25,7 +26,6 @@ window.addEventListener('DOMContentLoaded', () => {
   }
   async function signOut() { await supabaseClient.auth.signOut(); }
   
-  // FUNCIÓN CORREGIDA: Se restaura el bloque para mostrar el botón de admin.
   async function fetchUserProfile(user) {
     if (!user) return;
     try {
@@ -46,11 +46,9 @@ window.addEventListener('DOMContentLoaded', () => {
         userProfile.role = profile.role;
         userProfile.subscribedCity = profile.subscribed_city;
 
-        // --- BLOQUE RESTAURADO ---
         if (profile.role === 'admin') {
             document.getElementById('admin-panel-btn').classList.remove('hidden');
         }
-        // --- FIN DEL BLOQUE RESTAURADO ---
 
         if (profile.subscribed_city) {
             const { data: city, error: cityError } = await supabaseClient
@@ -69,7 +67,6 @@ window.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  // Se mantiene la versión robusta que espera a que la animación de login termine.
   async function handleAuthStateChange(event, session) {
     const user = session ? session.user : null;
     if (user) {
@@ -157,9 +154,7 @@ window.addEventListener('DOMContentLoaded', () => {
     });
   }
 
- // Se mantiene la versión robusta que cambia el orden de inicialización.
   function initGame() {
-    // --- PASO 1: Definir la vista inicial ---
     let initialCoords = [38.88, -6.97];
     let initialZoom = 13;
     if (userProfile.cityData) {
@@ -167,7 +162,6 @@ window.addEventListener('DOMContentLoaded', () => {
         initialZoom = userProfile.cityData.default_zoom;
     }
 
-    // --- PASO 2: Crear el mapa con opciones básicas ---
     gameMap = L.map('game-map-container', { zoomSnap: 0.25 });
     
     L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager_nolabels/{z}/{x}/{y}{r}.png',{
@@ -175,10 +169,8 @@ window.addEventListener('DOMContentLoaded', () => {
       minZoom: userProfile.cityData ? initialZoom - 2 : 5 
     }).addTo(gameMap);
     
-    // --- PASO 3: Establecer la vista del mapa ---
     gameMap.setView(initialCoords, initialZoom);
     
-    // --- PASO 4: Aplicar los límites (si existen) ---
     if (userProfile.cityData) {
         const latOffset = 20 / 111.1;
         const lngOffset = 20 / (111.1 * Math.cos(initialCoords[0] * Math.PI / 180));
@@ -188,10 +180,8 @@ window.addEventListener('DOMContentLoaded', () => {
         gameMap.setMaxBounds(bounds);
     }
     
-    // --- PASO 5: Forzar el re-cálculo de tamaño ---
     gameMap.invalidateSize();
 
-    // --- PASO 6: Añadir los listeners de los botones ---
     document.getElementById('drawZone').addEventListener('click', startDrawing);
     document.getElementById('undoPoint').addEventListener('click', undoLastPoint);
     document.getElementById('next').addEventListener('click', () => { document.getElementById('next').disabled=true; nextQ(); });
@@ -304,17 +294,38 @@ window.addEventListener('DOMContentLoaded', () => {
     document.getElementById('fb').textContent = zonePoints.length > 0 ? 'Punto eliminado. Sigue añadiendo.' : 'Haz click para añadir vértices.';
   }
 
+  // --- FUNCIÓN MODIFICADA PARA REUTILIZAR LA LISTA DE CALLES ---
   function repeatLastZone() {
-    if (lastGameZonePoints.length < 3) return;
-    startDrawing();
-    drawing = false;
-    gameMap.off('click', addVertex);
+    // Verificamos que tengamos tanto la zona como la lista de calles de la partida anterior.
+    if (lastGameZonePoints.length < 3 || lastGameStreetList.length === 0) return;
+
+    // 1. Limpiamos cualquier estado de una partida anterior.
+    clear();
+    if (zonePoly) gameMap.removeLayer(zonePoly);
+    if (oldZonePoly) gameMap.removeLayer(oldZonePoly);
+    document.getElementById('question').textContent = '';
+    document.getElementById('fb').textContent = '';
+    ['drawZone', 'repeatZone', 'saveZoneBtn', 'start-options'].forEach(id => document.getElementById(id).classList.add('hidden'));
+
+    // 2. Restauramos la zona y la lista de calles.
     zonePoints = [...lastGameZonePoints];
     zonePoly = L.polygon(zonePoints, { color: COL_ZONE, weight: 2, fillOpacity: 0.1 }).addTo(gameMap);
-    document.getElementById('undoPoint').classList.add('hidden');
-    document.getElementById('start-options').classList.remove('hidden');
-    document.getElementById('start').disabled = false;
-    document.getElementById('fb').textContent = 'Zona anterior cargada. Pulsa Start.';
+    streetList = [...lastGameStreetList];
+    streetList.sort(() => Math.random() - 0.5); // Barajamos para que el orden sea distinto.
+
+    // 3. Preparamos el estado del juego y la UI para empezar.
+    playing = true;
+    qIdx = 0;
+    streetsGuessedCorrectly = 0;
+    totalQuestions = streetList.length;
+
+    document.getElementById('score-display').classList.remove('hidden');
+    document.getElementById('score').textContent = `0 / ${totalQuestions}`;
+    document.getElementById('next').classList.remove('hidden');
+    
+    // 4. Centramos el mapa y lanzamos la primera pregunta.
+    gameMap.fitBounds(zonePoly.getBounds(), { padding: [50, 50] });
+    nextQ();
   }
 
   function onMapClick(e){
@@ -426,6 +437,7 @@ window.addEventListener('DOMContentLoaded', () => {
       return { distance: Math.sqrt(minDistance), point: closestPointOnStreet };
   }
 
+  // --- FUNCIÓN MODIFICADA PARA GUARDAR LA LISTA DE CALLES ---
   function endGame() {
     playing = false;
     document.getElementById('fb').textContent = `¡Juego terminado! Has acertado ${streetsGuessedCorrectly} de ${totalQuestions}.`;
@@ -436,11 +448,14 @@ window.addEventListener('DOMContentLoaded', () => {
         oldZonePoly = zonePoly;
     }
     lastGameZonePoints = [...zonePoints];
+    lastGameStreetList = [...streetList]; // <--- GUARDAMOS LA LISTA DE CALLES
     saveGameStats(streetsGuessedCorrectly, totalQuestions);
     
     ['next'].forEach(id => document.getElementById(id).classList.add('hidden'));
     ['drawZone', 'repeatZone', 'saveZoneBtn'].forEach(id => document.getElementById(id).classList.remove('hidden'));
-    document.getElementById('repeatZone').disabled = (lastGameZonePoints.length < 3);
+    
+    // Habilitamos el botón de repetir solo si hay una zona Y una lista de calles guardada.
+    document.getElementById('repeatZone').disabled = (lastGameZonePoints.length < 3 || lastGameStreetList.length === 0);
 
     zonePoly = null; 
     zonePoints = []; 
@@ -472,7 +487,6 @@ window.addEventListener('DOMContentLoaded', () => {
     document.getElementById('next').disabled = true;
   }
   
-  // MODIFICACIÓN FINAL: La función reportIncident ahora envía la ciudad del usuario.
   async function reportIncident() {
     if (lastGameZonePoints.length === 0) {
       alert("Debes jugar en una zona primero para poder reportar una incidencia sobre ella.");
@@ -491,11 +505,10 @@ window.addEventListener('DOMContentLoaded', () => {
 
         const zoneString = lastGameZonePoints.map(p => `${p.lat},${p.lng}`).join(';');
         
-        // El cuerpo de la petición ahora incluye la ciudad del perfil.
         const requestBody = {
             zone_points: zoneString,
             description: description,
-            city: userProfile.subscribedCity // ¡Aquí está la magia!
+            city: userProfile.subscribedCity
         };
 
         const response = await fetch('/api/reportIncident', {

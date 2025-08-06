@@ -1,147 +1,974 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-    <meta charset="UTF-8">
-    <title>Calle a Calle</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0">
+  <meta charset="utf-8">
+  <title>Calle a Calle</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    /* --- ESTILOS GENERALES Y DE MAPA --- */
+    html, body { height: 100%; margin: 0; overflow: hidden; }
+    body { font-family: system-ui, sans-serif; background-color: #1a1a1a; }
+    .hidden { display: none !important; }
     
-    <link rel="stylesheet" href="style.css">
+    #game-screen { display: flex; height: 100%; width: 100%; }
+    #game-map-container { flex: 1; position: relative; z-index: 5; }
+
+    /* --- ESTILOS ASIDE Y PANELES --- */
+    aside { 
+      width: 320px;
+      box-shadow: 2px 0 4px rgba(0,0,0,.15); 
+      display: flex;
+      flex-direction: column;
+      background-color: white;
+      z-index: 10;
+      position: relative;
+    }
+
+    #top-panel {
+      padding: 1rem;
+      border-bottom: 1px solid #e5e7eb;
+    }
+
+    #middle-panel-container {
+      flex-grow: 1;
+      position: relative;
+      padding: 1rem;
+      overflow-y: hidden;
+    }
     
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;700&display=swap" rel="stylesheet">
+    .content-panel {
+      display: none;
+      padding: 1.5rem;
+      border-radius: 1rem;
+      background-color: rgba(17, 24, 39, 0.85);
+      backdrop-filter: blur(4px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      color: white;
+      height: 100%;
+      overflow-y: auto;
+    }
+    
+    .content-panel.active {
+      display: block;
+    }
+    
+    #bottom-menu {
+      padding: 0.5rem;
+      border-top: 1px solid #e5e7eb;
+    }
+
+    /* --- ESTILOS PANTALLA DE LOGIN --- */
+    #background-map {
+        position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+        z-index: 1; filter: blur(4px) brightness(0.7);
+    }
+@keyframes pulse {
+  0%, 100% { 
+    transform: scale(1); 
+    box-shadow: 0 0 0 0 rgba(76, 175, 80, 0.7); 
+  }
+  50% { 
+    transform: scale(1.05); 
+    box-shadow: 0 0 0 10px rgba(76, 175, 80, 0); 
+  }
+}
+
+#google-login-btn { 
+  animation: pulse 2.5s infinite; 
+}
+    #login-screen {
+        position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+        z-index: 20; display: flex; align-items: center; justify-content: center;
+    }
+    
+    /* --- ESTILOS DE BOTONES DE JUEGO (RESTAURADOS) --- */
+    button { cursor: pointer; }
+    button.game-control-btn {
+      width: 100%; padding: .45rem; border: none; border-radius: 6px;
+      font-size: 1rem; box-sizing: border-box; 
+      transition: transform 0.05s ease-in-out, background-color 0.2s;
+      margin-bottom: 0.5rem;
+    }
+    button.game-control-btn:not(:disabled):active { transform: scale(0.97); }
+    button.game-control-btn:disabled { opacity: .4; cursor: default; }
+    
+    #drawZone, #start, #next { background: #007BFF; color: #fff; }
+    #drawZone:not(:disabled):hover, #start:not(:disabled):hover, #next:not(:disabled):hover { background-color: #0069d9; }
+
+    #undoPoint { background-color: #c82333; color: #fff; }
+    #undoPoint:not(:disabled):hover { background-color: #a71d2a; }
+
+    #repeatZone { background-color: #28a745; color: #fff; }
+    #repeatZone:not(:disabled):hover { background-color: #218838; }
+
+    #saveZoneBtn { background-color: #ffc107; color: black; }
+    #saveZoneBtn:not(:disabled):hover { background-color: #e0a800; }
+    
+    /* --- OTROS ESTILOS --- */
+    .gradient-text {
+        font-size: 2.25rem; font-weight: 700; text-align: center;
+        background: linear-gradient(to right, #3b82f6, #8b5cf6);
+        -webkit-background-clip: text; background-clip: text; color: transparent;
+        margin-bottom: 1rem;
+    }
+    
+    #question { font-weight: 700; margin: .5rem 0; }
+    #fb { margin: .5rem 0; font-size: 0.9rem; }
+    #score-display { font-size: 1.1rem; font-weight: bold; color: #333; }
+    .loader { margin-top: 1rem; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 10px; padding: 10px; background-color: #f8f9fa; border-radius: 8px; border: 1px solid #e5e7eb; }
+    .loading-text { color: #333; font-size: 12pt; font-weight: 600; }
+    
+    /* --- NUEVOS ESTILOS PARA ZONAS GUARDADAS --- */
+    .saved-zone-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0.75rem;
+      border-radius: 0.375rem;
+      background-color: rgba(255, 255, 255, 0.1);
+      cursor: pointer;
+      transition: background-color 0.2s;
+    }
+    .saved-zone-item:hover {
+      background-color: rgba(59, 130, 246, 0.3);
+    }
+    .delete-zone-btn {
+      background: none;
+      border: none;
+      padding: 0.25rem;
+      display: none;
+      color: #ef4444;
+    }
+    .saved-zone-item:hover .delete-zone-btn {
+      display: block;
+    }
+    .delete-zone-btn:hover {
+      color: #dc2626;
+    }
+
+    /* ===== INICIO: NUEVOS ESTILOS DE ANIMACIÓN ===== */
+    @keyframes pulseAndFlash {
+        0% {
+            stroke-width: 8;
+            stroke: #007a2f; /* Color normal */
+            opacity: 0.8;
+        }
+        50% {
+            stroke-width: 14; /* Más gruesa (pulso) */
+            stroke: #66ffb3;  /* Color brillante (parpadeo) */
+            opacity: 1;
+        }
+        100% {
+            stroke-width: 8;
+            stroke: #007a2f; /* Vuelta a la normalidad */
+            opacity: 0.8;
+        }
+    }
+
+    .street-reveal-animation {
+        animation: pulseAndFlash 0.8s ease-out;
+    }
+    /* ===== FIN: NUEVOS ESTILOS DE ANIMACIÓN ===== */
+
+    /* --- INICIO: ESTILOS PARA EL NUEVO CHECKBOX (CORREGIDO) --- */
+    .checkbox-wrapper {
+        padding: 10px 0;
+    }
+    .checkbox-container {
+        display: flex; /* Usamos flex para alinear el texto verticalmente */
+        align-items: center; /* Centrado vertical */
+        position: relative;
+        cursor: pointer;
+        font-size: 16px;
+        user-select: none;
+        color: #333;
+    }
+    .custom-checkbox {
+        position: absolute;
+        opacity: 0;
+        cursor: pointer;
+        height: 0;
+        width: 0;
+    }
+    .checkmark {
+        position: relative; /* Cambiado de absolute */
+        height: 25px;
+        width: 25px;
+        min-width: 25px; /* Evita que se encoja */
+        background-color: #d1d5db;
+        border-radius: 4px;
+        transition: background-color 0.3s;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+        margin-right: 10px; /* Espacio entre el check y el texto */
+        display: flex; /* Usamos flex para centrar el tick */
+        align-items: center;
+        justify-content: center;
+    }
+    .checkmark:after {
+        content: "";
+        display: none;
+        width: 6px; /* Ancho del tick */
+        height: 12px; /* Alto del tick */
+        border: solid white;
+        border-width: 0 3px 3px 0;
+        transform: rotate(45deg);
+    }
+    .custom-checkbox:checked ~ .checkmark {
+        background-color: #3b82f6;
+        box-shadow: 0 3px 7px rgba(59, 130, 246, 0.3);
+    }
+    .custom-checkbox:checked ~ .checkmark:after {
+        display: block;
+    }
+    /* --- FIN: ESTILOS PARA EL NUEVO CHECKBOX --- */
+  </style>
 </head>
 <body>
-    <div id="background-map"></div>
-    <div id="login-screen">
-      <section class="p-2 bg-gradient-to-r from-blue-800 to-purple-800 rounded-3xl">
-        <div class="p-8 text-white bg-gray-900 border-8 border-transparent rounded-2xl shadow-xl bg-opacity-80 backdrop-blur-sm">
-          <h1 class="text-5xl font-bold text-center cursor-default">Calle a Calle</h1>
-          <p class="mt-2 mb-8 text-center text-gray-300">Inicia sesión para empezar a jugar</p>
-          <div class="flex justify-center">
-            <button id="google-login-btn" class="p-3 bg-white rounded-full shadow-lg login-btn hover:scale-105 transition transform duration-300">
-              <img class="w-10 h-10" loading="lazy" src="https://ucarecdn.com/8f25a2ba-bdcf-4ff1-b596-088f330416ef/" alt="Google" />
-            </button>
+  <div id="background-map"></div>
+  <div id="login-screen">
+    <section class="p-2 bg-gradient-to-r from-blue-800 to-purple-800 rounded-3xl">
+      <div class="p-8 text-white bg-gray-900 border-8 border-transparent rounded-2xl shadow-xl bg-opacity-80 backdrop-blur-sm">
+        <h1 class="text-5xl font-bold text-center cursor-default">Calle a Calle</h1>
+        <p class="mt-2 mb-8 text-center text-gray-300">Inicia sesión para empezar a jugar</p>
+        <div class="flex justify-center">
+          <button id="google-login-btn" class="p-3 bg-white rounded-full shadow-lg login-btn hover:scale-105 transition transform duration-300">
+            <img class="w-10 h-10" loading="lazy" src="https://ucarecdn.com/8f25a2ba-bdcf-4ff1-b596-088f330416ef/" alt="Google" />
+          </button>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <div id="game-screen" class="hidden">
+    <aside>
+      <div id="top-panel">
+          <h1 class="gradient-text">Calle a Calle</h1>
+          <button id="drawZone" class="game-control-btn">Establecer zona</button>
+          <button id="undoPoint" class="game-control-btn hidden">Retroceder Punto</button>
+          
+          <div id="start-options" class="hidden">
+            <div class="checkbox-wrapper">
+                <label class="checkbox-container">
+                    <input id="include-poi-checkbox" class="custom-checkbox" type="checkbox">
+                    <span class="checkmark"></span>
+                    Incluir Zonas de Interés
+                </label>
+            </div>
+            <button id="start" class="game-control-btn" disabled>Start</button>
           </div>
+
+          <button id="repeatZone" class="game-control-btn hidden" disabled>Repetir Zona</button>
+          <button id="saveZoneBtn" class="game-control-btn hidden">Guardar Zona</button>
+          <button id="next" class="game-control-btn hidden" disabled>Siguiente</button>
+          <p id="question"></p>
+          <p id="score-display" class="hidden">Calles acertadas: <span id="score">0 / 0</span></p>
+          <div id="loader-container" class="loader hidden">
+            <div id="loading-text" class="loading-text"></div>
+          </div>
+          <p id="fb"></p>
+      </div>
+      
+      <div id="middle-panel-container">
+        <div id="saved-zones-content" class="content-panel">
+            <h3 class="mb-4 text-xl font-bold">Mis Zonas Guardadas</h3>
+            <div id="saved-zones-list" class="space-y-2"></div>
         </div>
-      </section>
-    </div>
-
-    <div id="game-screen" class="hidden">
-        
-        <div id="game-map-container"></div>
-        
-        <button id="report-incident-btn" aria-label="Reportar incidencia">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 26.38 25.47"><g><path d="M23.38,1.5H3c-1.1,0-2,.9-2,2V16.67c0,1.1,.9,2,2,2h.5v5.3l5.3-5.3h14.58c1.1,0,2-.9,2-2V3.5c0-1.1-.9-2-2-2Z" style="fill: #5f657f;"/><rect x="6.06" y="7.5" width="14.25" height="4.25" rx="2.13" ry="2.13" style="fill: #fff;"/></g></svg>
-        </button>
-
-        <div id="question-area" class="hidden">
-            <span id="question-prompt">¿Dónde está...?</span>
-            <div id="street-name-box"><span id="street-name-text"></span></div>
+        <div id="stats-content" class="content-panel">
+            <h3 class="mb-4 text-xl font-bold">Estadísticas</h3>
+            <div id="stats-list"></div>
         </div>
-        
-        <div id="progress-bar-container" class="hidden"><div id="progress-bar"></div></div>
-        
-        <div id="bottom-bar">
-            <svg viewBox="0 0 414.03 191.13" id="bottom-svg">
-                 <g class="cls-1">
-                    <g id="Capa_2" data-name="Capa 2">
-                        <g id="Capa_1-2" data-name="Capa 1">
-                            <path class="cls-12" d="M40.23,0H373.8c22.21,0,40.23,18,40.23,40.23V150.9c0,22.21-18,40.23-40.23,40.23H40.23C18,191.13,0,173.11,0,150.9V40.23C0,18,18,0,40.23,0Z"/>
-                            
-                            <g id="info-panel">
-                                <rect class="cls-13" x="19.01" y="19.5" width="274.45" height="49.03" rx="24.51" ry="24.51"/>
-                                <foreignObject x="30" y="22" width="250" height="45">
-                                    <div xmlns="http://www.w3.org/1999/xhtml" class="info-panel-content">
-                                        <span class="logo-text">Calle a Calle</span>
-                                        <span id="info-text">Dibuja una zona para empezar</span>
-                                    </div>
-                                </foreignObject>
-                            </g>
-
-                            <g id="menu-btn-group" style="cursor: pointer;">
-                                <circle class="cls-11" cx="42.5" cy="144.5" r="24"/>
-                                <g>
-                                    <rect class="cls-14" x="32" y="134" width="21" height="21" />
-                                    <foreignObject x="32" y="134" width="21" height="21">
-                                        <div xmlns="http://www.w3.org/1999/xhtml" class="menu-icon">
-                                            <svg viewBox="0 0 24 24"><path fill="currentColor" d="M3,6H21V8H3V6M3,11H21V13H3V11M3,16H21V18H3V16Z"></path></svg>
-                                        </div>
-                                    </foreignObject>
-                                </g>
-                            </g>
-
-                            <g id="poi-switch-container">
-                                 <foreignObject x="85" y="125" width="150" height="48">
-                                      <div xmlns="http://www.w3.org/1999/xhtml" class="poi-switch-content">
-                                        <label for="poi-checkbox" class="poi-label">Incluir PDI</label>
-                                        <label class="switch">
-                                            <input type="checkbox" id="poi-checkbox">
-                                            <span class="slider round"></span>
-                                        </label>
-                                    </div>
-                                </foreignObject>
-                            </g>
-                            
-                             <g id="main-action-btn-group" style="cursor: pointer;">
-                                <rect class="cls-10" x="240" y="85" width="155" height="85" rx="30" ry="30"/>
-                                 <foreignObject x="240" y="85" width="155" height="85">
-                                    <button xmlns="http://www.w3.org/1999/xhtml" id="main-action-btn" class="action-btn btn-blue">
-                                        Establecer Zona
-                                    </button>
-                                </foreignObject>
-                            </g>
-                            
-                            <g id="user-avatar-group" style="cursor: pointer;">
-                                <circle class="cls-15" cx="351.5" cy="44.5" r="24"/>
-                                <foreignObject x="327.5" y="20.5" width="48" height="48">
-                                     <img xmlns="http://www.w3.org/1999/xhtml" id="user-avatar" class="user-avatar-img" src="https://placehold.co/48x48/2b324c/FFF?text=U" alt="User"/>
-                                </foreignObject>
-                            </g>
-                        </g>
-                    </g>
-                </g>
-            </svg>
+        <div id="profile-content" class="content-panel">
+            <h3 class="mb-4 text-xl font-bold">Perfil de Usuario</h3>
+            <div id="user-info-details" class="p-4 text-center bg-gray-700 rounded-lg"></div>
+            <button id="admin-panel-btn" class="w-full mt-4 game-control-btn hidden" style="background-color: #6f42c1; color: white;">Panel de Administración</button>
+            <button id="logout-btn" class="w-full mt-4 game-control-btn" style="background-color: #dc3545;">Cerrar Sesión</button>
         </div>
+      </div>
 
-        <div id="feedback-popup"><span id="feedback-text"></span></div>
-        
-        <div id="report-modal" class="modal-overlay hidden">
-            <div class="modal-content">
-                <h3 class="modal-title">Reportar una incidencia</h3>
-                <p class="modal-description">¿Has encontrado un error o tienes alguna sugerencia? ¡Cuéntanos!</p>
-                <textarea id="report-textarea" placeholder="Describe el problema o tu idea..."></textarea>
-                <div class="modal-actions">
-                    <button id="cancel-report-btn">Cancelar</button>
-                    <button id="submit-report-btn">Enviar</button>
-                </div>
-            </div>
-        </div>
+      <div id="bottom-menu">
+        <div class="flex items-center justify-center w-auto p-2 bg-gray-100 rounded-2xl">
+          <button class="menu-btn group flex-1 p-3 flex justify-center items-center rounded-xl" data-panel="saved-zones-content">
+            <svg viewBox="0 0 24 24" height="28" width="28" xmlns="http://www.w3.org/2000/svg" class="text-gray-500 group-hover:text-blue-500 group-[.active]:text-blue-500 transition-colors"><path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+          </button>
+          <button class="menu-btn group flex-1 p-3 flex justify-center items-center rounded-xl" data-panel="stats-content">
+            <svg viewBox="0 0 24 24" height="28" width="28" xmlns="http://www.w3.org/2000/svg" class="text-gray-500 group-hover:text-blue-500 group-[.active]:text-blue-500 transition-colors"><path d="M3 3v18h18" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path><path d="M18.7 8l-5.1 5.2-2.8-2.7L7 14.3" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+          </button>
+          <button class="menu-btn group flex-1 p-3 flex justify-center items-center rounded-xl" data-panel="profile-content">
+            <svg viewBox="0 0 24 24" height="28" width="28" xmlns="http://www.w3.org/2000/svg" class="text-gray-500 group-hover:text-blue-500 group-[.active]:text-blue-500 transition-colors"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path><circle cx="12" cy="7" r="4" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></circle></svg>
+          </button>
+          <button id="report-btn" title="Reportar incidencia" class="group flex-1 p-3 flex justify-center items-center rounded-xl">
+            <svg viewBox="0 0 24 24" height="28" width="28" xmlns="http://www.w3.org/2000/svg" class="text-gray-500 group-hover:text-red-500 transition-colors"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1v12zM4 22v-7" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+          </button>
+          </div>
+      </div>
+    </aside>
+    <div id="game-map-container"></div>
+  </div>
 
-        <div id="menu-overlay" class="modal-overlay hidden">
-            <div id="menu-content" class="menu-panel-container">
-                <button id="close-menu-btn">&times;</button>
-                <div id="menu-tabs">
-                    <button class="menu-tab-btn active" data-panel="profile-content">Perfil</button>
-                    <button class="menu-tab-btn" data-panel="saved-zones-content">Mis Zonas</button>
-                    <button class="menu-tab-btn" data-panel="stats-content">Estadísticas</button>
-                </div>
-                <div id="profile-content" class="menu-panel active"></div>
-                <div id="saved-zones-content" class="menu-panel"></div>
-                <div id="stats-content" class="menu-panel"></div>
-            </div>
-        </div>
+  <audio id="correct-sound" src="/sounds/correct.mp3" preload="auto"></audio>
+  <audio id="incorrect-sound" src="/sounds/incorrect.mp3" preload="auto"></audio>
 
-    </div>
-
-    <audio id="correct-sound" src="sounds/correct.mp3" preload="auto"></audio>
-    <audio id="incorrect-sound" src="sounds/incorrect.mp3" preload="auto"></audio>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script>
+    window.addEventListener('DOMContentLoaded', () => {
     
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script src="main.js"></script>
+      const SUPABASE_URL = 'https://hppzwfwtedghpsxfonoh.supabase.co';
+      const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhwcHp3Znd0ZWRnaHBzeGZvbm9oIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQxMjQzNDMsImV4cCI6MjA2OTcwMDM0M30.BAh6i5iJ5YkDBoydfkC9azAD4eMdYBkEBdxws9kj5Hg';
+      const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+      const loginScreen = document.getElementById('login-screen');
+      const gameScreen = document.getElementById('game-screen');
+      const backgroundMapContainer = document.getElementById('background-map');
+      const googleLoginBtn = document.getElementById('google-login-btn');
+      
+      let backgroundMap, gameMap = null;
+      const COL_ZONE = '#663399', COL_TRACE = '#007a2f', COL_DASH = '#1976d2';
+      let drawing=false, zonePoly=null, tempMarkers=[], zonePoints=[], oldZonePoly=null;
+      let playing=false, qIdx=0, target=null, userMk, guide, streetGrp;
+      let streetList = [], totalQuestions = 0, streetsGuessedCorrectly = 0, lastGameZonePoints = [];
+
+      let userProfile = { cityData: null, subscribedCity: null, role: null };
+
+      async function signInWithGoogle() { 
+        await supabaseClient.auth.signInWithOAuth({ 
+          provider: 'google',
+          options: { redirectTo: window.location.origin }
+        }); 
+      }
+      async function signOut() { await supabaseClient.auth.signOut(); }
+      
+      // FUNCIÓN CORREGIDA: Se restaura el bloque para mostrar el botón de admin.
+      async function fetchUserProfile(user) {
+        if (!user) return;
+        try {
+            const { data: profile, error } = await supabaseClient
+                .from('profiles')
+                .select('role, subscribed_city')
+                .eq('id', user.id)
+                .single();
+
+            if (error) {
+                if (error.code === 'PGRST116') {
+                    await new Promise(resolve => setTimeout(resolve, 2000));
+                    return fetchUserProfile(user);
+                }
+                throw error;
+            }
+
+            userProfile.role = profile.role;
+            userProfile.subscribedCity = profile.subscribed_city;
+
+            // --- BLOQUE RESTAURADO ---
+            if (profile.role === 'admin') {
+                document.getElementById('admin-panel-btn').classList.remove('hidden');
+            }
+            // --- FIN DEL BLOQUE RESTAURADO ---
+
+            if (profile.subscribed_city) {
+                const { data: city, error: cityError } = await supabaseClient
+                    .from('cities')
+                    .select('*')
+                    .eq('name', profile.subscribed_city)
+                    .single();
+                
+                if (cityError) throw new Error(`No se encontraron datos para la ciudad: ${profile.subscribed_city}`);
+                userProfile.cityData = city;
+            }
+
+        } catch (e) {
+            console.error("Error al obtener el perfil y la ciudad del usuario:", e);
+            alert("Hubo un problema al cargar los datos de tu ciudad. Contacta con soporte.");
+        }
+      }
+
+      // Se mantiene la versión robusta que espera a que la animación de login termine.
+      async function handleAuthStateChange(event, session) {
+        const user = session ? session.user : null;
+        if (user) {
+          loginScreen.style.opacity = '0';
+          gameScreen.classList.remove('hidden');
+          
+          document.getElementById('user-info-details').innerHTML = `<p class="text-sm text-gray-400">Conectado como</p><p class="font-semibold text-base truncate">${user.email}</p>`;
+          document.getElementById('logout-btn').addEventListener('click', signOut);
+
+          setTimeout(async () => {
+              loginScreen.classList.add('hidden');
+              await fetchUserProfile(user);
+
+              if (!gameMap) {
+                  initGame();
+              } else {
+                  gameMap.invalidateSize();
+              }
+          }, 500);
+
+        } else {
+          loginScreen.classList.remove('hidden');
+          loginScreen.style.opacity = '1';
+          gameScreen.classList.add('hidden');
+          if (!backgroundMap) {
+            initBackgroundMap();
+          }
+        }
+      }
+
+      function startDynamicBackground(bMap) {
+          const initialCenter = bMap.getCenter();
+          const startTime = Date.now();
+          const freqX = 0.00005;
+          const freqY = 0.0001;
+          const ampX = 0.008;
+          const ampY = 0.004;
+
+          setInterval(() => {
+              const elapsedTime = Date.now() - startTime;
+              const dx = Math.sin(elapsedTime * freqX) * ampX;
+              const dy = Math.cos(elapsedTime * freqY) * ampY;
+
+              bMap.panTo([initialCenter.lat + dy, initialCenter.lng + dx], {
+                  animate: true,
+                  duration: 1,
+                  noMoveStart: true
+              });
+          }, 100);
+      }
+
+      function initBackgroundMap() {
+          if (backgroundMap) return;
+          backgroundMap = L.map('background-map', { zoomControl: false, dragging: false, scrollWheelZoom: false, doubleClickZoom: false, touchZoom: false });
+          L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager_nolabels/{z}/{x}/{y}{r}.png', { attribution: '', maxZoom: 19 }).addTo(backgroundMap);
+          backgroundMap.setView([38.88, -6.97], 15);
+          setTimeout(() => {
+              startDynamicBackground(backgroundMap);
+          }, 1000);
+      }
+      
+      function setupMenu() {
+        const menuButtons = document.querySelectorAll('.menu-btn');
+        const contentPanels = document.querySelectorAll('.content-panel');
+
+        menuButtons.forEach(button => {
+          button.addEventListener('click', () => {
+            const panelId = button.dataset.panel;
+            const targetPanel = document.getElementById(panelId);
+            const isAlreadyActive = button.classList.contains('active');
+            
+            contentPanels.forEach(p => p.classList.remove('active'));
+            menuButtons.forEach(b => b.classList.remove('active'));
+            
+            if (isAlreadyActive) {
+              return;
+            }
+
+            button.classList.add('active');
+            targetPanel.classList.add('active');
+
+            if (panelId === 'saved-zones-content') displaySavedZones();
+            if (panelId === 'stats-content') displayStats();
+          });
+        });
+      }
+
+     // Se mantiene la versión robusta que cambia el orden de inicialización.
+      function initGame() {
+        // --- PASO 1: Definir la vista inicial ---
+        let initialCoords = [38.88, -6.97];
+        let initialZoom = 13;
+        if (userProfile.cityData) {
+            initialCoords = [userProfile.cityData.center_lat, userProfile.cityData.center_lng];
+            initialZoom = userProfile.cityData.default_zoom;
+        }
+
+        // --- PASO 2: Crear el mapa con opciones básicas ---
+        gameMap = L.map('game-map-container', { zoomSnap: 0.25 });
+        
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager_nolabels/{z}/{x}/{y}{r}.png',{
+          attribution: '© OSM & CARTO', subdomains:'abcd', maxZoom:19,
+          minZoom: userProfile.cityData ? initialZoom - 2 : 5 
+        }).addTo(gameMap);
+        
+        // --- PASO 3: Establecer la vista del mapa ---
+        gameMap.setView(initialCoords, initialZoom);
+        
+        // --- PASO 4: Aplicar los límites (si existen) ---
+        if (userProfile.cityData) {
+            const latOffset = 20 / 111.1;
+            const lngOffset = 20 / (111.1 * Math.cos(initialCoords[0] * Math.PI / 180));
+            const corner1 = L.latLng(initialCoords[0] - latOffset, initialCoords[1] - lngOffset);
+            const corner2 = L.latLng(initialCoords[0] + latOffset, initialCoords[1] + lngOffset);
+            const bounds = L.latLngBounds(corner1, corner2);
+            gameMap.setMaxBounds(bounds);
+        }
+        
+        // --- PASO 5: Forzar el re-cálculo de tamaño ---
+        gameMap.invalidateSize();
+
+        // --- PASO 6: Añadir los listeners de los botones ---
+        document.getElementById('drawZone').addEventListener('click', startDrawing);
+        document.getElementById('undoPoint').addEventListener('click', undoLastPoint);
+        document.getElementById('next').addEventListener('click', () => { document.getElementById('next').disabled=true; nextQ(); });
+        document.getElementById('repeatZone').addEventListener('click', repeatLastZone);
+        document.getElementById('saveZoneBtn').addEventListener('click', saveCurrentZone);
+        document.getElementById('report-btn').addEventListener('click', reportIncident);
+        document.getElementById('admin-panel-btn').addEventListener('click', () => { window.location.href = '/admin.html'; });
+
+        setupStartButton(document.getElementById('start'));
+        setupMenu();
+      }
+
+      function setupStartButton(bStart) {
+        const firstClickHandler = async () => {
+            if (oldZonePoly) gameMap.removeLayer(oldZonePoly);
+            if (!zonePoly) return;
+            if (drawing) {
+                drawing = false;
+                gameMap.off('click', addVertex);
+                tempMarkers.forEach(m => gameMap.removeLayer(m));
+                tempMarkers = [];
+            }
+            document.getElementById('undoPoint').classList.add('hidden');
+            
+            bStart.disabled = true;
+            bStart.textContent = 'Cargando calles...';
+            document.getElementById('include-poi-checkbox').disabled = true;
+
+            await preloadStreets();
+            
+            bStart.textContent = 'Iniciar juego';
+            bStart.onclick = secondClickHandler;
+
+            if (totalQuestions > 0) {
+              bStart.disabled = false;
+            } else {
+              document.getElementById('fb').textContent = 'No se encontraron calles. Dibuja otra zona.';
+              document.getElementById('start-options').classList.add('hidden');
+              document.getElementById('drawZone').classList.remove('hidden');
+            }
+        };
+        const secondClickHandler = () => {
+            playing = true; qIdx = 0; streetsGuessedCorrectly = 0;
+            document.getElementById('score-display').classList.remove('hidden');
+            document.getElementById('score').textContent = `0 / ${totalQuestions}`;
+            document.getElementById('start-options').classList.add('hidden');
+            document.getElementById('next').classList.remove('hidden');
+            gameMap.fitBounds(zonePoly.getBounds(), { padding: [50, 50] });
+            nextQ();
+        };
+        bStart.onclick = firstClickHandler;
+      }
+
+      function startDrawing(){
+        document.getElementById('fb').textContent = 'Haz click para añadir vértices. Con 3 se habilita Start. Haz click en el primer vértice para cerrar.';
+        ['repeatZone', 'saveZoneBtn', 'drawZone'].forEach(id => document.getElementById(id).classList.add('hidden'));
+        ['undoPoint', 'start-options'].forEach(id => document.getElementById(id).classList.remove('hidden'));
+        
+        const startButton = document.getElementById('start');
+        startButton.disabled = true;
+        startButton.textContent = 'Start';
+        document.getElementById('include-poi-checkbox').disabled = false;
+
+        if (zonePoly) gameMap.removeLayer(zonePoly);
+        if (oldZonePoly) gameMap.removeLayer(oldZonePoly);
+        zonePoints = []; tempMarkers = []; zonePoly = null;
+        playing = false;
+        drawing = true;
+        
+        setupStartButton(startButton);
+        gameMap.on('click', addVertex);
+      }
+
+      function addVertex(e){
+        const { latlng } = e;
+        if(zonePoints.length >= 3 && latlng.equals(zonePoints[0])){ finishPolygon(); return; }
+        const mk = L.circleMarker(latlng, { radius:5, color:COL_ZONE }).addTo(gameMap);
+        tempMarkers.push(mk);
+        zonePoints.push(latlng);
+        if(zonePoly) gameMap.removeLayer(zonePoly);
+        zonePoly = L.polygon(zonePoints, { color:COL_ZONE, weight:2, fillOpacity:0.1 }).addTo(gameMap);
+        if(zonePoints.length >= 3){ 
+          document.getElementById('fb').textContent = 'Zona mínima definida. Puedes cerrar o añadir más puntos.';
+          document.getElementById('start').disabled = false; 
+        }
+      }
+
+      function finishPolygon(){
+        drawing = false;
+        gameMap.off('click', addVertex);
+        tempMarkers.forEach(m=>gameMap.removeLayer(m));
+        tempMarkers = [];
+        zonePoly.addLatLng(zonePoints[0]);
+        document.getElementById('fb').textContent = 'Zona cerrada. Pulsa Start para buscar calles.';
+        document.getElementById('undoPoint').classList.add('hidden');
+        document.getElementById('start').disabled = false;
+      }
+      
+      function undoLastPoint() {
+        if (!drawing || zonePoints.length === 0) return;
+        zonePoints.pop();
+        const lastMarker = tempMarkers.pop();
+        if (lastMarker) gameMap.removeLayer(lastMarker);
+        if (zonePoly) gameMap.removeLayer(zonePoly);
+        zonePoly = null;
+        if (zonePoints.length >= 2) {
+            zonePoly = L.polygon(zonePoints, { color: COL_ZONE, weight: 2, fillOpacity: 0.1 }).addTo(gameMap);
+        }
+        document.getElementById('start').disabled = zonePoints.length < 3;
+        document.getElementById('fb').textContent = zonePoints.length > 0 ? 'Punto eliminado. Sigue añadiendo.' : 'Haz click para añadir vértices.';
+      }
+
+      function repeatLastZone() {
+        if (lastGameZonePoints.length < 3) return;
+        startDrawing();
+        drawing = false;
+        gameMap.off('click', addVertex);
+        zonePoints = [...lastGameZonePoints];
+        zonePoly = L.polygon(zonePoints, { color: COL_ZONE, weight: 2, fillOpacity: 0.1 }).addTo(gameMap);
+        document.getElementById('undoPoint').classList.add('hidden');
+        document.getElementById('start-options').classList.remove('hidden');
+        document.getElementById('start').disabled = false;
+        document.getElementById('fb').textContent = 'Zona anterior cargada. Pulsa Start.';
+      }
+
+      function onMapClick(e){
+        if(!playing) return; 
+        gameMap.off('click', onMapClick);
+        if (userMk) gameMap.removeLayer(userMk);
+        userMk = L.marker(e.latlng).addTo(gameMap);
+        streetGrp = drawStreet(); 
+        if(streetGrp){
+          try {
+              streetGrp.eachLayer(layer => {
+                  const element = layer.getElement();
+                  if (element) {
+                      element.classList.add('street-reveal-animation');
+                  }
+              });
+          } catch (e) {
+              console.warn("No se pudo aplicar la animación a la calle.");
+          }
+
+          const streetCheck = getDistanceToStreet(userMk.getLatLng(), streetGrp);
+          if (streetCheck.distance <= 30) {
+            streetsGuessedCorrectly++;
+            document.getElementById('fb').textContent = `¡Correcto! Has acertado.`;
+            const correctSound = document.getElementById('correct-sound');
+            if (correctSound) {
+                correctSound.play().catch(error => console.error("Error al reproducir sonido de acierto:", error));
+            }
+          } else {
+            document.getElementById('fb').textContent = `Casi, pero no has hecho clic sobre el lugar (a ${Math.round(streetCheck.distance)} metros).`;
+            const incorrectSound = document.getElementById('incorrect-sound');
+            if (incorrectSound) {
+                incorrectSound.play().catch(error => console.error("Error al reproducir sonido de fallo:", error));
+            }
+          }
+          document.getElementById('score').textContent = `${streetsGuessedCorrectly} / ${totalQuestions}`;
+          if (streetCheck.point) {
+            guide = L.polyline([userMk.getLatLng(), streetCheck.point], { dashArray:'6 4', color:COL_DASH }).addTo(gameMap);
+          }
+        } else {
+          document.getElementById('fb').textContent = 'Error: No se pudo dibujar el lugar. Pulsa Siguiente.';
+        }
+        document.getElementById('next').disabled=false;
+      }
+
+      function clear(){ 
+        if (!gameMap || !playing) return;
+        [userMk, guide, streetGrp].forEach(layer => {
+            if (layer && gameMap.hasLayer(layer)) gameMap.removeLayer(layer);
+        });
+        userMk = guide = streetGrp = null; 
+      }
+
+      async function preloadStreets() {
+          const fb = document.getElementById('fb');
+          const loaderContainer = document.getElementById('loader-container');
+          const loadingText = document.getElementById('loading-text');
+          
+          fb.textContent = '';
+          loaderContainer.classList.remove('hidden');
+          loadingText.innerHTML = `Identificando calles...`;
+
+          try {
+              const zoneParam = zonePoints.map(p => `${p.lat},${p.lng}`).join(';');
+              const includePOI = document.getElementById('include-poi-checkbox').checked;
+              const response = await fetch(`/api/getStreets?zone=${encodeURIComponent(zoneParam)}&includePOI=${includePOI}`);
+              
+              if (!response.ok) {
+                  const errorData = await response.json();
+                  throw new Error(errorData.error || 'Error del servidor.');
+              }
+              const data = await response.json();
+              streetList = data.streets;
+              totalQuestions = streetList.length;
+              streetList.sort(() => Math.random() - 0.5);
+              if (totalQuestions > 0) fb.textContent = `Se han encontrado ${totalQuestions} lugares. ¡Listo!`;
+              else fb.textContent = 'No se han encontrado lugares válidos. Dibuja otra zona.';
+              document.getElementById('score').textContent = `0 / ${totalQuestions}`;
+          } catch (error) {
+              console.error(error);
+              fb.textContent = `Error al cargar las calles: ${error.message}`;
+          } finally {
+              loaderContainer.classList.add('hidden');
+          }
+      }
+      
+      function drawStreet(){
+        const g = L.layerGroup().addTo(gameMap);
+        if (!target || !Array.isArray(target) || target.length === 0) return null;
+        target.forEach(geom => {
+            if (geom.isClosed) L.polygon(geom.points, { color: COL_TRACE, weight: 4, fillOpacity: 0.2 }).addTo(g);
+            else L.polyline(geom.points, { color: COL_TRACE, weight: 8 }).addTo(g);
+        });
+        return g;
+      }
+
+      function getDistanceToStreet(userPoint, streetLayer) {
+          let minDistance = Infinity, closestPointOnStreet = null;
+          streetLayer.eachLayer(layer => {
+              let latlngs = (layer instanceof L.Polygon) ? layer.getLatLngs()[0] : (layer instanceof L.Polyline) ? layer.getLatLngs() : [];
+              for (let i = 0; i < latlngs.length - 1; i++) {
+                  let p1=gameMap.latLngToLayerPoint(latlngs[i]), p2=gameMap.latLngToLayerPoint(latlngs[i+1]), p=gameMap.latLngToLayerPoint(userPoint);
+                  let x=p1.x,y=p1.y,dx=p2.x-x,dy=p2.y-y;
+                  if(dx!==0||dy!==0){let t=((p.x-x)*dx+(p.y-y)*dy)/(dx*dx+dy*dy);if(t>1){x=p2.x;y=p2.y}else if(t>0){x+=dx*t;y+=dy*t}}
+                  dx=p.x-x;dy=p.y-y;let dist=dx*dx+dy*dy;
+                  if(dist<minDistance){minDistance=dist;closestPointOnStreet=gameMap.layerPointToLatLng(L.point(x,y))}
+              }
+          });
+          return { distance: Math.sqrt(minDistance), point: closestPointOnStreet };
+      }
+
+      function endGame() {
+        playing = false;
+        document.getElementById('fb').textContent = `¡Juego terminado! Has acertado ${streetsGuessedCorrectly} de ${totalQuestions}.`;
+        document.getElementById('question').textContent = 'Elige una opción o dibuja una nueva zona.';
+        document.getElementById('score-display').classList.add('hidden');
+        if (zonePoly) {
+            zonePoly.setStyle({ color: '#696969', weight: 2, dashArray: '5, 5', fillOpacity: 0.05 });
+            oldZonePoly = zonePoly;
+        }
+        lastGameZonePoints = [...zonePoints];
+        saveGameStats(streetsGuessedCorrectly, totalQuestions);
+        
+        ['next'].forEach(id => document.getElementById(id).classList.add('hidden'));
+        ['drawZone', 'repeatZone', 'saveZoneBtn'].forEach(id => document.getElementById(id).classList.remove('hidden'));
+        document.getElementById('repeatZone').disabled = (lastGameZonePoints.length < 3);
+
+        zonePoly = null; 
+        zonePoints = []; 
+        streetList = []; 
+        totalQuestions = 0;
+        gameMap.off('click', onMapClick);
+      }
+
+      function checkAndRecenterMap() {
+          if (!gameMap || !zonePoly) return;
+          const mapBounds = gameMap.getBounds();
+          const polyBounds = zonePoly.getBounds();
+          if (!mapBounds.contains(polyBounds)) {
+              gameMap.flyToBounds(polyBounds, { padding: [50, 50], duration: 1.2 });
+          }
+      }
+
+      function nextQ(){
+        checkAndRecenterMap();
+        
+        clear();
+        if(qIdx >= totalQuestions){ endGame(); return; }
+        gameMap.on('click', onMapClick);
+        const s = streetList[qIdx];
+        target = s.geometries;
+        qIdx++;
+        document.getElementById('question').textContent = `Pregunta ${qIdx} / ${totalQuestions}: ¿Dónde está «${s.googleName}»?`;
+        document.getElementById('fb').textContent = 'Haz clic en el mapa para responder.';
+        document.getElementById('next').disabled = true;
+      }
+      
+      // MODIFICACIÓN FINAL: La función reportIncident ahora envía la ciudad del usuario.
+      async function reportIncident() {
+        if (lastGameZonePoints.length === 0) {
+          alert("Debes jugar en una zona primero para poder reportar una incidencia sobre ella.");
+          return;
+        }
+
+        const description = prompt("Por favor, describe la incidencia (ej. 'Falta la calle X', 'La calle Y no debería estar', etc.):");
+        if (!description || description.trim() === '') return;
+
+        try {
+            const { data: { session } } = await supabaseClient.auth.getSession();
+            if (!session) {
+                alert("Necesitas estar conectado para reportar una incidencia.");
+                return;
+            }
+
+            const zoneString = lastGameZonePoints.map(p => `${p.lat},${p.lng}`).join(';');
+            
+            // El cuerpo de la petición ahora incluye la ciudad del perfil.
+            const requestBody = {
+                zone_points: zoneString,
+                description: description,
+                city: userProfile.subscribedCity // ¡Aquí está la magia!
+            };
+
+            const response = await fetch('/api/reportIncident', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${session.access_token}`
+                },
+                body: JSON.stringify(requestBody)
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error || 'Error del servidor');
+            }
+
+            alert("¡Gracias! Tu incidencia ha sido enviada con éxito.");
+        } catch (error) {
+          console.error('Error al enviar la incidencia:', error.message);
+          alert(`Hubo un error al enviar tu reporte: ${error.message}`);
+        }
+      }
+      
+      async function saveCurrentZone() {
+        const zoneName = prompt("Dale un nombre a esta zona:", "Mi barrio");
+        if (!zoneName || zoneName.trim() === '') return;
+        if (zonePoints.length < 3) {
+            alert("La zona es demasiado pequeña para guardarla.");
+            return;
+        };
+        try {
+            const { data: { session } } = await supabaseClient.auth.getSession();
+            if (!session) return;
+            const zoneString = zonePoints.map(p => `${p.lat},${p.lng}`).join(';');
+            const { error } = await supabaseClient.from('saved_zones').insert({ user_id: session.user.id, name: zoneName, zone_points: zoneString });
+            if (error) throw error;
+            alert(`¡Zona "${zoneName}" guardada con éxito!`);
+            document.getElementById('saveZoneBtn').classList.add('hidden');
+        } catch (error) {
+            console.error('Error al guardar la zona:', error.message);
+            alert('Hubo un error al guardar la zona.');
+        }
+      }
+      
+      async function displaySavedZones() {
+        const listContainer = document.getElementById('saved-zones-list');
+        listContainer.innerHTML = '<p>Cargando zonas...</p>';
+        try {
+            const { data: { session } } = await supabaseClient.auth.getSession();
+            if (!session) return;
+            const { data: zones, error } = await supabaseClient.from('saved_zones').select('id, name, zone_points').eq('user_id', session.user.id).order('created_at', { ascending: false });
+            if (error) throw error;
+            listContainer.innerHTML = '';
+            if (zones.length === 0) {
+                listContainer.innerHTML = '<p>Aún no tienes zonas guardadas.</p>';
+                return;
+            }
+            zones.forEach(zone => {
+                const item = document.createElement('div');
+                item.className = 'saved-zone-item';
+                
+                const nameSpan = document.createElement('span');
+                nameSpan.className = 'font-semibold flex-grow truncate';
+                nameSpan.textContent = zone.name;
+                nameSpan.onclick = () => playFromHistory(zone.zone_points);
+                
+                const deleteBtn = document.createElement('button');
+                deleteBtn.className = 'delete-zone-btn';
+                deleteBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 256 256"><rect width="256" height="256" fill="none"></rect><line x1="216" y1="56" x2="40" y2="56" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"></line><line x1="104" y1="104" x2="104" y2="168" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"></line><line x1="152" y1="104" x2="152" y2="168" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"></line><path d="M200,56V208a8,8,0,0,1-8,8H64a8,8,0,0,1-8-8V56" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"></path><path d="M168,56V40a16,16,0,0,0-16-16H104A16,16,0,0,0,88,40V56" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"></path></svg>`;
+                deleteBtn.onclick = (e) => {
+                  e.stopPropagation();
+                  deleteZone(zone.id);
+                };
+
+                item.appendChild(nameSpan);
+                item.appendChild(deleteBtn);
+                listContainer.appendChild(item);
+            });
+        } catch (error) {
+            console.error('Error cargando zonas guardadas:', error.message);
+            listContainer.innerHTML = '<p class="text-red-400">Error al cargar zonas.</p>';
+        }
+      }
+
+      async function deleteZone(zoneId) {
+        if (!confirm('¿Estás seguro de que quieres eliminar esta zona?')) return;
+        try {
+            const { error } = await supabaseClient.from('saved_zones').delete().eq('id', zoneId);
+            if (error) throw error;
+            displaySavedZones();
+        } catch (error) {
+            console.error('Error al eliminar la zona:', error.message);
+            alert('No se pudo eliminar la zona.');
+        }
+      }
+
+      async function saveGameStats(correct, total) {
+        try {
+            const { data: { session } } = await supabaseClient.auth.getSession();
+            if (!session || total === 0) return;
+            await supabaseClient.from('game_stats').insert({ user_id: session.user.id, correct_guesses: correct, total_questions: total });
+        } catch (error) {
+            console.error('Error guardando estadísticas:', error.message);
+        }
+      }
+
+      async function displayStats() {
+        const statsContent = document.getElementById('stats-list');
+        statsContent.innerHTML = '<p>Calculando estadísticas...</p>';
+        try {
+            const { data: { session } } = await supabaseClient.auth.getSession();
+            if (!session) return;
+            const { data: stats, error } = await supabaseClient.from('game_stats').select('correct_guesses, total_questions').eq('user_id', session.user.id).order('created_at', { ascending: false }).limit(15);
+            if (error) throw error;
+            if (stats.length === 0) {
+                statsContent.innerHTML = '<p>Juega una partida para ver tus estadísticas.</p>';
+                return;
+            }
+            const totalCorrect = stats.reduce((sum, game) => sum + game.correct_guesses, 0);
+            const totalPlayed = stats.reduce((sum, game) => sum + game.total_questions, 0);
+            const percentage = totalPlayed > 0 ? Math.round((totalCorrect / totalPlayed) * 100) : 0;
+            statsContent.innerHTML = `
+                <div class="text-center">
+                    <p class="text-5xl font-bold text-blue-400">${percentage}%</p>
+                    <p class="mt-2 text-lg text-gray-300">de aciertos</p>
+                    <p class="text-sm text-gray-400">(${totalCorrect} de ${totalPlayed} en las últimas partidas)</p>
+                </div>`;
+        } catch (error) {
+            console.error('Error cargando estadísticas:', error.message);
+            statsContent.innerHTML = '<p class="text-red-400">Error al cargar estadísticas.</p>';
+        }
+      }
+      
+      function playFromHistory(zoneString) {
+        const points = zoneString.split(';').map(pair => {
+          const [lat, lng] = pair.split(',');
+          return { lat: parseFloat(lat), lng: parseFloat(lng) };
+        });
+        if (points.length < 3) return;
+        startDrawing(); 
+        drawing = false; 
+        gameMap.off('click', addVertex);
+        zonePoints = points.map(p => L.latLng(p.lat, p.lng));
+        zonePoly = L.polygon(zonePoints, { color: COL_ZONE, weight: 2, fillOpacity: 0.1 }).addTo(gameMap);
+        document.getElementById('undoPoint').classList.add('hidden');
+        document.getElementById('start-options').classList.remove('hidden');
+        document.getElementById('start').disabled = false;
+        document.getElementById('fb').textContent = 'Zona cargada. Pulsa Start.';
+        gameMap.fitBounds(zonePoly.getBounds(), { padding: [50, 50] });
+      }
+      
+      googleLoginBtn.addEventListener('click', signInWithGoogle);
+      supabaseClient.auth.onAuthStateChange(handleAuthStateChange);
+    });
+  </script>
 </body>
 </html>
+}
+}

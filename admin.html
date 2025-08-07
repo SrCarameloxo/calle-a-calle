@@ -226,29 +226,32 @@
                 document.querySelectorAll('.list-item').forEach(item => item.classList.remove('selected'));
                 document.querySelector(`.list-item[data-item-id='${incident.id}']`).classList.add('selected');
                 
-                resetDetailsPanel(false); 
+                // Configurar la UI para una incidencia
                 detailsPanel.title.classList.add('hidden');
                 detailsPanel.content.classList.remove('hidden');
+                detailsPanel.previewContainer.classList.add('hidden');
                 detailsPanel.formContainer.classList.remove('hidden');
-
-                detailsPanel.description.textContent = incident.description;
                 detailsPanel.descWrapper.classList.remove('hidden');
                 detailsPanel.resolutionWrapper.classList.remove('hidden');
+                adminMap.drawnItems.clearLayers();
 
+                // Rellenar el formulario
+                detailsPanel.description.textContent = incident.description;
                 detailsPanel.city.value = incident.city || '';
                 const match = incident.description.match(/["'](.*?)["']/) || incident.description.match(/calle (.*?)(?:\s|$)/i);
                 const guessedName = match ? (match[1].startsWith('C.') ? match[1].replace('C. ', 'Calle ') : `Calle ${match[1]}`) : '';
                 detailsPanel.osmName.value = guessedName;
                 detailsPanel.displayName.value = guessedName.toUpperCase();
 
+                // Dibujar en el mapa
                 const points = incident.zone_points.split(';').map(p => {
                     const [lat, lng] = p.split(',');
                     return [parseFloat(lat), parseFloat(lng)];
                 });
-                adminMap.drawnItems.clearLayers();
                 const polygon = L.polygon(points, {color: '#3b82f6'}).addTo(adminMap.drawnItems);
                 adminMap.fitBounds(polygon.getBounds(), {padding: [50, 50]});
                 
+                // Activar y configurar botones
                 configureButtonsForIncident();
             }
 
@@ -282,7 +285,7 @@
                 } catch (error) {
                     alert('Error al procesar la incidencia: ' + error.message);
                 } finally {
-                    setButtonsLoading(false);
+                    setButtonsLoading(false, 'incident');
                 }
             }
 
@@ -324,32 +327,32 @@
                     </div>`;
                 item.addEventListener('click', (e) => {
                     if (e.target.classList.contains('action-btn')) return;
-                    selectRule(rule, type);
+                    previewRule(rule, type);
                 });
                 item.querySelector('.delete-btn').addEventListener('click', () => deleteRule(rule.id, type));
-                if (isOverride) item.querySelector('.edit-btn').addEventListener('click', () => selectRule(rule, type, true));
+                if (isOverride) item.querySelector('.edit-btn').addEventListener('click', () => selectRuleForEditing(rule, type));
                 item.querySelector('.preview-btn').addEventListener('click', () => previewRule(rule, type));
                 return item;
             }
 
-            function selectRule(rule, type, isEditing = false) {
+            function selectRuleForEditing(rule, type) {
                 selectedItem = { type: 'rule', data: rule, ruleType: type };
-                 document.querySelectorAll('.list-item').forEach(item => item.classList.remove('selected'));
+                document.querySelectorAll('.list-item').forEach(item => item.classList.remove('selected'));
                 document.querySelector(`.list-item[data-item-id='${rule.id}']`).classList.add('selected');
 
-                resetDetailsPanel(false);
                 detailsPanel.title.classList.add('hidden');
                 detailsPanel.content.classList.remove('hidden');
+                detailsPanel.previewContainer.classList.add('hidden');
+                detailsPanel.formContainer.classList.remove('hidden');
+                detailsPanel.descWrapper.classList.add('hidden');
+                detailsPanel.resolutionWrapper.classList.add('hidden');
+                adminMap.drawnItems.clearLayers();
                 
-                if (isEditing) {
-                    detailsPanel.formContainer.classList.remove('hidden');
-                    detailsPanel.osmName.value = rule.osm_name;
-                    detailsPanel.displayName.value = rule.display_name;
-                    detailsPanel.city.value = rule.city;
-                    configureButtonsForRuleEdit();
-                } else {
-                    previewRule(rule, type);
-                }
+                detailsPanel.osmName.value = rule.osm_name;
+                detailsPanel.displayName.value = rule.display_name;
+                detailsPanel.city.value = rule.city;
+                
+                configureButtonsForRuleEdit();
             }
 
             async function saveRuleChanges() {
@@ -378,7 +381,7 @@
                 } catch (error) {
                     alert('Error al actualizar la regla: ' + error.message);
                 } finally {
-                    setButtonsLoading(false);
+                    setButtonsLoading(false, 'rule');
                 }
             }
 
@@ -400,11 +403,19 @@
             }
 
             async function previewRule(rule, type) {
-                resetDetailsPanel(false);
+                selectedItem = { type: 'rule', data: rule, ruleType: type };
+                document.querySelectorAll('.list-item').forEach(item => item.classList.remove('selected'));
+                document.querySelector(`.list-item[data-item-id='${rule.id}']`).classList.add('selected');
+
                 detailsPanel.title.classList.add('hidden');
                 detailsPanel.content.classList.remove('hidden');
+                detailsPanel.formContainer.classList.add('hidden');
                 detailsPanel.previewContainer.classList.remove('hidden');
                 detailsPanel.previewText.innerHTML = '<div class="spinner mx-auto"></div>';
+                
+                // Desactivamos los botones principales durante la previsualización
+                detailsPanel.mainBtn.disabled = true;
+                detailsPanel.secondaryBtn.disabled = true;
                 
                 try {
                     const response = await fetch(`/api/getStreetPreview?osmName=${encodeURIComponent(rule.osm_name)}&city=${encodeURIComponent(rule.city)}`, {
@@ -423,8 +434,6 @@
                     const displayName = type === 'override' ? rule.display_name : rule.osm_name;
                     detailsPanel.previewText.textContent = `¿Dónde está «${displayName.toUpperCase()}»?`;
                     
-                    // --- CORRECCIÓN AQUÍ ---
-                    // Cambiamos L.layerGroup() por L.featureGroup()
                     const featureGroup = L.featureGroup();
                     geometries.forEach(geom => {
                         const style = { color: '#007a2f', weight: geom.isClosed ? 4 : 8, fillOpacity: 0.2 };
@@ -441,23 +450,23 @@
             }
             
             // --- FUNCIONES AUXILIARES DE UI ---
-            function resetDetailsPanel(hide = true) {
+            function resetDetailsPanel() {
                 selectedItem = null;
-                if (hide) {
-                    detailsPanel.title.classList.remove('hidden');
-                    detailsPanel.content.classList.add('hidden');
-                }
+                detailsPanel.title.classList.remove('hidden');
+                detailsPanel.content.classList.add('hidden');
                 adminMap.drawnItems.clearLayers();
-                detailsPanel.formContainer.classList.add('hidden');
-                detailsPanel.previewContainer.classList.add('hidden');
-                detailsPanel.descWrapper.classList.add('hidden');
-                detailsPanel.resolutionWrapper.classList.add('hidden');
+                document.querySelectorAll('.list-item').forEach(item => item.classList.remove('selected'));
+                
+                // Reseteo completo de botones
                 detailsPanel.mainBtn.disabled = true;
                 detailsPanel.secondaryBtn.disabled = true;
-                document.querySelectorAll('.list-item').forEach(item => item.classList.remove('selected'));
+                detailsPanel.mainBtn.textContent = 'Acción Principal';
+                detailsPanel.secondaryBtn.textContent = 'Acción Secundaria';
+                detailsPanel.mainBtn.onclick = null;
+                detailsPanel.secondaryBtn.onclick = null;
             }
             
-            function setButtonsLoading(isLoading) {
+            function setButtonsLoading(isLoading, context) {
                 const spinner = '<div class="spinner"></div>';
                 if (isLoading) {
                     detailsPanel.mainBtn.innerHTML = spinner;
@@ -466,13 +475,16 @@
                 } else {
                     detailsPanel.mainBtn.disabled = false;
                     detailsPanel.secondaryBtn.disabled = false;
+                    // Restaurar texto basado en el contexto
+                    if (context === 'incident') configureButtonsForIncident();
+                    if (context === 'rule') configureButtonsForRuleEdit();
                 }
             }
 
             function configureButtonsForIncident() {
                 detailsPanel.mainBtn.textContent = 'Aprobar y Mapear';
                 detailsPanel.secondaryBtn.textContent = 'Rechazar Incidencia';
-                detailsPanel.mainBtn.className = 'flex-1 bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg';
+                detailsPanel.mainBtn.className = 'flex-1 bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg transition-colors flex items-center justify-center gap-2';
                 detailsPanel.mainBtn.disabled = false;
                 detailsPanel.secondaryBtn.disabled = false;
                 detailsPanel.mainBtn.onclick = () => resolveIncident('approve');
@@ -482,7 +494,7 @@
             function configureButtonsForRuleEdit() {
                 detailsPanel.mainBtn.textContent = 'Guardar Cambios';
                 detailsPanel.secondaryBtn.textContent = 'Cancelar';
-                detailsPanel.mainBtn.className = 'flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg';
+                detailsPanel.mainBtn.className = 'flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg transition-colors flex items-center justify-center gap-2';
                 detailsPanel.mainBtn.disabled = false;
                 detailsPanel.secondaryBtn.disabled = false;
                 detailsPanel.mainBtn.onclick = saveRuleChanges;

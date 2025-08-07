@@ -3,7 +3,7 @@ html, body { height: 100%; margin: 0; overflow: hidden; }
 body { font-family: system-ui, sans-serif; background-color: #1a1a1a; }
 .hidden { display: none !important; }
 
-#game-screen { display: flex; height: 100%; width: 100%; }
+#game-screen { display: flex; height: 100%; width: 100%; position: relative; } /* position: relative añadido */
 #game-map-container { flex: 1; position: relative; z-index: 5; }
 
 /* --- ESTILOS ASIDE Y PANELES --- */
@@ -214,3 +214,20 @@ button.game-control-btn:disabled { opacity: .4; cursor: default; }
     display: block;
 }
 /* --- FIN: ESTILOS PARA EL NUEVO CHECKBOX --- */
+
+/* --- INICIO: ESTILOS PARA EL PANEL SVG INFERIOR --- */
+#bottom-svg-panel {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  z-index: 8; /* Por debajo del menú lateral (10) pero encima del mapa (5) */
+  pointer-events: none; /* Para que no intercepte los clics del mapa */
+  line-height: 0; /* Evita espacios extra debajo del SVG */
+}
+
+#bottom-svg-panel svg {
+  width: 100%;
+  height: auto;
+}
+/* --- FIN: ESTILOS PARA EL PANEL SVG INFERIOR --- */

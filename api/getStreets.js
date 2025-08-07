@@ -174,7 +174,8 @@ module.exports = async (request, response) => {
             if (seenIds.has(entity.id)) continue;
             
             const mainOsmName = entity.osmNames[0];
-            const cacheKey = `street_v8:${entity.id.replace(/\s/g, '_')}`;
+            // --- CAMBIO 1: Nueva clave de caché con versión y ciudad ---
+            const cacheKey = `street_v9:${currentCity}:${entity.id.replace(/\s/g, '_')}`;
             streetData = await kv.get(cacheKey);
 
             if (!streetData) {
@@ -209,29 +210,27 @@ module.exports = async (request, response) => {
                         const osmParts = extractNameParts(mainOsmName);
                         const googleParts = extractNameParts(mostCommonGoogleName);
                         
-                        // --- INICIO DE LA LÓGICA DE VALIDACIÓN CORREGIDA Y MÁS ESTRICTA ---
-                        let isMatch = false;
-                        // Para que sea un match, tanto el nombre base como el tipo de vía deben coincidir.
-                        if (osmParts.baseName === googleParts.baseName && osmParts.type === googleParts.type) {
-                            isMatch = true;
-                        }
-                        
-                        // Si no es un match perfecto, activamos la red de seguridad.
-                        if (!isMatch) {
-                            // Si el nombre de Google corresponde a OTRA calle de la zona, es un "salto" (snap).
-                            // En ese caso, usamos el nombre de OSM para ser más seguros.
-                            if (allOsmBaseNamesInPoly.has(googleParts.baseName)) {
-                                processedStreet.displayName = mainOsmName.toUpperCase();
-                            } else {
-                                // Si no es un salto, podría ser una simple variación (ej. "Calle Milagros" vs "De los Milagros").
-                                // Aquí podemos usar el nombre de Google, ya que es la mejor conjetura.
-                                processedStreet.displayName = mostCommonGoogleName;
-                            }
+                        // --- CAMBIO 2: Nueva Lógica de Validación con Levenshtein ---
+                        const osmBaseName = osmParts.baseName;
+                        const googleBaseName = googleParts.baseName;
+
+                        // Calculamos la 'distancia de edición' entre los dos nombres.
+                        const distance = levenshtein(osmBaseName, googleBaseName);
+
+                        // Establecemos un umbral de tolerancia. Si la diferencia es más de la mitad
+                        // del largo del nombre, es demasiado diferente para ser una simple corrección.
+                        const threshold = Math.max(osmBaseName.length, googleBaseName.length) * 0.5;
+
+                        if (distance > threshold) {
+                            // DISCREPANCIA ALTA: Los nombres son muy diferentes. Es un error de "salto" de Google.
+                            // Ignoramos a Google y usamos el nombre original de OSM, que es más seguro.
+                            processedStreet.displayName = mainOsmName.toUpperCase();
                         } else {
-                            // Si es un match perfecto, usamos el nombre de Google.
+                            // SIMILITUD ALTA: Los nombres son parecidos. Aceptamos el nombre de Google
+                            // ya que probablemente sea una corrección de formato o una abreviatura.
                             processedStreet.displayName = mostCommonGoogleName;
                         }
-                        // --- FIN DE LA LÓGICA DE VALIDACIÓN CORREGIDA ---
+                        // --- FIN: Nueva Lógica de Validación con Levenshtein ---
 
                     } else {
                         processedStreet.displayName = mainOsmName.toUpperCase();

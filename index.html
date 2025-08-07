@@ -32,8 +32,7 @@
   <div id="game-screen" class="hidden">
     
     <div id="game-ui-container">
-      <div id="top-left-controls">
-        <h1 class="game-title">Calle a Calle</h1>
+        <h1 class="gradient-text">Calle a Calle</h1>
         <button id="drawZone" class="game-control-btn">Establecer zona</button>
         <button id="undoPoint" class="game-control-btn hidden">Retroceder Punto</button>
         
@@ -57,7 +56,6 @@
           <div id="loading-text" class="loading-text"></div>
         </div>
         <p id="fb"></p>
-      </div>
     </div>
     
     <div id="game-map-container"></div>
@@ -75,27 +73,27 @@
     </button>
 
     <div id="menu-content-panel" class="hidden">
-      <div class="menu-tabs">
-          <button class="menu-tab-btn active" data-panel="profile-content">Perfil</button>
-          <button class="menu-tab-btn" data-panel="stats-content">Estadísticas</button>
-          <button class="menu-tab-btn" data-panel="saved-zones-content">Mis Zonas</button>
-      </div>
-      <div class="menu-content-area">
-          <div id="profile-content" class="content-panel active">
-              <h3 class="mb-4 text-xl font-bold">Perfil de Usuario</h3>
-              <div id="user-info-details" class="p-4 text-center bg-gray-700 rounded-lg"></div>
-              <button id="admin-panel-btn" class="w-full mt-4 game-control-btn hidden" style="background-color: #6f42c1; color: white;">Panel de Administración</button>
-              <button id="logout-btn" class="w-full mt-4 game-control-btn" style="background-color: #dc3545;">Cerrar Sesión</button>
-          </div>
-          <div id="stats-content" class="content-panel">
-              <h3 class="mb-4 text-xl font-bold">Estadísticas</h3>
-              <div id="stats-list"></div>
-          </div>
-          <div id="saved-zones-content" class="content-panel">
-              <h3 class="mb-4 text-xl font-bold">Mis Zonas Guardadas</h3>
-              <div id="saved-zones-list" class="space-y-2"></div>
-          </div>
-      </div>
+        <div class="menu-tabs">
+            <button class="menu-tab-btn active" data-panel="profile-content">Perfil</button>
+            <button class="menu-tab-btn" data-panel="stats-content">Estadísticas</button>
+            <button class="menu-tab-btn" data-panel="saved-zones-content">Mis Zonas</button>
+        </div>
+        <div class="menu-content-area">
+            <div id="profile-content" class="content-panel active">
+                <h3 class="mb-4 text-xl font-bold">Perfil de Usuario</h3>
+                <div id="user-info-details" class="p-4 text-center bg-gray-700 rounded-lg"></div>
+                <button id="admin-panel-btn" class="w-full mt-4 game-control-btn hidden" style="background-color: #6f42c1; color: white;">Panel de Administración</button>
+                <button id="logout-btn" class="w-full mt-4 game-control-btn" style="background-color: #dc3545;">Cerrar Sesión</button>
+            </div>
+            <div id="stats-content" class="content-panel">
+                <h3 class="mb-4 text-xl font-bold">Estadísticas</h3>
+                <div id="stats-list"></div>
+            </div>
+            <div id="saved-zones-content" class="content-panel">
+                <h3 class="mb-4 text-xl font-bold">Mis Zonas Guardadas</h3>
+                <div id="saved-zones-list" class="space-y-2"></div>
+            </div>
+        </div>
     </div>
   </div>
 

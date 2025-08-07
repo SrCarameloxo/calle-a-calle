@@ -6,28 +6,17 @@ body { font-family: system-ui, sans-serif; background-color: #1a1a1a; }
 #game-screen { display: flex; height: 100%; width: 100%; position: relative; }
 #game-map-container { flex: 1; position: relative; z-index: 5; }
 
-/* Contenedor para la UI principal del juego (controles arriba a la izquierda) */
+/* --- Panel de controles del juego (antes era aside) --- */
 #game-ui-container {
-  position: absolute;
-  top: 1rem;
-  left: 1rem;
-  z-index: 10;
-  background-color: rgba(255, 255, 255, 0.9);
-  padding: 1rem;
-  border-radius: 0.5rem;
-  box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-  width: 320px;
-}
-
-#top-left-controls {
-  /* Contenedor para los controles que antes estaban en top-panel */
-}
-
-.game-title {
-    font-size: 2.25rem; font-weight: 700; text-align: center;
-    background: linear-gradient(to right, #3b82f6, #8b5cf6);
-    -webkit-background-clip: text; background-clip: text; color: transparent;
-    margin-bottom: 1rem;
+    position: absolute;
+    top: 1rem;
+    left: 1rem;
+    z-index: 10;
+    background-color: rgba(255, 255, 255, 0.9);
+    padding: 1rem;
+    border-radius: 0.5rem;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    width: 320px;
 }
 
 /* --- ESTILOS PANTALLA DE LOGIN --- */
@@ -45,7 +34,6 @@ transform: scale(1.05);
 box-shadow: 0 0 0 10px rgba(76, 175, 80, 0); 
 }
 }
-
 #google-login-btn { 
 animation: pulse 2.5s infinite; 
 }
@@ -64,244 +52,97 @@ button.game-control-btn {
 }
 button.game-control-btn:not(:disabled):active { transform: scale(0.97); }
 button.game-control-btn:disabled { opacity: .4; cursor: default; }
-
 #drawZone, #start, #next { background: #007BFF; color: #fff; }
 #drawZone:not(:disabled):hover, #start:not(:disabled):hover, #next:not(:disabled):hover { background-color: #0069d9; }
-
 #undoPoint { background-color: #c82333; color: #fff; }
 #undoPoint:not(:disabled):hover { background-color: #a71d2a; }
-
 #repeatZone { background-color: #28a745; color: #fff; }
 #repeatZone:not(:disabled):hover { background-color: #218838; }
-
 #saveZoneBtn { background-color: #ffc107; color: black; }
 #saveZoneBtn:not(:disabled):hover { background-color: #e0a800; }
 
-/* --- OTROS ESTILOS --- */
-#question { font-weight: 700; margin: .5rem 0; }
-#fb { margin: .5rem 0; font-size: 0.9rem; }
+/* --- OTROS ESTILOS DE TEXTO E UI --- */
+.gradient-text {
+    font-size: 2.25rem; font-weight: 700; text-align: center;
+    background: linear-gradient(to right, #3b82f6, #8b5cf6);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    margin-bottom: 1rem;
+}
+#question { font-weight: 700; margin: .5rem 0; color: #333; }
+#fb { margin: .5rem 0; font-size: 0.9rem; color: #555; }
 #score-display { font-size: 1.1rem; font-weight: bold; color: #333; }
 .loader { margin-top: 1rem; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 10px; padding: 10px; background-color: #f8f9fa; border-radius: 8px; border: 1px solid #e5e7eb; }
 .loading-text { color: #333; font-size: 12pt; font-weight: 600; }
 
-/* --- ESTILOS PARA ZONAS GUARDADAS --- */
-.saved-zone-item {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 0.75rem;
-  border-radius: 0.375rem;
-  background-color: rgba(255, 255, 255, 0.1);
-  cursor: pointer;
-  transition: background-color 0.2s;
-}
-.saved-zone-item:hover {
-  background-color: rgba(59, 130, 246, 0.3);
-}
-.delete-zone-btn {
-  background: none;
-  border: none;
-  padding: 0.25rem;
-  display: none;
-  color: #ef4444;
-}
-.saved-zone-item:hover .delete-zone-btn {
-  display: block;
-}
-.delete-zone-btn:hover {
-  color: #dc2626;
-}
-
-/* --- ESTILOS DE ANIMACIÓN DE CALLE --- */
+/* --- ESTILOS ANIMACIÓN DE CALLE --- */
 @keyframes pulseAndFlash {
-    0% {
-        stroke-width: 8;
-        stroke: #007a2f; /* Color normal */
-        opacity: 0.8;
-    }
-    50% {
-        stroke-width: 14; /* Más gruesa (pulso) */
-        stroke: #66ffb3;  /* Color brillante (parpadeo) */
-        opacity: 1;
-    }
-    100% {
-        stroke-width: 8;
-        stroke: #007a2f; /* Vuelta a la normalidad */
-        opacity: 0.8;
-    }
+    0% { stroke-width: 8; stroke: #007a2f; opacity: 0.8; }
+    50% { stroke-width: 14; stroke: #66ffb3; opacity: 1; }
+    100% { stroke-width: 8; stroke: #007a2f; opacity: 0.8; }
 }
+.street-reveal-animation { animation: pulseAndFlash 0.8s ease-out; }
 
-.street-reveal-animation {
-    animation: pulseAndFlash 0.8s ease-out;
-}
+/* --- ESTILOS CHECKBOX --- */
+.checkbox-wrapper { padding: 10px 0; }
+.checkbox-container { display: flex; align-items: center; position: relative; cursor: pointer; font-size: 16px; user-select: none; color: #333; }
+.custom-checkbox { position: absolute; opacity: 0; cursor: pointer; height: 0; width: 0; }
+.checkmark { position: relative; height: 25px; width: 25px; min-width: 25px; background-color: #d1d5db; border-radius: 4px; transition: background-color 0.3s; box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2); margin-right: 10px; display: flex; align-items: center; justify-content: center; }
+.checkmark:after { content: ""; display: none; width: 6px; height: 12px; border: solid white; border-width: 0 3px 3px 0; transform: rotate(45deg); }
+.custom-checkbox:checked ~ .checkmark { background-color: #3b82f6; box-shadow: 0 3px 7px rgba(59, 130, 246, 0.3); }
+.custom-checkbox:checked ~ .checkmark:after { display: block; }
 
-/* --- ESTILOS PARA EL CHECKBOX --- */
-.checkbox-wrapper {
-    padding: 10px 0;
-}
-.checkbox-container {
-    display: flex;
-    align-items: center;
-    position: relative;
-    cursor: pointer;
-    font-size: 16px;
-    user-select: none;
-    color: #333;
-}
-.custom-checkbox {
-    position: absolute;
-    opacity: 0;
-    cursor: pointer;
-    height: 0;
-    width: 0;
-}
-.checkmark {
-    position: relative;
-    height: 25px;
-    width: 25px;
-    min-width: 25px;
-    background-color: #d1d5db;
-    border-radius: 4px;
-    transition: background-color 0.3s;
-    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
-    margin-right: 10px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-.checkmark:after {
-    content: "";
-    display: none;
-    width: 6px;
-    height: 12px;
-    border: solid white;
-    border-width: 0 3px 3px 0;
-    transform: rotate(45deg);
-}
-.custom-checkbox:checked ~ .checkmark {
-    background-color: #3b82f6;
-    box-shadow: 0 3px 7px rgba(59, 130, 246, 0.3);
-}
-.custom-checkbox:checked ~ .checkmark:after {
-    display: block;
-}
-
-/* --- ESTILOS PARA EL PANEL SVG INFERIOR --- */
+/* --- ESTILOS PARA EL PANEL INFERIOR Y MENÚ --- */
 #bottom-svg-panel {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  width: 100%;
-  height: 100px; /* Altura fija para ayudar al posicionamiento */
-  z-index: 8; 
-  pointer-events: none;
-  line-height: 0;
+  position: absolute; bottom: 0; left: 0; width: 100%; height: 100px;
+  z-index: 8; pointer-events: none; line-height: 0;
 }
-#bottom-svg-panel svg {
-  width: 100%;
-  height: 100%;
-}
+#bottom-svg-panel svg { width: 100%; height: 100%; }
 
-/* --- ESTILOS PARA EL NUEVO MENÚ CENTRAL --- */
 #open-menu-btn {
-  position: absolute;
-  left: 50%;
-  bottom: 30px; /* Ajustar este valor para que quede sobre el 'bulto' */
-  transform: translateX(-50%);
-  z-index: 12;
-  background-color: #1f89c0;
-  border: none;
-  border-radius: 50%;
-  width: 60px;
-  height: 60px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 5px 15px rgba(0,0,0,0.3);
-  transition: background-color 0.2s, transform 0.2s;
+  position: absolute; left: 50%; bottom: 30px; transform: translateX(-50%);
+  z-index: 12; background-color: #1f89c0; border: none; border-radius: 50%;
+  width: 60px; height: 60px; display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 5px 15px rgba(0,0,0,0.3); transition: background-color 0.2s, transform 0.2s;
 }
-#open-menu-btn:hover {
-  background-color: #29abe2;
-  transform: translateX(-50%) translateY(-2px);
-}
+#open-menu-btn:hover { background-color: #29abe2; transform: translateX(-50%) translateY(-2px); }
 
 #menu-content-panel {
-  position: absolute;
-  left: 50%;
-  bottom: 110px; /* Altura del panel SVG + un pequeño margen */
-  transform: translateX(-50%);
-  width: 90%;
-  max-width: 450px;
-  background-color: rgba(17, 24, 39, 0.95);
-  backdrop-filter: blur(8px);
-  border-radius: 12px;
-  z-index: 11;
-  box-shadow: 0 -5px 20px rgba(0,0,0,0.25);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  color: white;
-  transition: opacity 0.3s ease, transform 0.3s ease;
-  transform-origin: bottom center;
+  position: absolute; left: 50%; bottom: 110px; transform: translateX(-50%);
+  width: 90%; max-width: 450px; background-color: rgba(17, 24, 39, 0.95);
+  backdrop-filter: blur(8px); border-radius: 12px; z-index: 11;
+  box-shadow: 0 -5px 20px rgba(0,0,0,0.25); border: 1px solid rgba(255, 255, 255, 0.1);
+  color: white; transition: opacity 0.3s ease, transform 0.3s ease; transform-origin: bottom center;
 }
-/* Estado de transición para cuando está oculto */
-#menu-content-panel.hidden {
-  opacity: 0;
-  transform: translateX(-50%) translateY(20px);
-  pointer-events: none;
-}
+#menu-content-panel.hidden { opacity: 0; transform: translateX(-50%) translateY(20px); pointer-events: none; }
 
-.menu-tabs {
-  display: flex;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-}
+.menu-tabs { display: flex; border-bottom: 1px solid rgba(255, 255, 255, 0.1); }
 .menu-tab-btn {
-  flex: 1;
-  padding: 1rem;
-  background: none;
-  border: none;
-  color: #a0aec0;
-  font-weight: 600;
-  transition: color 0.2s, background-color 0.2s;
+  flex: 1; padding: 1rem; background: none; border: none;
+  color: #a0aec0; font-weight: 600; transition: color 0.2s, background-color 0.2s;
 }
-.menu-tab-btn:hover {
-  background-color: rgba(255,255,255,0.05);
-  color: white;
-}
-.menu-tab-btn.active {
-  color: white;
-  border-bottom: 2px solid #3b82f6;
-}
+.menu-tab-btn:hover { background-color: rgba(255,255,255,0.05); color: white; }
+.menu-tab-btn.active { color: white; border-bottom: 2px solid #3b82f6; }
 
-.menu-content-area {
-  padding: 1rem;
-  max-height: 50vh;
-  overflow-y: auto;
-}
+.menu-content-area { padding: 1rem; max-height: 50vh; overflow-y: auto; }
+.content-panel { display: none; }
+.content-panel.active { display: block; }
 
-.content-panel {
-  display: none;
+.saved-zone-item {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 0.75rem; border-radius: 0.375rem; background-color: rgba(255, 255, 255, 0.1);
+  cursor: pointer; transition: background-color 0.2s;
 }
-.content-panel.active {
-  display: block;
+.saved-zone-item:hover { background-color: rgba(59, 130, 246, 0.3); }
+.delete-zone-btn {
+  background: none; border: none; padding: 0.25rem; color: #ef4444;
 }
+.delete-zone-btn:hover { color: #dc2626; }
 
-/* --- BOTÓN DE REPORTE FLOTANTE --- */
+
 #report-btn-fab {
-  position: absolute;
-  top: 20px;
-  right: 20px;
-  z-index: 10;
-  width: 50px;
-  height: 50px;
-  border-radius: 50%;
-  background-color: #dc3545;
-  color: white;
-  border: none;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 4px 10px rgba(0,0,0,0.2);
-  transition: transform 0.2s;
+  position: absolute; top: 20px; right: 20px; z-index: 10;
+  width: 50px; height: 50px; border-radius: 50%; background-color: #dc3545;
+  color: white; border: none; display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.2); transition: transform 0.2s;
 }
-#report-btn-fab:hover {
-  transform: scale(1.05);
-}
+#report-btn-fab:hover { transform: scale(1.05); }

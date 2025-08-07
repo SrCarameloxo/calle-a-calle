@@ -15,7 +15,8 @@ body { font-family: system-ui, sans-serif; background-color: #1a1a1a; }
     background-color: rgba(255, 255, 255, 0.9);
     padding: 1rem;
     border-radius: 0.5rem;
-    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    /* --- CAMBIO: Sombra más pronunciada --- */
+    box-shadow: 0 8px 25px rgba(0,0,0,0.25);
     width: 320px;
 }
 
@@ -91,29 +92,73 @@ button.game-control-btn:disabled { opacity: .4; cursor: default; }
 .custom-checkbox:checked ~ .checkmark { background-color: #3b82f6; box-shadow: 0 3px 7px rgba(59, 130, 246, 0.3); }
 .custom-checkbox:checked ~ .checkmark:after { display: block; }
 
-/* --- ESTILOS PARA EL PANEL INFERIOR Y MENÚ --- */
-#bottom-svg-panel {
-  position: absolute; bottom: 0; left: 0; width: 100%; height: 100px;
-  z-index: 8; pointer-events: none; line-height: 0;
-}
-#bottom-svg-panel svg { width: 100%; height: 100%; }
+/* --- INICIO CAMBIO: Estilos para los nuevos botones y menú --- */
 
+/* Botón de Menú (Hamburguesa) */
 #open-menu-btn {
-  position: absolute; left: 50%; bottom: 30px; transform: translateX(-50%);
-  z-index: 12; background-color: #1f89c0; border: none; border-radius: 50%;
-  width: 60px; height: 60px; display: flex; align-items: center; justify-content: center;
-  box-shadow: 0 5px 15px rgba(0,0,0,0.3); transition: background-color 0.2s, transform 0.2s;
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  z-index: 12;
+  background: none;
+  border: none;
+  padding: 5px;
+  color: #333; /* Color del icono de hamburguesa */
+  cursor: pointer;
+  filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5)); /* Sombreado */
+  transition: transform 0.2s;
 }
-#open-menu-btn:hover { background-color: #29abe2; transform: translateX(-50%) translateY(-2px); }
+#open-menu-btn:hover {
+  transform: scale(1.1);
+}
 
-#menu-content-panel {
-  position: absolute; left: 50%; bottom: 110px; transform: translateX(-50%);
-  width: 90%; max-width: 450px; background-color: rgba(17, 24, 39, 0.95);
-  backdrop-filter: blur(8px); border-radius: 12px; z-index: 11;
-  box-shadow: 0 -5px 20px rgba(0,0,0,0.25); border: 1px solid rgba(255, 255, 255, 0.1);
-  color: white; transition: opacity 0.3s ease, transform 0.3s ease; transform-origin: bottom center;
+/* Botón de Reporte (Bandera) */
+#report-btn-fab {
+  position: absolute;
+  top: 70px; /* Posición debajo del botón de menú */
+  right: 20px;
+  z-index: 11;
+  background: none;
+  border: none;
+  padding: 5px;
+  width: auto;
+  height: auto;
+  border-radius: 0;
+  color: #dc3545; /* Color rojo para el icono de bandera */
+  cursor: pointer;
+  filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5)); /* Sombreado */
+  transition: transform 0.2s;
 }
-#menu-content-panel.hidden { opacity: 0; transform: translateX(-50%) translateY(20px); pointer-events: none; }
+#report-btn-fab:hover {
+  transform: scale(1.1);
+}
+
+
+/* Panel de Contenido del Menú */
+#menu-content-panel {
+  position: absolute;
+  top: 70px; /* Debajo del botón de menú */
+  right: 20px;
+  left: auto;
+  bottom: auto;
+  transform: none;
+  width: 90%;
+  max-width: 350px;
+  background-color: rgba(17, 24, 39, 0.95);
+  backdrop-filter: blur(8px);
+  border-radius: 12px;
+  z-index: 11;
+  box-shadow: 0 5px 20px rgba(0,0,0,0.25);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: white;
+  transition: opacity 0.3s ease, transform 0.3s ease;
+  transform-origin: top right; /* Animación desde la esquina */
+}
+#menu-content-panel.hidden {
+  opacity: 0;
+  transform: translateY(-15px) scale(0.95); /* Animación de aparición */
+  pointer-events: none;
+}
 
 .menu-tabs { display: flex; border-bottom: 1px solid rgba(255, 255, 255, 0.1); }
 .menu-tab-btn {
@@ -137,12 +182,4 @@ button.game-control-btn:disabled { opacity: .4; cursor: default; }
   background: none; border: none; padding: 0.25rem; color: #ef4444;
 }
 .delete-zone-btn:hover { color: #dc2626; }
-
-
-#report-btn-fab {
-  position: absolute; top: 20px; right: 20px; z-index: 10;
-  width: 50px; height: 50px; border-radius: 50%; background-color: #dc3545;
-  color: white; border: none; display: flex; align-items: center; justify-content: center;
-  box-shadow: 0 4px 10px rgba(0,0,0,0.2); transition: transform 0.2s;
-}
-#report-btn-fab:hover { transform: scale(1.05); }
+/* --- FIN CAMBIO --- */

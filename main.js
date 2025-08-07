@@ -26,11 +26,9 @@ window.addEventListener('DOMContentLoaded', () => {
   const loadingText = document.getElementById('loading-text');
   const startOptions = document.getElementById('start-options');
   const includePOICheckbox = document.getElementById('include-poi-checkbox');
-  // --- INICIO: Selectores para los nuevos elementos ---
   const openMenuBtn = document.getElementById('open-menu-btn');
   const menuContentPanel = document.getElementById('menu-content-panel');
   const reportBtnFAB = document.getElementById('report-btn-fab');
-  // --- FIN: Selectores para los nuevos elementos ---
 
   
   let backgroundMap, gameMap = null;
@@ -94,6 +92,16 @@ window.addEventListener('DOMContentLoaded', () => {
   async function handleAuthStateChange(event, session) {
     const user = session ? session.user : null;
     if (user) {
+      // --- INICIO CAMBIO: Corregir visualización de perfil ---
+      const userName = user.user_metadata?.full_name || user.email.split('@')[0];
+      const profileImageUrl = user.user_metadata?.avatar_url || '';
+      userInfoDetails.innerHTML = `
+        ${profileImageUrl ? `<img src="${profileImageUrl}" alt="Avatar" class="w-16 h-16 mx-auto mb-3 rounded-full">` : ''}
+        <p class="font-semibold text-lg truncate">${userName}</p>
+        <p class="text-sm text-gray-400">${user.email}</p>
+      `;
+      // --- FIN CAMBIO ---
+
       loginScreen.style.opacity = '0';
       gameScreen.classList.remove('hidden');
       
@@ -106,7 +114,6 @@ window.addEventListener('DOMContentLoaded', () => {
           if (!gameMap) {
               initGame();
           }
-          // Pequeño retraso para asegurar que el DOM está listo para el mapa
           setTimeout(() => gameMap.invalidateSize(), 100);
       }, 500);
 
@@ -142,21 +149,12 @@ window.addEventListener('DOMContentLoaded', () => {
       setTimeout(() => startDynamicBackground(backgroundMap), 1000);
   }
   
-  // --- INICIO: LÓGICA MODIFICADA PARA EL NUEVO MENÚ ---
   function setupMenu() {
     const menuTabs = document.querySelectorAll('.menu-tab-btn');
     const contentPanels = document.querySelectorAll('.content-panel');
 
     openMenuBtn.addEventListener('click', () => {
         menuContentPanel.classList.toggle('hidden');
-        // Cargar perfil y avatar si el menú se abre y no hay info
-        const user = supabaseClient.auth.user;
-        if (!menuContentPanel.classList.contains('hidden') && userInfoDetails.innerHTML === '') {
-            const { data: { user } } = supabaseClient.auth.getUser();
-            if(user) {
-                userInfoDetails.innerHTML = `<p class="text-sm text-gray-400">Conectado como</p><p class="font-semibold text-base truncate">${user.email}</p>`;
-            }
-        }
     });
 
     menuTabs.forEach(button => {
@@ -175,7 +173,6 @@ window.addEventListener('DOMContentLoaded', () => {
       });
     });
   }
-  // --- FIN: LÓGICA MODIFICADA PARA EL NUEVO MENÚ ---
 
   function initGame() {
     let initialCoords = [38.88, -6.97];
@@ -184,7 +181,14 @@ window.addEventListener('DOMContentLoaded', () => {
         initialCoords = [userProfile.cityData.center_lat, userProfile.cityData.center_lng];
         initialZoom = userProfile.cityData.default_zoom;
     }
-    gameMap = L.map('game-map-container', { zoomSnap: 0.25 });
+    // --- INICIO CAMBIO: Mover controles de zoom ---
+    gameMap = L.map('game-map-container', { 
+        zoomSnap: 0.25,
+        zoomControl: false // Desactivamos el control por defecto
+    });
+    L.control.zoom({ position: 'bottomright' }).addTo(gameMap); // Añadimos el nuevo en la esquina
+    // --- FIN CAMBIO ---
+
     L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager_nolabels/{z}/{x}/{y}{r}.png',{
       attribution: '© OSM & CARTO', subdomains:'abcd', maxZoom:19,
       minZoom: userProfile.cityData ? initialZoom - 2 : 5 
@@ -202,11 +206,11 @@ window.addEventListener('DOMContentLoaded', () => {
     nextBtn.addEventListener('click', () => { nextBtn.disabled=true; nextQ(); });
     repeatZoneBtn.addEventListener('click', repeatLastZone);
     saveZoneBtn.addEventListener('click', saveCurrentZone);
-    reportBtnFAB.addEventListener('click', reportIncident); // <--- CAMBIO: apunta al nuevo botón flotante
+    reportBtnFAB.addEventListener('click', reportIncident);
     adminPanelBtn.addEventListener('click', () => { window.location.href = '/admin.html'; });
 
     setupStartButton(startBtn);
-    setupMenu(); // <--- Esto llama a la nueva función de menú
+    setupMenu();
   }
 
   function setupStartButton(bStart) {
@@ -426,7 +430,9 @@ window.addEventListener('DOMContentLoaded', () => {
     saveGameStats(streetsGuessedCorrectly, totalQuestions);
     ['next'].forEach(id => document.getElementById(id).classList.add('hidden'));
     ['drawZone', 'repeatZone', 'saveZoneBtn'].forEach(id => document.getElementById(id).classList.remove('hidden'));
-    reportBtnFAB.classList.remove('hidden'); // <--- CAMBIO: Mostrar botón de reporte
+    // --- INICIO CAMBIO: Mostrar botón de reporte ---
+    reportBtnFAB.classList.remove('hidden');
+    // --- FIN CAMBIO ---
     document.getElementById('repeatZone').disabled = (lastGameZonePoints.length < 3 || lastGameStreetList.length === 0);
     zonePoly = null; zonePoints = []; streetList = []; totalQuestions = 0;
     gameMap.off('click', onMapClick);

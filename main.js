@@ -12,6 +12,7 @@ window.addEventListener('DOMContentLoaded', () => {
   const logoutBtn = document.getElementById('logout-btn');
   const userInfoDetails = document.getElementById('user-info-details');
   const adminPanelBtn = document.getElementById('admin-panel-btn');
+  const gameUiContainer = document.getElementById('game-ui-container'); // Selector para el panel
   const drawZoneBtn = document.getElementById('drawZone');
   const undoPointBtn = document.getElementById('undoPoint');
   const startBtn = document.getElementById('start');
@@ -23,13 +24,11 @@ window.addEventListener('DOMContentLoaded', () => {
   const scoreEl = document.getElementById('score');
   const fbEl = document.getElementById('fb');
   const loaderContainer = document.getElementById('loader-container');
-  const loadingText = document.getElementById('loading-text');
   const startOptions = document.getElementById('start-options');
   const includePOICheckbox = document.getElementById('include-poi-checkbox');
   const openMenuBtn = document.getElementById('open-menu-btn');
   const menuContentPanel = document.getElementById('menu-content-panel');
   const reportBtnFAB = document.getElementById('report-btn-fab');
-
   
   let backgroundMap, gameMap = null;
   const COL_ZONE = '#663399', COL_TRACE = '#007a2f', COL_DASH = '#1976d2';
@@ -37,8 +36,19 @@ window.addEventListener('DOMContentLoaded', () => {
   let playing=false, qIdx=0, target=null, userMk, guide, streetGrp;
   let streetList = [], totalQuestions = 0, streetsGuessedCorrectly = 0, lastGameZonePoints = [];
   let lastGameStreetList = [];
-
   let userProfile = { cityData: null, subscribedCity: null, role: null };
+
+  // --- INICIO CAMBIO: Función para la animación del panel ---
+  function triggerPanelPulse() {
+      if (gameUiContainer) {
+          gameUiContainer.classList.add('panel-pulse');
+          // Quitar la clase después de que la animación termine (dura 400ms)
+          setTimeout(() => {
+              gameUiContainer.classList.remove('panel-pulse');
+          }, 400);
+      }
+  }
+  // --- FIN CAMBIO ---
 
   async function signInWithGoogle() { 
     await supabaseClient.auth.signInWithOAuth({ 
@@ -51,12 +61,7 @@ window.addEventListener('DOMContentLoaded', () => {
   async function fetchUserProfile(user) {
     if (!user) return;
     try {
-        const { data: profile, error } = await supabaseClient
-            .from('profiles')
-            .select('role, subscribed_city')
-            .eq('id', user.id)
-            .single();
-
+        const { data: profile, error } = await supabaseClient.from('profiles').select('role, subscribed_city').eq('id', user.id).single();
         if (error) {
             if (error.code === 'PGRST116') {
                 await new Promise(resolve => setTimeout(resolve, 2000));
@@ -64,25 +69,16 @@ window.addEventListener('DOMContentLoaded', () => {
             }
             throw error;
         }
-
         userProfile.role = profile.role;
         userProfile.subscribedCity = profile.subscribed_city;
-
         if (profile.role === 'admin') {
-            document.getElementById('admin-panel-btn').classList.remove('hidden');
+            adminPanelBtn.classList.remove('hidden');
         }
-
         if (profile.subscribed_city) {
-            const { data: city, error: cityError } = await supabaseClient
-                .from('cities')
-                .select('*')
-                .eq('name', profile.subscribed_city)
-                .single();
-            
+            const { data: city, error: cityError } = await supabaseClient.from('cities').select('*').eq('name', profile.subscribed_city).single();
             if (cityError) throw new Error(`No se encontraron datos para la ciudad: ${profile.subscribed_city}`);
             userProfile.cityData = city;
         }
-
     } catch (e) {
         console.error("Error al obtener el perfil y la ciudad del usuario:", e);
         alert("Hubo un problema al cargar los datos de tu ciudad. Contacta con soporte.");
@@ -92,7 +88,6 @@ window.addEventListener('DOMContentLoaded', () => {
   async function handleAuthStateChange(event, session) {
     const user = session ? session.user : null;
     if (user) {
-      // --- INICIO CAMBIO: Corregir visualización de perfil ---
       const userName = user.user_metadata?.full_name || user.email.split('@')[0];
       const profileImageUrl = user.user_metadata?.avatar_url || '';
       userInfoDetails.innerHTML = `
@@ -100,30 +95,20 @@ window.addEventListener('DOMContentLoaded', () => {
         <p class="font-semibold text-lg truncate">${userName}</p>
         <p class="text-sm text-gray-400">${user.email}</p>
       `;
-      // --- FIN CAMBIO ---
-
       loginScreen.style.opacity = '0';
       gameScreen.classList.remove('hidden');
-      
       logoutBtn.addEventListener('click', signOut);
-
       setTimeout(async () => {
           loginScreen.classList.add('hidden');
           await fetchUserProfile(user);
-
-          if (!gameMap) {
-              initGame();
-          }
+          if (!gameMap) initGame();
           setTimeout(() => gameMap.invalidateSize(), 100);
       }, 500);
-
     } else {
       loginScreen.classList.remove('hidden');
       loginScreen.style.opacity = '1';
       gameScreen.classList.add('hidden');
-      if (!backgroundMap) {
-        initBackgroundMap();
-      }
+      if (!backgroundMap) initBackgroundMap();
     }
   }
 
@@ -135,9 +120,7 @@ window.addEventListener('DOMContentLoaded', () => {
           const elapsedTime = Date.now() - startTime;
           const dx = Math.sin(elapsedTime * freqX) * ampX;
           const dy = Math.cos(elapsedTime * freqY) * ampY;
-          bMap.panTo([initialCenter.lat + dy, initialCenter.lng + dx], {
-              animate: true, duration: 1, noMoveStart: true
-          });
+          bMap.panTo([initialCenter.lat + dy, initialCenter.lng + dx], { animate: true, duration: 1, noMoveStart: true });
       }, 100);
   }
 
@@ -152,22 +135,17 @@ window.addEventListener('DOMContentLoaded', () => {
   function setupMenu() {
     const menuTabs = document.querySelectorAll('.menu-tab-btn');
     const contentPanels = document.querySelectorAll('.content-panel');
-
     openMenuBtn.addEventListener('click', () => {
         menuContentPanel.classList.toggle('hidden');
     });
-
     menuTabs.forEach(button => {
       button.addEventListener('click', () => {
         const panelId = button.dataset.panel;
         const targetPanel = document.getElementById(panelId);
-        
         menuTabs.forEach(b => b.classList.remove('active'));
         button.classList.add('active');
-        
         contentPanels.forEach(p => p.classList.remove('active'));
         targetPanel.classList.add('active');
-
         if (panelId === 'saved-zones-content') displaySavedZones();
         if (panelId === 'stats-content') displayStats();
       });
@@ -181,14 +159,11 @@ window.addEventListener('DOMContentLoaded', () => {
         initialCoords = [userProfile.cityData.center_lat, userProfile.cityData.center_lng];
         initialZoom = userProfile.cityData.default_zoom;
     }
-    // --- INICIO CAMBIO: Mover controles de zoom ---
     gameMap = L.map('game-map-container', { 
         zoomSnap: 0.25,
-        zoomControl: false // Desactivamos el control por defecto
+        zoomControl: false 
     });
-    L.control.zoom({ position: 'bottomright' }).addTo(gameMap); // Añadimos el nuevo en la esquina
-    // --- FIN CAMBIO ---
-
+    L.control.zoom({ position: 'bottomright' }).addTo(gameMap);
     L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager_nolabels/{z}/{x}/{y}{r}.png',{
       attribution: '© OSM & CARTO', subdomains:'abcd', maxZoom:19,
       minZoom: userProfile.cityData ? initialZoom - 2 : 5 
@@ -200,7 +175,6 @@ window.addEventListener('DOMContentLoaded', () => {
         gameMap.setMaxBounds(bounds);
     }
     gameMap.invalidateSize();
-    
     drawZoneBtn.addEventListener('click', startDrawing);
     undoPointBtn.addEventListener('click', undoLastPoint);
     nextBtn.addEventListener('click', () => { nextBtn.disabled=true; nextQ(); });
@@ -208,13 +182,13 @@ window.addEventListener('DOMContentLoaded', () => {
     saveZoneBtn.addEventListener('click', saveCurrentZone);
     reportBtnFAB.addEventListener('click', reportIncident);
     adminPanelBtn.addEventListener('click', () => { window.location.href = '/admin.html'; });
-
     setupStartButton(startBtn);
     setupMenu();
   }
 
   function setupStartButton(bStart) {
     const firstClickHandler = async () => {
+        triggerPanelPulse(); // Animar panel
         if (oldZonePoly) gameMap.removeLayer(oldZonePoly);
         if (!zonePoly) return;
         if (drawing) {
@@ -223,15 +197,17 @@ window.addEventListener('DOMContentLoaded', () => {
             tempMarkers.forEach(m => gameMap.removeLayer(m));
             tempMarkers = [];
         }
-        undoPointBtn.classList.add('hidden');
+        startOptions.classList.add('hidden'); // Ocultamos todo mientras carga
         bStart.disabled = true;
-        bStart.textContent = 'Cargando calles...';
-        includePOICheckbox.disabled = true;
         await preloadStreets();
         bStart.textContent = 'Iniciar juego';
         bStart.onclick = secondClickHandler;
         if (totalQuestions > 0) {
           bStart.disabled = false;
+          // Mostramos de nuevo las opciones ya con el botón "Iniciar Juego"
+          startOptions.classList.remove('hidden');
+          undoPointBtn.classList.add('hidden'); // Ocultamos retroceder punto
+          startBtn.classList.remove('hidden');
         } else {
           fbEl.textContent = 'No se encontraron calles. Dibuja otra zona.';
           startOptions.classList.add('hidden');
@@ -239,6 +215,7 @@ window.addEventListener('DOMContentLoaded', () => {
         }
     };
     const secondClickHandler = () => {
+        triggerPanelPulse(); // Animar panel
         playing = true; qIdx = 0; streetsGuessedCorrectly = 0;
         scoreDisplay.classList.remove('hidden');
         scoreEl.textContent = `0 / ${totalQuestions}`;
@@ -251,17 +228,18 @@ window.addEventListener('DOMContentLoaded', () => {
   }
 
   function startDrawing(){
+    triggerPanelPulse(); // Animar panel
     fbEl.textContent = 'Haz click para añadir vértices. Con 3 se habilita Start. Haz click en el primer vértice para cerrar.';
-    ['repeatZone', 'saveZoneBtn', 'drawZone'].forEach(id => document.getElementById(id).classList.add('hidden'));
-    ['undoPoint', 'start-options'].forEach(id => document.getElementById(id).classList.remove('hidden'));
+    ['repeatZone', 'saveZoneBtn', 'drawZone', 'next'].forEach(id => document.getElementById(id).classList.add('hidden'));
+    startOptions.classList.remove('hidden'); // Mostrar el contenedor de opciones de inicio
+    undoPointBtn.classList.remove('hidden'); // Asegurarse de que retroceder punto esté visible
     startBtn.disabled = true;
     startBtn.textContent = 'Start';
     includePOICheckbox.disabled = false;
     if (zonePoly) gameMap.removeLayer(zonePoly);
     if (oldZonePoly) gameMap.removeLayer(oldZonePoly);
     zonePoints = []; tempMarkers = []; zonePoly = null;
-    playing = false;
-    drawing = true;
+    playing = false; drawing = true;
     setupStartButton(startBtn);
     gameMap.on('click', addVertex);
   }
@@ -275,12 +253,14 @@ window.addEventListener('DOMContentLoaded', () => {
     if(zonePoly) gameMap.removeLayer(zonePoly);
     zonePoly = L.polygon(zonePoints, { color:COL_ZONE, weight:2, fillOpacity:0.1 }).addTo(gameMap);
     if(zonePoints.length >= 3){ 
+      triggerPanelPulse(); // Animar panel
       fbEl.textContent = 'Zona mínima definida. Puedes cerrar o añadir más puntos.';
       startBtn.disabled = false; 
     }
   }
 
   function finishPolygon(){
+    triggerPanelPulse(); // Animar panel
     drawing = false;
     gameMap.off('click', addVertex);
     tempMarkers.forEach(m=>gameMap.removeLayer(m));
@@ -293,6 +273,7 @@ window.addEventListener('DOMContentLoaded', () => {
   
   function undoLastPoint() {
     if (!drawing || zonePoints.length === 0) return;
+    triggerPanelPulse(); // Animar panel
     zonePoints.pop();
     const lastMarker = tempMarkers.pop();
     if (lastMarker) gameMap.removeLayer(lastMarker);
@@ -301,11 +282,14 @@ window.addEventListener('DOMContentLoaded', () => {
     if (zonePoints.length >= 2) {
         zonePoly = L.polygon(zonePoints, { color: COL_ZONE, weight: 2, fillOpacity: 0.1 }).addTo(gameMap);
     }
-    startBtn.disabled = zonePoints.length < 3;
+    if (zonePoints.length < 3) {
+        startBtn.disabled = true;
+    }
     fbEl.textContent = zonePoints.length > 0 ? 'Punto eliminado. Sigue añadiendo.' : 'Haz click para añadir vértices.';
   }
 
   function repeatLastZone() {
+    triggerPanelPulse(); // Animar panel
     if (lastGameZonePoints.length < 3 || lastGameStreetList.length === 0) return;
     clear();
     if (zonePoly) gameMap.removeLayer(zonePoly);
@@ -368,7 +352,12 @@ window.addEventListener('DOMContentLoaded', () => {
   async function preloadStreets() {
       fbEl.textContent = '';
       loaderContainer.classList.remove('hidden');
-      loadingText.innerHTML = `Identificando calles...`;
+      // --- INICIO CAMBIO: Actualizar texto del nuevo loader ---
+      const loaderTextElement = document.querySelector('#loader-container .earth p');
+      if (loaderTextElement) {
+          loaderTextElement.textContent = 'Identificando calles...';
+      }
+      // --- FIN CAMBIO ---
       try {
           const zoneParam = zonePoints.map(p => `${p.lat},${p.lng}`).join(';');
           const includePOI = includePOICheckbox.checked;
@@ -417,6 +406,7 @@ window.addEventListener('DOMContentLoaded', () => {
   }
 
   function endGame() {
+    triggerPanelPulse(); // Animar panel
     playing = false;
     fbEl.textContent = `¡Juego terminado! Has acertado ${streetsGuessedCorrectly} de ${totalQuestions}.`;
     questionEl.textContent = 'Elige una opción o dibuja una nueva zona.';
@@ -430,9 +420,7 @@ window.addEventListener('DOMContentLoaded', () => {
     saveGameStats(streetsGuessedCorrectly, totalQuestions);
     ['next'].forEach(id => document.getElementById(id).classList.add('hidden'));
     ['drawZone', 'repeatZone', 'saveZoneBtn'].forEach(id => document.getElementById(id).classList.remove('hidden'));
-    // --- INICIO CAMBIO: Mostrar botón de reporte ---
     reportBtnFAB.classList.remove('hidden');
-    // --- FIN CAMBIO ---
     document.getElementById('repeatZone').disabled = (lastGameZonePoints.length < 3 || lastGameStreetList.length === 0);
     zonePoly = null; zonePoints = []; streetList = []; totalQuestions = 0;
     gameMap.off('click', onMapClick);

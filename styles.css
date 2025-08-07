@@ -6,7 +6,7 @@ body { font-family: system-ui, sans-serif; background-color: #1a1a1a; }
 #game-screen { display: flex; height: 100%; width: 100%; position: relative; }
 #game-map-container { flex: 1; position: relative; z-index: 5; }
 
-/* --- Panel de controles del juego (antes era aside) --- */
+/* --- Panel de controles del juego --- */
 #game-ui-container {
     position: absolute;
     top: 1rem;
@@ -16,9 +16,23 @@ body { font-family: system-ui, sans-serif; background-color: #1a1a1a; }
     padding: 1rem;
     border-radius: 0.5rem;
     /* --- CAMBIO: Sombra más pronunciada --- */
-    box-shadow: 0 8px 25px rgba(0,0,0,0.25);
+    box-shadow: 0 10px 30px rgba(0,0,0,0.3);
     width: 320px;
+    /* --- CAMBIO: Transición para la altura y animación --- */
+    transition: max-height 0.4s ease-in-out;
+    max-height: 500px; /* Un valor inicial suficientemente grande */
 }
+
+/* --- CAMBIO: Animación de pulso para el panel --- */
+@keyframes panel-pulse-anim {
+    0% { transform: scale(1); }
+    50% { transform: scale(0.98); }
+    100% { transform: scale(1); }
+}
+.panel-pulse {
+    animation: panel-pulse-anim 0.4s ease-in-out;
+}
+
 
 /* --- ESTILOS PANTALLA DE LOGIN --- */
 #background-map {
@@ -26,18 +40,10 @@ body { font-family: system-ui, sans-serif; background-color: #1a1a1a; }
     z-index: 1; filter: blur(4px) brightness(0.7);
 }
 @keyframes pulse {
-0%, 100% { 
-transform: scale(1); 
-box-shadow: 0 0 0 0 rgba(76, 175, 80, 0.7); 
+0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(76, 175, 80, 0.7); }
+50% { transform: scale(1.05); box-shadow: 0 0 0 10px rgba(76, 175, 80, 0); }
 }
-50% { 
-transform: scale(1.05); 
-box-shadow: 0 0 0 10px rgba(76, 175, 80, 0); 
-}
-}
-#google-login-btn { 
-animation: pulse 2.5s infinite; 
-}
+#google-login-btn { animation: pulse 2.5s infinite; }
 #login-screen {
     position: fixed; top: 0; left: 0; width: 100%; height: 100%;
     z-index: 20; display: flex; align-items: center; justify-content: center;
@@ -72,8 +78,6 @@ button.game-control-btn:disabled { opacity: .4; cursor: default; }
 #question { font-weight: 700; margin: .5rem 0; color: #333; }
 #fb { margin: .5rem 0; font-size: 0.9rem; color: #555; }
 #score-display { font-size: 1.1rem; font-weight: bold; color: #333; }
-.loader { margin-top: 1rem; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 10px; padding: 10px; background-color: #f8f9fa; border-radius: 8px; border: 1px solid #e5e7eb; }
-.loading-text { color: #333; font-size: 12pt; font-weight: 600; }
 
 /* --- ESTILOS ANIMACIÓN DE CALLE --- */
 @keyframes pulseAndFlash {
@@ -92,94 +96,144 @@ button.game-control-btn:disabled { opacity: .4; cursor: default; }
 .custom-checkbox:checked ~ .checkmark { background-color: #3b82f6; box-shadow: 0 3px 7px rgba(59, 130, 246, 0.3); }
 .custom-checkbox:checked ~ .checkmark:after { display: block; }
 
-/* --- INICIO CAMBIO: Estilos para los nuevos botones y menú --- */
-
-/* Botón de Menú (Hamburguesa) */
+/* --- ESTILOS PARA LOS NUEVOS BOTONES Y MENÚ --- */
 #open-menu-btn {
-  position: absolute;
-  top: 20px;
-  right: 20px;
-  z-index: 12;
-  background: none;
-  border: none;
-  padding: 5px;
-  color: #333; /* Color del icono de hamburguesa */
-  cursor: pointer;
-  filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5)); /* Sombreado */
+  position: absolute; top: 20px; right: 20px; z-index: 12;
+  background: none; border: none; padding: 5px;
+  color: #333; cursor: pointer;
+  filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5));
   transition: transform 0.2s;
 }
-#open-menu-btn:hover {
-  transform: scale(1.1);
-}
+#open-menu-btn:hover { transform: scale(1.1); }
 
-/* Botón de Reporte (Bandera) */
 #report-btn-fab {
-  position: absolute;
-  top: 70px; /* Posición debajo del botón de menú */
-  right: 20px;
-  z-index: 11;
-  background: none;
-  border: none;
-  padding: 5px;
-  width: auto;
-  height: auto;
-  border-radius: 0;
-  color: #dc3545; /* Color rojo para el icono de bandera */
-  cursor: pointer;
-  filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5)); /* Sombreado */
+  position: absolute; top: 70px; right: 20px; z-index: 11;
+  background: none; border: none; padding: 5px;
+  width: auto; height: auto; border-radius: 0;
+  color: #dc3545; cursor: pointer;
+  filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5));
   transition: transform 0.2s;
 }
-#report-btn-fab:hover {
-  transform: scale(1.1);
-}
+#report-btn-fab:hover { transform: scale(1.1); }
 
-
-/* Panel de Contenido del Menú */
 #menu-content-panel {
-  position: absolute;
-  top: 70px; /* Debajo del botón de menú */
-  right: 20px;
-  left: auto;
-  bottom: auto;
-  transform: none;
-  width: 90%;
-  max-width: 350px;
-  background-color: rgba(17, 24, 39, 0.95);
-  backdrop-filter: blur(8px);
-  border-radius: 12px;
-  z-index: 11;
-  box-shadow: 0 5px 20px rgba(0,0,0,0.25);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  position: absolute; top: 70px; right: 20px; left: auto; bottom: auto;
+  transform: none; width: 90%; max-width: 350px;
+  background-color: rgba(17, 24, 39, 0.95); backdrop-filter: blur(8px);
+  border-radius: 12px; z-index: 11;
+  box-shadow: 0 5px 20px rgba(0,0,0,0.25); border: 1px solid rgba(255, 255, 255, 0.1);
   color: white;
   transition: opacity 0.3s ease, transform 0.3s ease;
-  transform-origin: top right; /* Animación desde la esquina */
+  transform-origin: top right;
 }
 #menu-content-panel.hidden {
   opacity: 0;
-  transform: translateY(-15px) scale(0.95); /* Animación de aparición */
+  transform: translateY(-15px) scale(0.95);
   pointer-events: none;
 }
 
 .menu-tabs { display: flex; border-bottom: 1px solid rgba(255, 255, 255, 0.1); }
-.menu-tab-btn {
-  flex: 1; padding: 1rem; background: none; border: none;
-  color: #a0aec0; font-weight: 600; transition: color 0.2s, background-color 0.2s;
-}
+.menu-tab-btn { flex: 1; padding: 1rem; background: none; border: none; color: #a0aec0; font-weight: 600; transition: color 0.2s, background-color 0.2s; }
 .menu-tab-btn:hover { background-color: rgba(255,255,255,0.05); color: white; }
 .menu-tab-btn.active { color: white; border-bottom: 2px solid #3b82f6; }
-
 .menu-content-area { padding: 1rem; max-height: 50vh; overflow-y: auto; }
 .content-panel { display: none; }
 .content-panel.active { display: block; }
-
-.saved-zone-item {
-  display: flex; justify-content: space-between; align-items: center;
-  padding: 0.75rem; border-radius: 0.375rem; background-color: rgba(255, 255, 255, 0.1);
-  cursor: pointer; transition: background-color 0.2s;
-}
+.saved-zone-item { display: flex; justify-content: space-between; align-items: center; padding: 0.75rem; border-radius: 0.375rem; background-color: rgba(255, 255, 255, 0.1); cursor: pointer; transition: background-color 0.2s; }
 .saved-zone-item:hover { background-color: rgba(59, 130, 246, 0.3); }
-.delete-zone-btn {
-  background: none; border: none; padding: 0.25rem; color: #ef4444;
-}
+.delete-zone-btn { background: none; border: none; padding: 0.25rem; color: #ef4444; }
 .delete-zone-btn:hover { color: #dc2626; }
+
+/* --- INICIO CAMBIO: Nueva Animación de Carga (Earth Loader) --- */
+.loader {
+    /* Quitamos estilos antiguos y dejamos que el contenedor se adapte */
+    background-color: transparent;
+    border: none;
+    padding: 0;
+}
+.earth {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+.earth-loader {
+  --watercolor: #3344c1;
+  --landcolor: #7cc133;
+  width: 7.5em;
+  height: 7.5em;
+  background-color: var(--watercolor);
+  position: relative;
+  overflow: hidden;
+  border-radius: 50%;
+  box-shadow:
+    inset 0em 0.5em rgb(255, 255, 255, 0.25),
+    inset 0em -0.5em rgb(0, 0, 0, 0.25);
+  border: solid 0.15em white;
+  animation: startround 1s;
+  animation-iteration-count: 1;
+}
+.earth p {
+  color: #333;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding-top: 1em;
+  font-size: 1.25em;
+  font-family: "Gill Sans", "Gill Sans MT", Calibri, "Trebuchet MS", sans-serif;
+  font-weight: 600;
+}
+.earth-loader svg:nth-child(1) {
+  position: absolute;
+  bottom: -2em;
+  width: 7em;
+  height: auto;
+  animation: round1 5s infinite linear 0.75s;
+}
+.earth-loader svg:nth-child(2) {
+  position: absolute;
+  top: -3em;
+  width: 7em;
+  height: auto;
+  animation: round1 5s infinite linear;
+}
+.earth-loader svg:nth-child(3) {
+  position: absolute;
+  top: -2.5em;
+  width: 7em;
+  height: auto;
+  animation: round2 5s infinite linear;
+}
+.earth-loader svg:nth-child(4) {
+  position: absolute;
+  bottom: -2.2em;
+  width: 7em;
+  height: auto;
+  animation: round2 5s infinite linear 0.75s;
+}
+@keyframes startround {
+  0% { filter: brightness(500%); box-shadow: none; }
+  75% { filter: brightness(500%); box-shadow: none; }
+  100% {
+    filter: brightness(100%);
+    box-shadow:
+      inset 0em 0.5em rgb(255, 255, 255, 0.25),
+      inset 0em -0.5em rgb(0, 0, 0, 0.25);
+  }
+}
+@keyframes round1 {
+  0% { left: -2em; opacity: 100%; transform: skewX(0deg) rotate(0deg); }
+  30% { left: -6em; opacity: 100%; transform: skewX(-25deg) rotate(25deg); }
+  31% { left: -6em; opacity: 0%; transform: skewX(-25deg) rotate(25deg); }
+  35% { left: 7em; opacity: 0%; transform: skewX(25deg) rotate(-25deg); }
+  45% { left: 7em; opacity: 100%; transform: skewX(25deg) rotate(-25deg); }
+  100% { left: -2em; opacity: 100%; transform: skewX(0deg) rotate(0deg); }
+}
+@keyframes round2 {
+  0% { left: 5em; opacity: 100%; transform: skewX(0deg) rotate(0deg); }
+  75% { left: -7em; opacity: 100%; transform: skewX(-25deg) rotate(25deg); }
+  76% { left: -7em; opacity: 0%; transform: skewX(-25deg) rotate(25deg); }
+  77% { left: 8em; opacity: 0%; transform: skewX(25deg) rotate(-25deg); }
+  80% { left: 8em; opacity: 100%; transform: skewX(25deg) rotate(-25deg); }
+  100% { left: 5em; opacity: 100%; transform: skewX(0deg) rotate(0deg); }
+}
 /* --- FIN CAMBIO --- */

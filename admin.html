@@ -9,9 +9,14 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         body { background-color: #111827; color: #d1d5db; }
-        .incident-item.selected { background-color: #3b82f6; color: white; }
+        .list-item.selected { background-color: #3b82f6; color: white; }
         .spinner { border: 4px solid rgba(255, 255, 255, 0.3); border-left-color: #fff; border-radius: 50%; width: 24px; height: 24px; animation: spin 1s linear infinite; }
         @keyframes spin { to { transform: rotate(360deg); } }
+        .tab-btn { padding: 8px 16px; border: none; background: none; color: #9ca3af; font-weight: 600; cursor: pointer; }
+        .tab-btn.active { color: white; border-bottom: 2px solid #3b82f6; }
+        .action-btn { background-color: #374151; padding: 4px 8px; font-size: 0.8rem; border-radius: 4px; margin-right: 8px; border: 1px solid #4b5563; }
+        .action-btn:hover { background-color: #4b5563; }
+        .preview-text { font-size: 1.25rem; font-weight: bold; text-align: center; color: #e5e7eb; padding: 1rem; background-color: rgba(0,0,0,0.2); border-radius: 8px; }
     </style>
 </head>
 <body class="font-sans">
@@ -22,26 +27,45 @@
     </div>
 
     <div id="admin-panel" class="hidden h-screen w-screen grid grid-cols-1 md:grid-cols-3 gap-4 p-4">
+        <!-- Panel Izquierdo con Pestañas -->
         <div class="flex flex-col bg-gray-800 rounded-lg p-4 overflow-y-auto">
-            <div class="flex justify-between items-center mb-4 border-b border-gray-700 pb-2">
-                <h1 class="text-2xl font-bold">Incidencias Pendientes</h1>
-                <a href="/" class="text-sm text-blue-400 hover:underline">Volver al Juego</a>
+            <div class="flex border-b border-gray-700 mb-4 items-center">
+                <button id="tab-incidents" class="tab-btn active">Incidencias</button>
+                <button id="tab-rules" class="tab-btn">Reglas Creadas</button>
+                <a href="/" class="text-sm text-blue-400 hover:underline ml-auto">Volver al Juego</a>
             </div>
-            <div id="incidents-list" class="space-y-2"></div>
+            
+            <div id="incidents-content">
+                <h1 class="text-2xl font-bold mb-4">Incidencias Pendientes</h1>
+                <div id="incidents-list" class="space-y-2"></div>
+            </div>
+            <div id="rules-content" class="hidden">
+                <h1 class="text-2xl font-bold mb-4">Gestión de Reglas</h1>
+                <div id="rules-list" class="space-y-2"></div>
+            </div>
         </div>
 
+        <!-- Panel de Detalles (Derecha) -->
         <div id="details-panel" class="md:col-span-2 flex flex-col bg-gray-800 rounded-lg p-4">
-            <h2 id="details-title" class="text-xl font-semibold text-gray-400">Selecciona una incidencia para revisarla</h2>
+            <h2 id="details-title" class="text-xl font-semibold text-gray-400">Selecciona un elemento para revisarlo</h2>
             <div id="details-content" class="hidden flex-grow grid grid-rows-2 gap-4 mt-4">
                 <div id="admin-map" class="bg-gray-700 rounded-md"></div>
-                <div class="bg-gray-700 rounded-md p-4 flex flex-col justify-between">
-                    <div>
-                        <p class="text-sm text-gray-400">Descripción del usuario:</p>
-                        <p id="incident-description" class="bg-gray-800 p-2 rounded-md my-2"></p>
-                        
+                
+                <div class="bg-gray-700 rounded-md p-4 flex flex-col justify-between overflow-y-auto">
+                    <!-- Contenedor para la PREVISUALIZACIÓN -->
+                    <div id="preview-container" class="hidden mb-4">
+                        <p id="preview-text" class="preview-text"></p>
+                    </div>
+
+                    <!-- Contenedor para el FORMULARIO -->
+                    <div id="form-container">
+                        <div>
+                            <p class="text-sm text-gray-400">Descripción del usuario:</p>
+                            <p id="incident-description" class="bg-gray-800 p-2 rounded-md my-2"></p>
+                        </div>
                         <div class="my-4">
                             <p class="text-sm text-gray-400">Acción a realizar al aprobar:</p>
-                            <div class="flex gap-4 mt-2">
+                            <div id="resolution-type-wrapper" class="flex gap-4 mt-2">
                                 <label class="flex items-center p-2 bg-gray-900 rounded-md cursor-pointer flex-1">
                                     <input type="radio" name="resolutionType" value="override" class="mr-2" checked>
                                     <span>Corregir / Añadir Nombre</span>
@@ -61,11 +85,17 @@
                                 <label for="display-name-input" class="text-sm text-gray-400">Nombre para el Juego (de Google Maps)</label>
                                 <input type="text" id="display-name-input" class="w-full bg-gray-900 border border-gray-600 rounded-md p-2 mt-1 text-white focus:ring-blue-500 focus:border-blue-500">
                             </div>
+                             <div>
+                                <label for="city-input" class="text-sm text-gray-400">Ciudad</label>
+                                <input type="text" id="city-input" class="w-full bg-gray-900 border border-gray-600 rounded-md p-2 mt-1 text-white focus:ring-blue-500 focus:border-blue-500">
+                            </div>
                         </div>
                     </div>
-                    <div class="flex gap-4 mt-4">
-                        <button id="approve-btn" class="flex-1 bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg transition-colors flex items-center justify-center gap-2" disabled>Aprobar y Mapear</button>
-                        <button id="reject-btn" class="flex-1 bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg transition-colors flex items-center justify-center gap-2" disabled>Rechazar Incidencia</button>
+                    
+                    <!-- Contenedor para los BOTONES -->
+                    <div id="buttons-container" class="flex gap-4 mt-4">
+                        <button id="main-action-btn" class="flex-1 bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg transition-colors flex items-center justify-center gap-2" disabled>Acción Principal</button>
+                        <button id="secondary-action-btn" class="flex-1 bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg transition-colors flex items-center justify-center gap-2" disabled>Acción Secundaria</button>
                     </div>
                 </div>
             </div>
@@ -75,33 +105,48 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
         window.addEventListener('DOMContentLoaded', () => {
+            // --- CONSTANTES Y CLIENTE SUPABASE ---
             const SUPABASE_URL = 'https://hppzwfwtedghpsxfonoh.supabase.co';
-            const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhwcHp3Znd0ZWRnaHBzeGZvbm9oIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQxMjQzNDMsImV4cCI6MjA2OTcwMDM0M30.BAh6i5iJ5YkDBoydfkC9azAD4eMdYBkEBdxws9kj5Hg';
+            const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhwcHp3Znd0ZWRnaHBzeGZvbm9oIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQxMjQzNDMsImV4cCI6MjA2OTcwMDM0M30.BAh6iJ5YkDBoydfkC9azAD4eMdYBkEBdxws9kj5Hg';
             const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
+            // --- SELECTORES DOM ---
             const loadingScreen = document.getElementById('loading-screen');
             const adminPanel = document.getElementById('admin-panel');
-            const incidentsList = document.getElementById('incidents-list');
-            const detailsTitle = document.getElementById('details-title');
-            const detailsContent = document.getElementById('details-content');
-            const incidentDescription = document.getElementById('incident-description');
-            const osmNameInput = document.getElementById('osm-name-input');
-            const displayNameInput = document.getElementById('display-name-input');
-            const displayNameWrapper = document.getElementById('display-name-wrapper');
-            const radioButtons = document.querySelectorAll('input[name="resolutionType"]');
-            const approveBtn = document.getElementById('approve-btn');
-            const rejectBtn = document.getElementById('reject-btn');
+            const detailsPanel = {
+                title: document.getElementById('details-title'),
+                content: document.getElementById('details-content'),
+                description: document.getElementById('incident-description'),
+                descWrapper: document.querySelector('p.text-sm:nth-child(1)'),
+                osmName: document.getElementById('osm-name-input'),
+                displayName: document.getElementById('display-name-input'),
+                city: document.getElementById('city-input'),
+                displayNameWrapper: document.getElementById('display-name-wrapper'),
+                resolutionWrapper: document.getElementById('resolution-type-wrapper'),
+                formContainer: document.getElementById('form-container'),
+                previewContainer: document.getElementById('preview-container'),
+                previewText: document.getElementById('preview-text'),
+                mainBtn: document.getElementById('main-action-btn'),
+                secondaryBtn: document.getElementById('secondary-action-btn')
+            };
+            const tabs = {
+                incidents: document.getElementById('tab-incidents'),
+                rules: document.getElementById('tab-rules')
+            };
+            const content = {
+                incidents: document.getElementById('incidents-content'),
+                rules: document.getElementById('rules-content'),
+                incidentsList: document.getElementById('incidents-list'),
+                rulesList: document.getElementById('rules-list')
+            };
             
-            let adminMap;
-            let selectedIncident = null;
+            // --- VARIABLES DE ESTADO ---
+            let adminMap, session;
+            let selectedItem = null; // Puede ser una incidencia o una regla
 
+            // --- LÓGICA PRINCIPAL ---
             async function checkAdminAccess(user) {
-                const { data: profile, error } = await supabase
-                    .from('profiles')
-                    .select('role')
-                    .eq('id', user.id)
-                    .single();
-
+                const { data: profile, error } = await supabase.from('profiles').select('role').eq('id', user.id).single();
                 if (error || !profile || profile.role !== 'admin') {
                     loadingScreen.innerHTML = '<p class="text-red-500">Acceso Denegado. Debes ser administrador.</p>';
                     setTimeout(() => window.location.href = '/', 2000);
@@ -111,160 +156,325 @@
                     initAdminPanel();
                 }
             }
+            
+            function initAdminPanel() {
+                adminMap = L.map('admin-map');
+                L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', { attribution: '© OpenStreetMap contributors, © CARTO' }).addTo(adminMap);
+                adminMap.drawnItems = new L.FeatureGroup().addTo(adminMap);
+                
+                tabs.incidents.addEventListener('click', () => switchTab('incidents'));
+                tabs.rules.addEventListener('click', () => switchTab('rules'));
+                document.querySelectorAll('input[name="resolutionType"]').forEach(radio => radio.addEventListener('change', (e) => {
+                    detailsPanel.displayNameWrapper.style.display = e.target.value === 'block' ? 'none' : 'block';
+                }));
+                fetchIncidents();
+            }
 
+            function switchTab(tabName) {
+                if (tabName === 'incidents') {
+                    content.incidents.classList.remove('hidden');
+                    content.rules.classList.add('hidden');
+                    tabs.incidents.classList.add('active');
+                    tabs.rules.classList.remove('active');
+                    fetchIncidents();
+                } else {
+                    content.rules.classList.remove('hidden');
+                    content.incidents.classList.add('hidden');
+                    tabs.rules.classList.add('active');
+                    tabs.incidents.classList.remove('active');
+                    fetchAndDisplayRules();
+                }
+                resetDetailsPanel();
+            }
+
+            // --- MANEJO DE INCIDENCIAS ---
             async function fetchIncidents() {
-                incidentsList.innerHTML = '<div class="flex justify-center items-center"><div class="spinner"></div></div>';
-                const { data: incidents, error } = await supabase
-                    .from('incidents').select('*').eq('status', 'nuevo').order('created_at', { ascending: true });
-                if (error) {
-                    incidentsList.innerHTML = '<p class="text-red-500">Error al cargar incidencias.</p>'; return;
-                }
-                incidentsList.innerHTML = '';
-                if (incidents.length === 0) {
-                     incidentsList.innerHTML = '<p>¡No hay incidencias nuevas pendientes!</p>';
-                }
-                incidents.forEach(incident => {
+                content.incidentsList.innerHTML = '<div class="spinner"></div>';
+                const { data, error } = await supabase.from('incidents').select('*').eq('status', 'nuevo').order('created_at', { ascending: true });
+                if (error) { content.incidentsList.innerHTML = '<p class="text-red-500">Error al cargar incidencias.</p>'; return; }
+                content.incidentsList.innerHTML = data.length === 0 ? '<p>¡No hay incidencias nuevas pendientes!</p>' : '';
+                data.forEach(incident => {
                     const item = document.createElement('div');
-                    item.className = 'incident-item p-3 rounded-lg cursor-pointer hover:bg-gray-700 transition-colors';
-                    item.dataset.incidentId = incident.id;
+                    item.className = 'list-item p-3 rounded-lg cursor-pointer hover:bg-gray-700 transition-colors';
+                    item.dataset.itemId = incident.id;
                     item.innerHTML = `<p class="font-semibold truncate">${incident.description}</p><p class="text-sm text-gray-400">Ciudad: ${incident.city || 'Desconocida'}</p>`;
                     item.addEventListener('click', () => selectIncident(incident));
-                    incidentsList.appendChild(item);
+                    content.incidentsList.appendChild(item);
                 });
             }
 
             function selectIncident(incident) {
-                selectedIncident = incident;
-                approveBtn.disabled = false;
-                rejectBtn.disabled = false;
-                document.querySelectorAll('.incident-item').forEach(item => {
-                    item.classList.toggle('selected', item.dataset.incidentId == incident.id);
-                });
-                detailsTitle.classList.add('hidden');
-                detailsContent.classList.remove('hidden');
-                incidentDescription.textContent = incident.description;
+                selectedItem = { type: 'incident', data: incident };
+                document.querySelectorAll('.list-item').forEach(item => item.classList.remove('selected'));
+                document.querySelector(`.list-item[data-item-id='${incident.id}']`).classList.add('selected');
+                
+                resetDetailsPanel(false); // No ocultar, solo resetear
+                detailsPanel.title.classList.add('hidden');
+                detailsPanel.content.classList.remove('hidden');
+                detailsPanel.formContainer.classList.remove('hidden');
+
+                detailsPanel.description.textContent = incident.description;
+                detailsPanel.descWrapper.classList.remove('hidden');
+                detailsPanel.resolutionWrapper.classList.remove('hidden');
+
+                detailsPanel.city.value = incident.city || '';
                 const match = incident.description.match(/["'](.*?)["']/) || incident.description.match(/calle (.*?)(?:\s|$)/i);
                 const guessedName = match ? (match[1].startsWith('C.') ? match[1].replace('C. ', 'Calle ') : `Calle ${match[1]}`) : '';
-                osmNameInput.value = guessedName;
-                displayNameInput.value = guessedName.toUpperCase();
+                detailsPanel.osmName.value = guessedName;
+                detailsPanel.displayName.value = guessedName.toUpperCase();
+
                 const points = incident.zone_points.split(';').map(p => {
                     const [lat, lng] = p.split(',');
                     return [parseFloat(lat), parseFloat(lng)];
                 });
-                if(adminMap.drawnItems) adminMap.drawnItems.clearLayers();
-                else {
-                    adminMap.drawnItems = new L.FeatureGroup();
-                    adminMap.addLayer(adminMap.drawnItems);
-                }
+                adminMap.drawnItems.clearLayers();
                 const polygon = L.polygon(points, {color: '#3b82f6'}).addTo(adminMap.drawnItems);
                 adminMap.fitBounds(polygon.getBounds(), {padding: [50, 50]});
+                
+                configureButtonsForIncident();
             }
-            
-           async function resolveIncident(action) {
-                if (!selectedIncident) return;
 
+            async function resolveIncident(action) {
+                const incident = selectedItem.data;
                 const selectedActionType = document.querySelector('input[name="resolutionType"]:checked').value;
-                const osmName = osmNameInput.value.trim();
-                const displayName = displayNameInput.value.trim();
-                let city = selectedIncident.city;
+                const osmName = detailsPanel.osmName.value.trim();
+                const displayName = detailsPanel.displayName.value.trim();
+                let city = detailsPanel.city.value.trim();
 
                 if (action === 'approve') {
-                    if (!osmName) {
-                        alert('El campo "Nombre en OpenStreetMap" es obligatorio para aprobar.');
-                        return;
-                    }
-                    if (selectedActionType === 'override' && !displayName) {
-                        alert('Para "Corregir / Añadir", el campo "Nombre para el Juego" es obligatorio.');
-                        return;
-                    }
+                    if (!osmName) { alert('El campo "Nombre en OpenStreetMap" es obligatorio.'); return; }
+                    if (selectedActionType === 'override' && !displayName) { alert('El campo "Nombre para el Juego" es obligatorio.'); return; }
                     if (!city) {
-                        city = prompt("La ciudad no fue detectada. Por favor, introduce la ciudad para esta incidencia (ej. 'Badajoz'):");
-                        if (!city || city.trim() === '') {
-                            alert('La ciudad es necesaria para aprobar la incidencia.');
-                            return;
-                        }
+                        city = prompt("La ciudad no fue detectada. Introduce la ciudad (ej. 'Badajoz'):");
+                        if (!city) { alert('La ciudad es necesaria para aprobar.'); return; }
                     }
                 }
-
-                approveBtn.disabled = true;
-                rejectBtn.disabled = true;
-                approveBtn.innerHTML = '<div class="spinner"></div>';
-
+                
+                setButtonsLoading(true);
                 try {
-                    const { data: { session } } = await supabase.auth.getSession();
                     const response = await fetch('/api/resolveIncident', {
                         method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'Authorization': `Bearer ${session.access_token}`
-                        },
-                        body: JSON.stringify({
-                            incidentId: selectedIncident.id,
-                            action: action, // 'approve' o 'reject'
-                            actionType: selectedActionType, // 'override' o 'block'
-                            osmName: osmName,
-                            displayName: displayName,
-                            city: city
-                        })
+                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
+                        body: JSON.stringify({ incidentId: incident.id, action, actionType: selectedActionType, osmName, displayName, city })
                     });
-
-                    if (!response.ok) {
-                        const errorData = await response.json();
-                        throw new Error(errorData.details || errorData.error || 'Error del servidor');
-                    }
-
+                    if (!response.ok) { const err = await response.json(); throw new Error(err.details || err.error); }
                     alert(`Incidencia marcada como ${action === 'approve' ? 'resuelta' : 'rechazada'}.`);
                     resetDetailsPanel();
                     fetchIncidents();
-
                 } catch (error) {
-                    console.error('Error resolving incident:', error);
                     alert('Error al procesar la incidencia: ' + error.message);
                 } finally {
-                    approveBtn.disabled = false;
-                    rejectBtn.disabled = false;
-                    approveBtn.innerHTML = 'Aprobar y Mapear';
+                    setButtonsLoading(false);
+                }
+            }
+
+            // --- MANEJO DE REGLAS ---
+            async function fetchAndDisplayRules() {
+                content.rulesList.innerHTML = '<div class="spinner"></div>';
+                try {
+                    const response = await fetch('/api/manageRules', { headers: { 'Authorization': `Bearer ${session.access_token}` } });
+                    if (!response.ok) throw new Error('Error al cargar reglas.');
+                    const { overrides, blocklist } = await response.json();
+                    content.rulesList.innerHTML = '';
+                    
+                    if (overrides.length === 0 && blocklist.length === 0) {
+                        content.rulesList.innerHTML = '<p>No se han creado reglas todavía.</p>';
+                    }
+
+                    overrides.forEach(rule => content.rulesList.appendChild(createRuleElement(rule, 'override')));
+                    blocklist.forEach(rule => content.rulesList.appendChild(createRuleElement(rule, 'block')));
+                    
+                } catch (error) {
+                    content.rulesList.innerHTML = `<p class="text-red-500">${error.message}</p>`;
+                }
+            }
+
+            function createRuleElement(rule, type) {
+                const item = document.createElement('div');
+                item.className = 'list-item p-3 rounded-lg cursor-pointer hover:bg-gray-700 transition-colors';
+                item.dataset.itemId = rule.id;
+                const isOverride = type === 'override';
+                item.innerHTML = `
+                    <p class="font-semibold ${isOverride ? 'text-blue-300' : 'text-red-400'}">${isOverride ? 'CORRECCIÓN' : 'BLOQUEO'}</p>
+                    <p><b>OSM:</b> ${rule.osm_name}</p>
+                    ${isOverride ? `<p><b>Juego:</b> ${rule.display_name}</p>` : ''}
+                    <p class="text-sm text-gray-400">Ciudad: ${rule.city}</p>
+                    <div class="mt-2">
+                        ${isOverride ? `<button class="action-btn edit-btn">Editar</button>` : ''}
+                        <button class="action-btn delete-btn">Eliminar</button>
+                        <button class="action-btn preview-btn">Previsualizar</button>
+                    </div>`;
+                item.addEventListener('click', (e) => {
+                    if (e.target.classList.contains('action-btn')) return;
+                    selectRule(rule, type);
+                });
+                item.querySelector('.delete-btn').addEventListener('click', () => deleteRule(rule.id, type));
+                if (isOverride) item.querySelector('.edit-btn').addEventListener('click', () => selectRule(rule, type, true));
+                item.querySelector('.preview-btn').addEventListener('click', () => previewRule(rule, type));
+                return item;
+            }
+
+            function selectRule(rule, type, isEditing = false) {
+                selectedItem = { type: 'rule', data: rule, ruleType: type };
+                 document.querySelectorAll('.list-item').forEach(item => item.classList.remove('selected'));
+                document.querySelector(`.list-item[data-item-id='${rule.id}']`).classList.add('selected');
+
+                resetDetailsPanel(false);
+                detailsPanel.title.classList.add('hidden');
+                detailsPanel.content.classList.remove('hidden');
+                
+                if (isEditing) {
+                    detailsPanel.formContainer.classList.remove('hidden');
+                    detailsPanel.osmName.value = rule.osm_name;
+                    detailsPanel.displayName.value = rule.display_name;
+                    detailsPanel.city.value = rule.city;
+                    configureButtonsForRuleEdit();
+                } else {
+                    previewRule(rule, type);
+                }
+            }
+
+            async function saveRuleChanges() {
+                const rule = selectedItem.data;
+                const body = {
+                    ruleId: rule.id,
+                    osmName: detailsPanel.osmName.value.trim(),
+                    displayName: detailsPanel.displayName.value.trim(),
+                    city: detailsPanel.city.value.trim()
+                };
+                if (!body.osmName || !body.displayName || !body.city) {
+                    alert("Todos los campos son obligatorios para guardar."); return;
+                }
+
+                setButtonsLoading(true);
+                try {
+                    const response = await fetch('/api/manageRules', {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
+                        body: JSON.stringify(body)
+                    });
+                    if (!response.ok) { const err = await response.json(); throw new Error(err.details || err.error); }
+                    alert('Regla actualizada con éxito.');
+                    resetDetailsPanel();
+                    fetchAndDisplayRules();
+                } catch (error) {
+                    alert('Error al actualizar la regla: ' + error.message);
+                } finally {
+                    setButtonsLoading(false);
+                }
+            }
+
+            async function deleteRule(ruleId, type) {
+                if (!confirm(`¿Seguro que quieres eliminar esta regla de ${type}? Esta acción no se puede deshacer.`)) return;
+                try {
+                     const response = await fetch('/api/manageRules', {
+                        method: 'DELETE',
+                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
+                        body: JSON.stringify({ ruleId, type })
+                    });
+                    if (!response.ok) { const err = await response.json(); throw new Error(err.details || err.error); }
+                    alert('Regla eliminada.');
+                    if (selectedItem && selectedItem.data.id === ruleId) resetDetailsPanel();
+                    fetchAndDisplayRules();
+                } catch (error) {
+                    alert('Error al eliminar: ' + error.message);
+                }
+            }
+
+            async function previewRule(rule, type) {
+                resetDetailsPanel(false);
+                detailsPanel.title.classList.add('hidden');
+                detailsPanel.content.classList.remove('hidden');
+                detailsPanel.previewContainer.classList.remove('hidden');
+                detailsPanel.previewText.innerHTML = '<div class="spinner mx-auto"></div>';
+                
+                try {
+                    const response = await fetch(`/api/getStreetPreview?osmName=${encodeURIComponent(rule.osm_name)}&city=${encodeURIComponent(rule.city)}`, {
+                        headers: { 'Authorization': `Bearer ${session.access_token}` }
+                    });
+                    if (!response.ok) { const err = await response.json(); throw new Error(err.details || err.error); }
+                    
+                    const { geometries } = await response.json();
+                    adminMap.drawnItems.clearLayers();
+                    
+                    if (geometries.length === 0) {
+                        detailsPanel.previewText.textContent = 'No se encontró la geometría para esta calle.';
+                        return;
+                    }
+                    
+                    const displayName = type === 'override' ? rule.display_name : rule.osm_name;
+                    detailsPanel.previewText.textContent = `¿Dónde está «${displayName.toUpperCase()}»?`;
+                    
+                    const layerGroup = L.layerGroup();
+                    geometries.forEach(geom => {
+                        const style = { color: '#007a2f', weight: geom.isClosed ? 4 : 8, fillOpacity: 0.2 };
+                        if (geom.isClosed) L.polygon(geom.points, style).addTo(layerGroup);
+                        else L.polyline(geom.points, style).addTo(layerGroup);
+                    });
+                    layerGroup.addTo(adminMap.drawnItems);
+                    adminMap.fitBounds(layerGroup.getBounds(), { padding: [50, 50] });
+
+                } catch (error) {
+                    detailsPanel.previewText.textContent = `Error en previsualización: ${error.message}`;
                 }
             }
             
-            function resetDetailsPanel() {
-                selectedIncident = null;
-                approveBtn.disabled = true;
-                rejectBtn.disabled = true;
-                detailsTitle.classList.remove('hidden');
-                detailsContent.classList.add('hidden');
-                osmNameInput.value = '';
-                displayNameInput.value = '';
-                if(adminMap.drawnItems) adminMap.drawnItems.clearLayers();
+            // --- FUNCIONES AUXILIARES DE UI ---
+            function resetDetailsPanel(hide = true) {
+                selectedItem = null;
+                if (hide) {
+                    detailsPanel.title.classList.remove('hidden');
+                    detailsPanel.content.classList.add('hidden');
+                }
+                adminMap.drawnItems.clearLayers();
+                detailsPanel.formContainer.classList.add('hidden');
+                detailsPanel.previewContainer.classList.add('hidden');
+                detailsPanel.descWrapper.classList.add('hidden');
+                detailsPanel.resolutionWrapper.classList.add('hidden');
+                detailsPanel.mainBtn.disabled = true;
+                detailsPanel.secondaryBtn.disabled = true;
+                document.querySelectorAll('.list-item').forEach(item => item.classList.remove('selected'));
+            }
+            
+            function setButtonsLoading(isLoading) {
+                const spinner = '<div class="spinner"></div>';
+                if (isLoading) {
+                    detailsPanel.mainBtn.innerHTML = spinner;
+                    detailsPanel.mainBtn.disabled = true;
+                    detailsPanel.secondaryBtn.disabled = true;
+                } else {
+                    // El texto se restaura en las funciones de configuración
+                    detailsPanel.mainBtn.disabled = false;
+                    detailsPanel.secondaryBtn.disabled = false;
+                }
             }
 
-            function initAdminPanel() {
-                adminMap = L.map('admin-map');
-                L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-                    attribution: '© OpenStreetMap contributors, © CARTO'
-                }).addTo(adminMap);
-                
-                // Listener para los radio buttons que controla la visibilidad del campo 'displayName'
-                radioButtons.forEach(radio => {
-                    radio.addEventListener('change', (event) => {
-                        const isBlockAction = event.target.value === 'block';
-                        displayNameWrapper.style.display = isBlockAction ? 'none' : 'block';
-                    });
-
-                });
-
-                fetchIncidents();
-                approveBtn.addEventListener('click', () => resolveIncident('approve'));
-                rejectBtn.addEventListener('click', () => resolveIncident('reject'));
+            function configureButtonsForIncident() {
+                detailsPanel.mainBtn.textContent = 'Aprobar y Mapear';
+                detailsPanel.secondaryBtn.textContent = 'Rechazar Incidencia';
+                detailsPanel.mainBtn.className = 'flex-1 bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg';
+                detailsPanel.mainBtn.disabled = false;
+                detailsPanel.secondaryBtn.disabled = false;
+                detailsPanel.mainBtn.onclick = () => resolveIncident('approve');
+                detailsPanel.secondaryBtn.onclick = () => resolveIncident('reject');
+            }
+            
+            function configureButtonsForRuleEdit() {
+                detailsPanel.mainBtn.textContent = 'Guardar Cambios';
+                detailsPanel.secondaryBtn.textContent = 'Cancelar';
+                detailsPanel.mainBtn.className = 'flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg';
+                detailsPanel.mainBtn.disabled = false;
+                detailsPanel.secondaryBtn.disabled = false;
+                detailsPanel.mainBtn.onclick = saveRuleChanges;
+                detailsPanel.secondaryBtn.onclick = resetDetailsPanel;
             }
 
-            supabase.auth.onAuthStateChange((event, session) => {
+            // --- INICIALIZACIÓN Y AUTH ---
+            supabase.auth.onAuthStateChange((event, s) => {
+                session = s;
                 if (event === 'INITIAL_SESSION' || event === 'SIGNED_IN') {
-                    if (session) {
-                        checkAdminAccess(session.user);
-                    } else {
-                        window.location.href = '/';
-                    }
+                    if (session) checkAdminAccess(session.user);
+                    else window.location.href = '/';
                 } else if (event === 'SIGNED_OUT') {
                     window.location.href = '/';
                 }

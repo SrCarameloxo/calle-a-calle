@@ -30,77 +30,77 @@
   </div>
 
   <div id="game-screen" class="hidden">
-    <aside>
-      <div id="top-panel">
-          <h1 class="gradient-text">Calle a Calle</h1>
-          <button id="drawZone" class="game-control-btn">Establecer zona</button>
-          <button id="undoPoint" class="game-control-btn hidden">Retroceder Punto</button>
-          
-          <div id="start-options" class="hidden">
-            <div class="checkbox-wrapper">
-                <label class="checkbox-container">
-                    <input id="include-poi-checkbox" class="custom-checkbox" type="checkbox">
-                    <span class="checkmark"></span>
-                    Incluir Zonas de Interés
-                </label>
-            </div>
-            <button id="start" class="game-control-btn" disabled>Start</button>
+    
+    <div id="game-ui-container">
+      <div id="top-left-controls">
+        <h1 class="game-title">Calle a Calle</h1>
+        <button id="drawZone" class="game-control-btn">Establecer zona</button>
+        <button id="undoPoint" class="game-control-btn hidden">Retroceder Punto</button>
+        
+        <div id="start-options" class="hidden">
+          <div class="checkbox-wrapper">
+              <label class="checkbox-container">
+                  <input id="include-poi-checkbox" class="custom-checkbox" type="checkbox">
+                  <span class="checkmark"></span>
+                  Incluir Zonas de Interés
+              </label>
           </div>
+          <button id="start" class="game-control-btn" disabled>Start</button>
+        </div>
 
-          <button id="repeatZone" class="game-control-btn hidden" disabled>Repetir Zona</button>
-          <button id="saveZoneBtn" class="game-control-btn hidden">Guardar Zona</button>
-          <button id="next" class="game-control-btn hidden" disabled>Siguiente</button>
-          <p id="question"></p>
-          <p id="score-display" class="hidden">Calles acertadas: <span id="score">0 / 0</span></p>
-          <div id="loader-container" class="loader hidden">
-            <div id="loading-text" class="loading-text"></div>
-          </div>
-          <p id="fb"></p>
-      </div>
-      
-      <div id="middle-panel-container">
-        <div id="saved-zones-content" class="content-panel">
-            <h3 class="mb-4 text-xl font-bold">Mis Zonas Guardadas</h3>
-            <div id="saved-zones-list" class="space-y-2"></div>
+        <button id="repeatZone" class="game-control-btn hidden" disabled>Repetir Zona</button>
+        <button id="saveZoneBtn" class="game-control-btn hidden">Guardar Zona</button>
+        <button id="next" class="game-control-btn hidden" disabled>Siguiente</button>
+        <p id="question"></p>
+        <p id="score-display" class="hidden">Calles acertadas: <span id="score">0 / 0</span></p>
+        <div id="loader-container" class="loader hidden">
+          <div id="loading-text" class="loading-text"></div>
         </div>
-        <div id="stats-content" class="content-panel">
-            <h3 class="mb-4 text-xl font-bold">Estadísticas</h3>
-            <div id="stats-list"></div>
-        </div>
-        <div id="profile-content" class="content-panel">
-            <h3 class="mb-4 text-xl font-bold">Perfil de Usuario</h3>
-            <div id="user-info-details" class="p-4 text-center bg-gray-700 rounded-lg"></div>
-            <button id="admin-panel-btn" class="w-full mt-4 game-control-btn hidden" style="background-color: #6f42c1; color: white;">Panel de Administración</button>
-            <button id="logout-btn" class="w-full mt-4 game-control-btn" style="background-color: #dc3545;">Cerrar Sesión</button>
-        </div>
+        <p id="fb"></p>
       </div>
-
-      <div id="bottom-menu">
-        <div class="flex items-center justify-center w-auto p-2 bg-gray-100 rounded-2xl">
-          <button class="menu-btn group flex-1 p-3 flex justify-center items-center rounded-xl" data-panel="saved-zones-content">
-            <svg viewBox="0 0 24 24" height="28" width="28" xmlns="http://www.w3.org/2000/svg" class="text-gray-500 group-hover:text-blue-500 group-[.active]:text-blue-500 transition-colors"><path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"></path></svg>
-          </button>
-          <button class="menu-btn group flex-1 p-3 flex justify-center items-center rounded-xl" data-panel="stats-content">
-            <svg viewBox="0 0 24 24" height="28" width="28" xmlns="http://www.w3.org/2000/svg" class="text-gray-500 group-hover:text-blue-500 group-[.active]:text-blue-500 transition-colors"><path d="M3 3v18h18" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path><path d="M18.7 8l-5.1 5.2-2.8-2.7L7 14.3" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
-          </button>
-          <button class="menu-btn group flex-1 p-3 flex justify-center items-center rounded-xl" data-panel="profile-content">
-            <svg viewBox="0 0 24 24" height="28" width="28" xmlns="http://www.w3.org/2000/svg" class="text-gray-500 group-hover:text-blue-500 group-[.active]:text-blue-500 transition-colors"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path><circle cx="12" cy="7" r="4" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></circle></svg>
-          </button>
-          <button id="report-btn" title="Reportar incidencia" class="group flex-1 p-3 flex justify-center items-center rounded-xl">
-            <svg viewBox="0 0 24 24" height="28" width="28" xmlns="http://www.w3.org/2000/svg" class="text-gray-500 group-hover:text-red-500 transition-colors"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1v12zM4 22v-7" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
-          </button>
-          </div>
-      </div>
-    </aside>
+    </div>
+    
     <div id="game-map-container"></div>
+    
+    <button id="report-btn-fab" title="Reportar incidencia" class="hidden">
+        <svg viewBox="0 0 24 24" height="28" width="28" xmlns="http://www.w3.org/2000/svg"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1v12zM4 22v-7" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+    </button>
+    
+    <div id="bottom-svg-panel">
+      <svg id="Capa_1" data-name="Capa 1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1080" preserveAspectRatio="none"><defs><style>.cls-1{fill:#29abe2;}</style></defs><path class="cls-1" d="M1621.11,929.41h-610A35.56,35.56,0,0,1,983.85,917a72.81,72.81,0,0,0-111.28,0,35.59,35.59,0,0,1-27.22,12.39h-612a28.86,28.86,0,0,0-28.87,28.86V1008a28.87,28.87,0,0,0,28.87,28.87H1621.11a29.9,29.9,0,0,0,29.89-29.9V959.3A29.89,29.89,0,0,0,1621.11,929.41Z"/></svg>
+    </div>
+
+    <button id="open-menu-btn" title="Abrir menú">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="32" height="32" fill="white"><path d="M12 2.09961L3 11.0996V21H21V11.0996L12 2.09961ZM12 4.79102L19 11.167V19H5V11.167L12 4.79102Z"/></svg>
+    </button>
+
+    <div id="menu-content-panel" class="hidden">
+      <div class="menu-tabs">
+          <button class="menu-tab-btn active" data-panel="profile-content">Perfil</button>
+          <button class="menu-tab-btn" data-panel="stats-content">Estadísticas</button>
+          <button class="menu-tab-btn" data-panel="saved-zones-content">Mis Zonas</button>
+      </div>
+      <div class="menu-content-area">
+          <div id="profile-content" class="content-panel active">
+              <h3 class="mb-4 text-xl font-bold">Perfil de Usuario</h3>
+              <div id="user-info-details" class="p-4 text-center bg-gray-700 rounded-lg"></div>
+              <button id="admin-panel-btn" class="w-full mt-4 game-control-btn hidden" style="background-color: #6f42c1; color: white;">Panel de Administración</button>
+              <button id="logout-btn" class="w-full mt-4 game-control-btn" style="background-color: #dc3545;">Cerrar Sesión</button>
+          </div>
+          <div id="stats-content" class="content-panel">
+              <h3 class="mb-4 text-xl font-bold">Estadísticas</h3>
+              <div id="stats-list"></div>
+          </div>
+          <div id="saved-zones-content" class="content-panel">
+              <h3 class="mb-4 text-xl font-bold">Mis Zonas Guardadas</h3>
+              <div id="saved-zones-list" class="space-y-2"></div>
+          </div>
+      </div>
+    </div>
   </div>
 
   <audio id="correct-sound" src="/sounds/correct.mp3" preload="auto"></audio>
   <audio id="incorrect-sound" src="/sounds/incorrect.mp3" preload="auto"></audio>
-
-  <div id="bottom-svg-panel">
-    <svg id="Capa_1" data-name="Capa 1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1080" preserveAspectRatio="none"><defs><style>.cls-1{fill:#29abe2;}</style></defs><path class="cls-1" d="M1621.11,929.41h-610A35.56,35.56,0,0,1,983.85,917a72.81,72.81,0,0,0-111.28,0,35.59,35.59,0,0,1-27.22,12.39h-612a28.86,28.86,0,0,0-28.87,28.86V1008a28.87,28.87,0,0,0,28.87,28.87H1621.11a29.9,29.9,0,0,0,29.89-29.9V959.3A29.89,29.89,0,0,0,1621.11,929.41Z"/></svg>
-  </div>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="main.js"></script>

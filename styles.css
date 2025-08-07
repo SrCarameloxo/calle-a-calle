@@ -3,52 +3,29 @@ html, body { height: 100%; margin: 0; overflow: hidden; }
 body { font-family: system-ui, sans-serif; background-color: #1a1a1a; }
 .hidden { display: none !important; }
 
-#game-screen { display: flex; height: 100%; width: 100%; position: relative; } /* position: relative añadido */
+#game-screen { display: flex; height: 100%; width: 100%; position: relative; }
 #game-map-container { flex: 1; position: relative; z-index: 5; }
 
-/* --- ESTILOS ASIDE Y PANELES --- */
-aside { 
-  width: 320px;
-  box-shadow: 2px 0 4px rgba(0,0,0,.15); 
-  display: flex;
-  flex-direction: column;
-  background-color: white;
+/* Contenedor para la UI principal del juego (controles arriba a la izquierda) */
+#game-ui-container {
+  position: absolute;
+  top: 1rem;
+  left: 1rem;
   z-index: 10;
-  position: relative;
-}
-
-#top-panel {
+  background-color: rgba(255, 255, 255, 0.9);
   padding: 1rem;
-  border-bottom: 1px solid #e5e7eb;
+  border-radius: 0.5rem;
+  box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+  width: 320px;
 }
 
-#middle-panel-container {
-  flex-grow: 1;
-  position: relative;
-  padding: 1rem;
-  overflow-y: hidden;
+.game-title {
+    font-size: 2.25rem; font-weight: 700; text-align: center;
+    background: linear-gradient(to right, #3b82f6, #8b5cf6);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    margin-bottom: 1rem;
 }
 
-.content-panel {
-  display: none;
-  padding: 1.5rem;
-  border-radius: 1rem;
-  background-color: rgba(17, 24, 39, 0.85);
-  backdrop-filter: blur(4px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  color: white;
-  height: 100%;
-  overflow-y: auto;
-}
-
-.content-panel.active {
-  display: block;
-}
-
-#bottom-menu {
-  padding: 0.5rem;
-  border-top: 1px solid #e5e7eb;
-}
 
 /* --- ESTILOS PANTALLA DE LOGIN --- */
 #background-map {
@@ -74,7 +51,7 @@ animation: pulse 2.5s infinite;
     z-index: 20; display: flex; align-items: center; justify-content: center;
 }
 
-/* --- ESTILOS DE BOTONES DE JUEGO (RESTAURADOS) --- */
+/* --- ESTILOS DE BOTONES DE JUEGO --- */
 button { cursor: pointer; }
 button.game-control-btn {
   width: 100%; padding: .45rem; border: none; border-radius: 6px;
@@ -98,20 +75,13 @@ button.game-control-btn:disabled { opacity: .4; cursor: default; }
 #saveZoneBtn:not(:disabled):hover { background-color: #e0a800; }
 
 /* --- OTROS ESTILOS --- */
-.gradient-text {
-    font-size: 2.25rem; font-weight: 700; text-align: center;
-    background: linear-gradient(to right, #3b82f6, #8b5cf6);
-    -webkit-background-clip: text; background-clip: text; color: transparent;
-    margin-bottom: 1rem;
-}
-
 #question { font-weight: 700; margin: .5rem 0; }
 #fb { margin: .5rem 0; font-size: 0.9rem; }
 #score-display { font-size: 1.1rem; font-weight: bold; color: #333; }
 .loader { margin-top: 1rem; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 10px; padding: 10px; background-color: #f8f9fa; border-radius: 8px; border: 1px solid #e5e7eb; }
 .loading-text { color: #333; font-size: 12pt; font-weight: 600; }
 
-/* --- NUEVOS ESTILOS PARA ZONAS GUARDADAS --- */
+/* --- ESTILOS PARA ZONAS GUARDADAS --- */
 .saved-zone-item {
   display: flex;
   justify-content: space-between;
@@ -139,7 +109,7 @@ button.game-control-btn:disabled { opacity: .4; cursor: default; }
   color: #dc2626;
 }
 
-/* ===== INICIO: NUEVOS ESTILOS DE ANIMACIÓN ===== */
+/* --- ESTILOS DE ANIMACIÓN DE CALLE --- */
 @keyframes pulseAndFlash {
     0% {
         stroke-width: 8;
@@ -161,15 +131,14 @@ button.game-control-btn:disabled { opacity: .4; cursor: default; }
 .street-reveal-animation {
     animation: pulseAndFlash 0.8s ease-out;
 }
-/* ===== FIN: NUEVOS ESTILOS DE ANIMACIÓN ===== */
 
-/* --- INICIO: ESTILOS PARA EL NUEVO CHECKBOX (CORREGIDO) --- */
+/* --- ESTILOS PARA EL CHECKBOX --- */
 .checkbox-wrapper {
     padding: 10px 0;
 }
 .checkbox-container {
-    display: flex; /* Usamos flex para alinear el texto verticalmente */
-    align-items: center; /* Centrado vertical */
+    display: flex;
+    align-items: center;
     position: relative;
     cursor: pointer;
     font-size: 16px;
@@ -184,24 +153,24 @@ button.game-control-btn:disabled { opacity: .4; cursor: default; }
     width: 0;
 }
 .checkmark {
-    position: relative; /* Cambiado de absolute */
+    position: relative;
     height: 25px;
     width: 25px;
-    min-width: 25px; /* Evita que se encoja */
+    min-width: 25px;
     background-color: #d1d5db;
     border-radius: 4px;
     transition: background-color 0.3s;
     box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
-    margin-right: 10px; /* Espacio entre el check y el texto */
-    display: flex; /* Usamos flex para centrar el tick */
+    margin-right: 10px;
+    display: flex;
     align-items: center;
     justify-content: center;
 }
 .checkmark:after {
     content: "";
     display: none;
-    width: 6px; /* Ancho del tick */
-    height: 12px; /* Alto del tick */
+    width: 6px;
+    height: 12px;
     border: solid white;
     border-width: 0 3px 3px 0;
     transform: rotate(45deg);
@@ -213,21 +182,123 @@ button.game-control-btn:disabled { opacity: .4; cursor: default; }
 .custom-checkbox:checked ~ .checkmark:after {
     display: block;
 }
-/* --- FIN: ESTILOS PARA EL NUEVO CHECKBOX --- */
 
-/* --- INICIO: ESTILOS PARA EL PANEL SVG INFERIOR --- */
+/* --- ESTILOS PARA EL PANEL SVG INFERIOR --- */
 #bottom-svg-panel {
   position: absolute;
   bottom: 0;
   left: 0;
   width: 100%;
-  z-index: 8; /* Por debajo del menú lateral (10) pero encima del mapa (5) */
-  pointer-events: none; /* Para que no intercepte los clics del mapa */
-  line-height: 0; /* Evita espacios extra debajo del SVG */
+  height: 100px; /* Altura fija para ayudar al posicionamiento */
+  z-index: 8; 
+  pointer-events: none;
+  line-height: 0;
 }
-
 #bottom-svg-panel svg {
   width: 100%;
-  height: auto;
+  height: 100%;
 }
-/* --- FIN: ESTILOS PARA EL PANEL SVG INFERIOR --- */
+
+/* --- ESTILOS PARA EL NUEVO MENÚ CENTRAL --- */
+#open-menu-btn {
+  position: absolute;
+  left: 50%;
+  bottom: 30px; /* Ajustar este valor para que quede sobre el 'bulto' */
+  transform: translateX(-50%);
+  z-index: 12;
+  background-color: #1f89c0;
+  border: none;
+  border-radius: 50%;
+  width: 60px;
+  height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+  transition: background-color 0.2s, transform 0.2s;
+}
+#open-menu-btn:hover {
+  background-color: #29abe2;
+  transform: translateX(-50%) translateY(-2px);
+}
+
+#menu-content-panel {
+  position: absolute;
+  left: 50%;
+  bottom: 110px; /* Altura del panel SVG + un pequeño margen */
+  transform: translateX(-50%);
+  width: 90%;
+  max-width: 450px;
+  background-color: rgba(17, 24, 39, 0.95);
+  backdrop-filter: blur(8px);
+  border-radius: 12px;
+  z-index: 11;
+  box-shadow: 0 -5px 20px rgba(0,0,0,0.25);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: white;
+  transition: opacity 0.3s ease, transform 0.3s ease;
+  transform-origin: bottom center;
+}
+/* Estado de transición para cuando está oculto */
+#menu-content-panel.hidden {
+  opacity: 0;
+  transform: translateX(-50%) translateY(20px);
+  pointer-events: none;
+}
+
+.menu-tabs {
+  display: flex;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+.menu-tab-btn {
+  flex: 1;
+  padding: 1rem;
+  background: none;
+  border: none;
+  color: #a0aec0;
+  font-weight: 600;
+  transition: color 0.2s, background-color 0.2s;
+}
+.menu-tab-btn:hover {
+  background-color: rgba(255,255,255,0.05);
+  color: white;
+}
+.menu-tab-btn.active {
+  color: white;
+  border-bottom: 2px solid #3b82f6;
+}
+
+.menu-content-area {
+  padding: 1rem;
+  max-height: 50vh;
+  overflow-y: auto;
+}
+
+.content-panel {
+  display: none;
+}
+.content-panel.active {
+  display: block;
+}
+
+/* --- BOTÓN DE REPORTE FLOTANTE --- */
+#report-btn-fab {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  z-index: 10;
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  background-color: #dc3545;
+  color: white;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+  transition: transform 0.2s;
+}
+#report-btn-fab:hover {
+  transform: scale(1.05);
+}

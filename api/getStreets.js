@@ -1,5 +1,6 @@
 const { createClient } = require('@supabase/supabase-js');
 const { createClient: createKvClient } = require('@vercel/kv');
+const { extractNameParts } = require('./_lib/helpers.js');
 
 // --- Clientes de Servicios ---
 const kv = createKvClient({
@@ -13,7 +14,7 @@ const supabaseAdmin = createClient(
 );
 
 
-// --- Funciones Auxiliares (SIN CAMBIOS) ---
+// --- Funciones Auxiliares ---
 
 function calculateOptimalSearch(zonePoints) {
   if (zonePoints.length === 0) return { center: { lat: 0, lng: 0 }, radius: 1500 };
@@ -69,22 +70,7 @@ async function geocode(pt, apiKey) {
   return null;
 }
 
-function extractNameParts(name) {
-    const streetTypeWords = new Set(['AV', 'AV.', 'AVDA', 'AVENIDA', 'CALLE', 'C', 'C.', 'C/', 'PASEO', 'Pº', 'P°', 'PLAZA', 'PL.', 'PZ', 'PUENTE', 'CAMINO', 'CAÑADA', 'CALLEJA', 'CALLEJON', 'PARQUE', 'JARDIN', 'POLIGONO', 'URBANIZACION', 'RONDA', 'GLORIETA', 'GTA']);
-    const typeSynonymMap = { 'C': 'CALLE', 'C.': 'CALLE', 'C/': 'CALLE', 'AV': 'AVENIDA', 'AV.': 'AVENIDA', 'AVDA': 'AVENIDA', 'Pº': 'PASEO', 'P°': 'PASEO', 'PL': 'PLAZA', 'PL.': 'PLAZA', 'PZ': 'PLAZA', 'GTA': 'GLORIETA' };
-    const stopWords = new Set(['DE', 'DEL', 'LA', 'LAS', 'LOS', 'EL', 'Y', 'I']);
-    const normalized = name.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase();
-    const words = normalized.split(/[^A-Z0-9]+/).filter(Boolean);
-    const foundType = words.find(w => streetTypeWords.has(w)) || null;
-    let canonicalType = foundType;
-    if (foundType && typeSynonymMap[foundType]) {
-        canonicalType = typeSynonymMap[foundType];
-    }
-    const baseWords = words.filter(w => !streetTypeWords.has(w) && !stopWords.has(w));
-    return { type: canonicalType, baseName: baseWords.join(' ') };
-}
-
-// --- Handler Principal (LÓGICA FINAL Y CORREGIDA) ---
+// --- Handler Principal ---
 module.exports = async (request, response) => {
   try {
     const { zone, includePOI } = request.query;
@@ -121,9 +107,6 @@ module.exports = async (request, response) => {
     const initialOsmNames = new Set(initialData.elements.map(el => el.tags.name));
     const streetNamesInPoly = [...initialOsmNames].filter(name => !blockedNames.has(name));
     
-    const allOsmBaseNamesInPoly = new Set(streetNamesInPoly.map(name => extractNameParts(name).baseName));
-    
-    // FASE 1: AGRUPAMIENTO POR NOMBRE BASE
     const groupedByBaseName = new Map();
     for (const osmName of streetNamesInPoly) {
         const parts = extractNameParts(osmName);
@@ -139,7 +122,6 @@ module.exports = async (request, response) => {
     const LINE_TYPES = new Set(['CALLE', 'AVENIDA', 'PASEO', 'RONDA', 'CAMINO', 'CAÑADA', 'CALLEJA', 'CALLEJON']);
     const AREA_TYPES = new Set(['PLAZA', 'PARQUE', 'JARDIN', 'GLORIETA']);
 
-    // FASE 2: PROCESAMIENTO INTELIGENTE DE GRUPOS
     for (const [baseName, group] of groupedByBaseName.entries()) {
         const groupTypes = new Set(group.map(item => item.parts.type));
         
@@ -174,8 +156,7 @@ module.exports = async (request, response) => {
             if (seenIds.has(entity.id)) continue;
             
             const mainOsmName = entity.osmNames[0];
-            // --- CAMBIO 1: Nueva clave de caché con versión y ciudad ---
-            const cacheKey = `street_v9:${currentCity}:${entity.id.replace(/\s/g, '_')}`;
+            const cacheKey = `street_v10:${currentCity}:${entity.id.replace(/\s/g, '_')}`;
             streetData = await kv.get(cacheKey);
 
             if (!streetData) {
@@ -210,27 +191,17 @@ module.exports = async (request, response) => {
                         const osmParts = extractNameParts(mainOsmName);
                         const googleParts = extractNameParts(mostCommonGoogleName);
                         
-                        // --- CAMBIO 2: Nueva Lógica de Validación con Levenshtein ---
                         const osmBaseName = osmParts.baseName;
                         const googleBaseName = googleParts.baseName;
 
-                        // Calculamos la 'distancia de edición' entre los dos nombres.
                         const distance = levenshtein(osmBaseName, googleBaseName);
-
-                        // Establecemos un umbral de tolerancia. Si la diferencia es más de la mitad
-                        // del largo del nombre, es demasiado diferente para ser una simple corrección.
                         const threshold = Math.max(osmBaseName.length, googleBaseName.length) * 0.5;
 
                         if (distance > threshold) {
-                            // DISCREPANCIA ALTA: Los nombres son muy diferentes. Es un error de "salto" de Google.
-                            // Ignoramos a Google y usamos el nombre original de OSM, que es más seguro.
                             processedStreet.displayName = mainOsmName.toUpperCase();
                         } else {
-                            // SIMILITUD ALTA: Los nombres son parecidos. Aceptamos el nombre de Google
-                            // ya que probablemente sea una corrección de formato o una abreviatura.
                             processedStreet.displayName = mostCommonGoogleName;
                         }
-                        // --- FIN: Nueva Lógica de Validación con Levenshtein ---
 
                     } else {
                         processedStreet.displayName = mainOsmName.toUpperCase();
@@ -265,7 +236,6 @@ module.exports = async (request, response) => {
         }
     }
     
-    // Barajamos la lista final solo una vez antes de enviarla
     finalStreetList.sort(() => Math.random() - 0.5);
     response.status(200).json({ streets: finalStreetList });
 

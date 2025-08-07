@@ -29,7 +29,6 @@
     </div>
 
     <div id="admin-panel" class="hidden h-screen w-screen grid grid-cols-1 md:grid-cols-3 gap-4 p-4">
-        <!-- Panel Izquierdo con Pestañas -->
         <div class="flex flex-col bg-gray-800 rounded-lg p-4 overflow-y-auto">
             <div class="flex border-b border-gray-700 mb-4 items-center">
                 <button id="tab-incidents" class="tab-btn active">Incidencias</button>
@@ -47,19 +46,16 @@
             </div>
         </div>
 
-        <!-- Panel de Detalles (Derecha) -->
         <div id="details-panel" class="md:col-span-2 flex flex-col bg-gray-800 rounded-lg p-4">
             <h2 id="details-title" class="text-xl font-semibold text-gray-400">Selecciona un elemento para revisarlo</h2>
             <div id="details-content" class="hidden flex-grow grid grid-rows-2 gap-4 mt-4">
                 <div id="admin-map" class="bg-gray-700 rounded-md"></div>
                 
                 <div class="bg-gray-700 rounded-md p-4 flex flex-col justify-between overflow-y-auto">
-                    <!-- Contenedor para la PREVISUALIZACIÓN -->
                     <div id="preview-container" class="hidden mb-4">
                         <p id="preview-text" class="preview-text"></p>
                     </div>
 
-                    <!-- Contenedor para el FORMULARIO -->
                     <div id="form-container">
                         <div>
                             <p class="text-sm text-gray-400">Descripción del usuario:</p>
@@ -94,7 +90,6 @@
                         </div>
                     </div>
                     
-                    <!-- Contenedor para los BOTONES -->
                     <div id="buttons-container" class="flex gap-4 mt-4">
                         <button id="main-action-btn" class="flex-1 bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg transition-colors flex items-center justify-center gap-2" disabled>Acción Principal</button>
                         <button id="secondary-action-btn" class="flex-1 bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg transition-colors flex items-center justify-center gap-2" disabled>Acción Secundaria</button>
@@ -107,12 +102,10 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
         window.addEventListener('DOMContentLoaded', () => {
-            // --- CONSTANTES Y CLIENTE SUPABASE ---
             const SUPABASE_URL = 'https://hppzwfwtedghpsxfonoh.supabase.co';
             const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhwcHp3Znd0ZWRnaHBzeGZvbm9oIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQxMjQzNDMsImV4cCI6MjA2OTcwMDM0M30.BAh6i5iJ5YkDBoydfkC9azAD4eMdYBkEBdxws9kj5Hg';
             const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-            // --- SELECTORES DOM ---
             const loadingScreen = document.getElementById('loading-screen');
             const loadingText = document.getElementById('loading-text');
             const adminPanel = document.getElementById('admin-panel');
@@ -143,28 +136,23 @@
                 rulesList: document.getElementById('rules-list')
             };
             
-            // --- VARIABLES DE ESTADO ---
             let adminMap, session;
             let selectedItem = null;
 
-            // --- LÓGICA PRINCIPAL ---
             async function checkAdminAccess(user) {
                 const { data: profile, error } = await supabase
                     .from('profiles')
                     .select('role')
                     .eq('id', user.id)
                     .single();
-
                 if (error) {
                     loadingText.innerHTML = `<p class="text-red-500 font-mono">Error al leer el perfil: ${error.message}. <br><br>Esto suele ocurrir por las Políticas de Seguridad (RLS) de la tabla 'profiles'. Asegúrate de que los usuarios autenticados pueden leerla.</p>`;
                     return; 
                 }
-
                 if (!profile) {
                     loadingText.innerHTML = `<p class="text-red-500">Acceso Denegado: No se encontró tu perfil en la tabla 'profiles'.</p>`;
                     return;
                 }
-                
                 if (profile.role !== 'admin') {
                     loadingText.innerHTML = `<p class="text-red-500">Acceso Denegado. Tu rol actual es '${profile.role}'. Debes ser 'admin'.</p>`;
                     setTimeout(() => window.location.href = '/', 4000);
@@ -179,7 +167,6 @@
                 adminMap = L.map('admin-map');
                 L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', { attribution: '© OpenStreetMap contributors, © CARTO' }).addTo(adminMap);
                 adminMap.drawnItems = new L.FeatureGroup().addTo(adminMap);
-                
                 tabs.incidents.addEventListener('click', () => switchTab('incidents'));
                 tabs.rules.addEventListener('click', () => switchTab('rules'));
                 document.querySelectorAll('input[name="resolutionType"]').forEach(radio => radio.addEventListener('change', (e) => {
@@ -205,7 +192,6 @@
                 resetDetailsPanel();
             }
 
-            // --- MANEJO DE INCIDENCIAS ---
             async function fetchIncidents() {
                 content.incidentsList.innerHTML = '<div class="spinner"></div>';
                 const { data, error } = await supabase.from('incidents').select('*').eq('status', 'nuevo').order('created_at', { ascending: true });
@@ -225,8 +211,6 @@
                 selectedItem = { type: 'incident', data: incident };
                 document.querySelectorAll('.list-item').forEach(item => item.classList.remove('selected'));
                 document.querySelector(`.list-item[data-item-id='${incident.id}']`).classList.add('selected');
-                
-                // Configurar la UI para una incidencia
                 detailsPanel.title.classList.add('hidden');
                 detailsPanel.content.classList.remove('hidden');
                 detailsPanel.previewContainer.classList.add('hidden');
@@ -234,24 +218,18 @@
                 detailsPanel.descWrapper.classList.remove('hidden');
                 detailsPanel.resolutionWrapper.classList.remove('hidden');
                 adminMap.drawnItems.clearLayers();
-
-                // Rellenar el formulario
                 detailsPanel.description.textContent = incident.description;
                 detailsPanel.city.value = incident.city || '';
                 const match = incident.description.match(/["'](.*?)["']/) || incident.description.match(/calle (.*?)(?:\s|$)/i);
                 const guessedName = match ? (match[1].startsWith('C.') ? match[1].replace('C. ', 'Calle ') : `Calle ${match[1]}`) : '';
                 detailsPanel.osmName.value = guessedName;
                 detailsPanel.displayName.value = guessedName.toUpperCase();
-
-                // Dibujar en el mapa
                 const points = incident.zone_points.split(';').map(p => {
                     const [lat, lng] = p.split(',');
                     return [parseFloat(lat), parseFloat(lng)];
                 });
                 const polygon = L.polygon(points, {color: '#3b82f6'}).addTo(adminMap.drawnItems);
                 adminMap.fitBounds(polygon.getBounds(), {padding: [50, 50]});
-                
-                // Activar y configurar botones
                 configureButtonsForIncident();
             }
 
@@ -261,7 +239,6 @@
                 const osmName = detailsPanel.osmName.value.trim();
                 const displayName = detailsPanel.displayName.value.trim();
                 let city = detailsPanel.city.value.trim();
-
                 if (action === 'approve') {
                     if (!osmName) { alert('El campo "Nombre en OpenStreetMap" es obligatorio.'); return; }
                     if (selectedActionType === 'override' && !displayName) { alert('El campo "Nombre para el Juego" es obligatorio.'); return; }
@@ -270,7 +247,6 @@
                         if (!city) { alert('La ciudad es necesaria para aprobar.'); return; }
                     }
                 }
-                
                 setButtonsLoading(true);
                 try {
                     const response = await fetch('/api/resolveIncident', {
@@ -289,7 +265,6 @@
                 }
             }
 
-            // --- MANEJO DE REGLAS ---
             async function fetchAndDisplayRules() {
                 content.rulesList.innerHTML = '<div class="spinner"></div>';
                 try {
@@ -297,14 +272,11 @@
                     if (!response.ok) throw new Error('Error al cargar reglas.');
                     const { overrides, blocklist } = await response.json();
                     content.rulesList.innerHTML = '';
-                    
                     if (overrides.length === 0 && blocklist.length === 0) {
                         content.rulesList.innerHTML = '<p>No se han creado reglas todavía.</p>';
                     }
-
                     overrides.forEach(rule => content.rulesList.appendChild(createRuleElement(rule, 'override')));
                     blocklist.forEach(rule => content.rulesList.appendChild(createRuleElement(rule, 'block')));
-                    
                 } catch (error) {
                     content.rulesList.innerHTML = `<p class="text-red-500">${error.message}</p>`;
                 }
@@ -329,7 +301,7 @@
                     if (e.target.classList.contains('action-btn')) return;
                     previewRule(rule, type);
                 });
-                item.querySelector('.delete-btn').addEventListener('click', () => deleteRule(rule.id, type));
+                item.querySelector('.delete-btn').addEventListener('click', () => deleteRule(rule, type));
                 if (isOverride) item.querySelector('.edit-btn').addEventListener('click', () => selectRuleForEditing(rule, type));
                 item.querySelector('.preview-btn').addEventListener('click', () => previewRule(rule, type));
                 return item;
@@ -339,7 +311,6 @@
                 selectedItem = { type: 'rule', data: rule, ruleType: type };
                 document.querySelectorAll('.list-item').forEach(item => item.classList.remove('selected'));
                 document.querySelector(`.list-item[data-item-id='${rule.id}']`).classList.add('selected');
-
                 detailsPanel.title.classList.add('hidden');
                 detailsPanel.content.classList.remove('hidden');
                 detailsPanel.previewContainer.classList.add('hidden');
@@ -347,11 +318,9 @@
                 detailsPanel.descWrapper.classList.add('hidden');
                 detailsPanel.resolutionWrapper.classList.add('hidden');
                 adminMap.drawnItems.clearLayers();
-                
                 detailsPanel.osmName.value = rule.osm_name;
                 detailsPanel.displayName.value = rule.display_name;
                 detailsPanel.city.value = rule.city;
-                
                 configureButtonsForRuleEdit();
             }
 
@@ -361,12 +330,12 @@
                     ruleId: rule.id,
                     osmName: detailsPanel.osmName.value.trim(),
                     displayName: detailsPanel.displayName.value.trim(),
-                    city: detailsPanel.city.value.trim()
+                    city: detailsPanel.city.value.trim(),
+                    oldOsmName: rule.osm_name
                 };
                 if (!body.osmName || !body.displayName || !body.city) {
                     alert("Todos los campos son obligatorios para guardar."); return;
                 }
-
                 setButtonsLoading(true);
                 try {
                     const response = await fetch('/api/manageRules', {
@@ -375,7 +344,8 @@
                         body: JSON.stringify(body)
                     });
                     if (!response.ok) { const err = await response.json(); throw new Error(err.details || err.error); }
-                    alert('Regla actualizada con éxito.');
+                    const result = await response.json();
+                    alert(result.message);
                     resetDetailsPanel();
                     fetchAndDisplayRules();
                 } catch (error) {
@@ -385,16 +355,18 @@
                 }
             }
 
-            async function deleteRule(ruleId, type) {
+            async function deleteRule(rule, type) {
+                const { id: ruleId, osm_name: osmName, city } = rule;
                 if (!confirm(`¿Seguro que quieres eliminar esta regla de ${type}? Esta acción no se puede deshacer.`)) return;
                 try {
                      const response = await fetch('/api/manageRules', {
                         method: 'DELETE',
                         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
-                        body: JSON.stringify({ ruleId, type })
+                        body: JSON.stringify({ ruleId, type, osmName, city })
                     });
                     if (!response.ok) { const err = await response.json(); throw new Error(err.details || err.error); }
-                    alert('Regla eliminada.');
+                    const result = await response.json();
+                    alert(result.message);
                     if (selectedItem && selectedItem.data.id === ruleId) resetDetailsPanel();
                     fetchAndDisplayRules();
                 } catch (error) {
@@ -406,34 +378,26 @@
                 selectedItem = { type: 'rule', data: rule, ruleType: type };
                 document.querySelectorAll('.list-item').forEach(item => item.classList.remove('selected'));
                 document.querySelector(`.list-item[data-item-id='${rule.id}']`).classList.add('selected');
-
                 detailsPanel.title.classList.add('hidden');
                 detailsPanel.content.classList.remove('hidden');
                 detailsPanel.formContainer.classList.add('hidden');
                 detailsPanel.previewContainer.classList.remove('hidden');
                 detailsPanel.previewText.innerHTML = '<div class="spinner mx-auto"></div>';
-                
-                // Desactivamos los botones principales durante la previsualización
                 detailsPanel.mainBtn.disabled = true;
                 detailsPanel.secondaryBtn.disabled = true;
-                
                 try {
                     const response = await fetch(`/api/getStreetPreview?osmName=${encodeURIComponent(rule.osm_name)}&city=${encodeURIComponent(rule.city)}`, {
                         headers: { 'Authorization': `Bearer ${session.access_token}` }
                     });
                     if (!response.ok) { const err = await response.json(); throw new Error(err.details || err.error); }
-                    
                     const { geometries } = await response.json();
                     adminMap.drawnItems.clearLayers();
-                    
                     if (geometries.length === 0) {
                         detailsPanel.previewText.textContent = 'No se encontró la geometría para esta calle.';
                         return;
                     }
-                    
                     const displayName = type === 'override' ? rule.display_name : rule.osm_name;
                     detailsPanel.previewText.textContent = `¿Dónde está «${displayName.toUpperCase()}»?`;
-                    
                     const featureGroup = L.featureGroup();
                     geometries.forEach(geom => {
                         const style = { color: '#007a2f', weight: geom.isClosed ? 4 : 8, fillOpacity: 0.2 };
@@ -442,22 +406,18 @@
                     });
                     featureGroup.addTo(adminMap.drawnItems);
                     adminMap.fitBounds(featureGroup.getBounds(), { padding: [50, 50] });
-
                 } catch (error) {
                     detailsPanel.previewText.textContent = `Error en previsualización: ${error.message}`;
                     console.error("Error detallado en previewRule:", error);
                 }
             }
             
-            // --- FUNCIONES AUXILIARES DE UI ---
             function resetDetailsPanel() {
                 selectedItem = null;
                 detailsPanel.title.classList.remove('hidden');
                 detailsPanel.content.classList.add('hidden');
                 adminMap.drawnItems.clearLayers();
                 document.querySelectorAll('.list-item').forEach(item => item.classList.remove('selected'));
-                
-                // Reseteo completo de botones
                 detailsPanel.mainBtn.disabled = true;
                 detailsPanel.secondaryBtn.disabled = true;
                 detailsPanel.mainBtn.textContent = 'Acción Principal';
@@ -475,7 +435,6 @@
                 } else {
                     detailsPanel.mainBtn.disabled = false;
                     detailsPanel.secondaryBtn.disabled = false;
-                    // Restaurar texto basado en el contexto
                     if (context === 'incident') configureButtonsForIncident();
                     if (context === 'rule') configureButtonsForRuleEdit();
                 }
@@ -501,7 +460,6 @@
                 detailsPanel.secondaryBtn.onclick = resetDetailsPanel;
             }
 
-            // --- INICIALIZACIÓN Y AUTH ---
             supabase.auth.onAuthStateChange((event, s) => {
                 session = s;
                 if (event === 'INITIAL_SESSION' || event === 'SIGNED_IN') {

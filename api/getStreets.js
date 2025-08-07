@@ -1,3 +1,5 @@
+// RUTA: /api/getStreets.js
+
 const { createClient } = require('@supabase/supabase-js');
 const { createClient: createKvClient } = require('@vercel/kv');
 const { extractNameParts } = require('./_lib/helpers.js');
@@ -162,8 +164,14 @@ module.exports = async (request, response) => {
             if (!streetData) {
                 let processedStreet = {};
                 const rule = entity.osmNames.reduce((acc, name) => acc || overrideRules.get(name), null);
+                
+                // ===================== INICIO DEL CAMBIO =====================
+                // Forzamos un radio de búsqueda grande (5km) para la geometría completa,
+                // asegurando que se encuentren todos los segmentos, incluso si están lejos.
+                const geometrySearchRadius = Math.max(radius, 5000); 
+                const queryNames = entity.osmNames.map(n => `way["name"="${n}"](around:${geometrySearchRadius}, ${center.lat}, ${center.lng});`).join('');
+                // ====================== FIN DEL CAMBIO =======================
 
-                const queryNames = entity.osmNames.map(n => `way["name"="${n}"](around:${radius}, ${center.lat}, ${center.lng});`).join('');
                 const geometryQuery = `[out:json][timeout:25]; (${queryNames}); out body; >; out skel qt;`;
                 res = await fetch('https://overpass-api.de/api/interpreter', { method: 'POST', body: geometryQuery });
                 const geomData = await res.json();

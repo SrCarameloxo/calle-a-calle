@@ -21,9 +21,11 @@
 </head>
 <body class="font-sans">
 
-    <div id="loading-screen" class="fixed inset-0 bg-gray-900 flex items-center justify-center z-50">
-        <div class="spinner"></div>
-        <p class="ml-4">Verificando acceso de administrador...</p>
+    <div id="loading-screen" class="fixed inset-0 bg-gray-900 flex items-center justify-center z-50 p-8 text-center">
+        <div>
+            <div class="spinner mx-auto mb-4"></div>
+            <p id="loading-text" class="ml-4">Verificando acceso de administrador...</p>
+        </div>
     </div>
 
     <div id="admin-panel" class="hidden h-screen w-screen grid grid-cols-1 md:grid-cols-3 gap-4 p-4">
@@ -107,17 +109,18 @@
         window.addEventListener('DOMContentLoaded', () => {
             // --- CONSTANTES Y CLIENTE SUPABASE ---
             const SUPABASE_URL = 'https://hppzwfwtedghpsxfonoh.supabase.co';
-            const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhwcHp3Znd0ZWRnaHBzeGZvbm9oIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQxMjQzNDMsImV4cCI6MjA2OTcwMDM0M30.BAh6iJ5YkDBoydfkC9azAD4eMdYBkEBdxws9kj5Hg';
+            const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhwcHp3Znd0ZWRnaHBzeGZvbm9oIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQxMjQzNDMsImV4cCI6MjA2OTcwMDM0M30.BAh6i5iJ5YkDBoydfkC9azAD4eMdYBkEBdxws9kj5Hg';
             const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
             // --- SELECTORES DOM ---
             const loadingScreen = document.getElementById('loading-screen');
+            const loadingText = document.getElementById('loading-text');
             const adminPanel = document.getElementById('admin-panel');
             const detailsPanel = {
                 title: document.getElementById('details-title'),
                 content: document.getElementById('details-content'),
                 description: document.getElementById('incident-description'),
-                descWrapper: document.querySelector('p.text-sm:nth-child(1)'),
+                descWrapper: document.querySelector('#form-container > div:nth-child(1)'),
                 osmName: document.getElementById('osm-name-input'),
                 displayName: document.getElementById('display-name-input'),
                 city: document.getElementById('city-input'),
@@ -142,15 +145,40 @@
             
             // --- VARIABLES DE ESTADO ---
             let adminMap, session;
-            let selectedItem = null; // Puede ser una incidencia o una regla
+            let selectedItem = null;
 
             // --- LÓGICA PRINCIPAL ---
+
+            // ESTA ES LA FUNCIÓN CORREGIDA
             async function checkAdminAccess(user) {
-                const { data: profile, error } = await supabase.from('profiles').select('role').eq('id', user.id).single();
-                if (error || !profile || profile.role !== 'admin') {
-                    loadingScreen.innerHTML = '<p class="text-red-500">Acceso Denegado. Debes ser administrador.</p>';
-                    setTimeout(() => window.location.href = '/', 2000);
+                console.log('Verificando acceso para el usuario:', user);
+                
+                const { data: profile, error } = await supabase
+                    .from('profiles')
+                    .select('role')
+                    .eq('id', user.id)
+                    .single();
+
+                if (error) {
+                    console.error('Error al obtener el perfil desde Supabase:', error);
+                    loadingText.innerHTML = `<p class="text-red-500 font-mono">Error al leer el perfil: ${error.message}. <br><br>Esto suele ocurrir por las Políticas de Seguridad (RLS) de la tabla 'profiles'. Asegúrate de que los usuarios autenticados pueden leerla.</p>`;
+                    return; 
+                }
+
+                if (!profile) {
+                    console.error('No se encontró un perfil para el ID de usuario:', user.id);
+                    loadingText.innerHTML = `<p class="text-red-500">Acceso Denegado: No se encontró tu perfil en la tabla 'profiles'.</p>`;
+                    return;
+                }
+                
+                console.log('Perfil obtenido:', profile);
+
+                if (profile.role !== 'admin') {
+                    console.warn(`Acceso denegado. El rol del usuario es '${profile.role}', pero se requiere 'admin'.`);
+                    loadingText.innerHTML = `<p class="text-red-500">Acceso Denegado. Tu rol actual es '${profile.role}'. Debes ser 'admin'.</p>`;
+                    setTimeout(() => window.location.href = '/', 4000);
                 } else {
+                    console.log('¡Acceso concedido! El usuario es administrador.');
                     loadingScreen.classList.add('hidden');
                     adminPanel.classList.remove('hidden');
                     initAdminPanel();
@@ -208,7 +236,7 @@
                 document.querySelectorAll('.list-item').forEach(item => item.classList.remove('selected'));
                 document.querySelector(`.list-item[data-item-id='${incident.id}']`).classList.add('selected');
                 
-                resetDetailsPanel(false); // No ocultar, solo resetear
+                resetDetailsPanel(false); 
                 detailsPanel.title.classList.add('hidden');
                 detailsPanel.content.classList.remove('hidden');
                 detailsPanel.formContainer.classList.remove('hidden');
@@ -443,7 +471,6 @@
                     detailsPanel.mainBtn.disabled = true;
                     detailsPanel.secondaryBtn.disabled = true;
                 } else {
-                    // El texto se restaura en las funciones de configuración
                     detailsPanel.mainBtn.disabled = false;
                     detailsPanel.secondaryBtn.disabled = false;
                 }
@@ -473,8 +500,12 @@
             supabase.auth.onAuthStateChange((event, s) => {
                 session = s;
                 if (event === 'INITIAL_SESSION' || event === 'SIGNED_IN') {
-                    if (session) checkAdminAccess(session.user);
-                    else window.location.href = '/';
+                    if (session) {
+                        checkAdminAccess(session.user);
+                    } else {
+                        // Si no hay sesión, redirigir a la página principal para iniciar sesión.
+                        window.location.href = '/';
+                    }
                 } else if (event === 'SIGNED_OUT') {
                     window.location.href = '/';
                 }

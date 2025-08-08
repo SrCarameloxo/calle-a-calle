@@ -282,7 +282,10 @@ window.addEventListener('DOMContentLoaded', () => {
 
   function startDrawing(){
     updatePanelUI(() => {
-        ['end-game-options', 'drawZone', 'loaded-zone-options', 'game-interface', 'back-to-menu-btn', 'back-from-review-btn'].forEach(id => document.getElementById(id).classList.add('hidden'));
+        ['end-game-options', 'drawZone', 'loaded-zone-options', 'game-interface', 'back-to-menu-btn', 'back-from-review-btn'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.classList.add('hidden');
+        });
         if (userProfile.showDrawHelp) drawHelpContainer.classList.remove('hidden');
         checkboxWrapper.classList.remove('hidden');
         startOptions.classList.remove('hidden');
@@ -544,7 +547,10 @@ window.addEventListener('DOMContentLoaded', () => {
     clear(true);
     updatePanelUI(() => {
         ['start-options', 'loaded-zone-options', 'checkbox-wrapper', 'game-interface', 'end-game-options', 'back-from-review-btn'].forEach(id => {
-            document.getElementById(id).classList.add('hidden');
+            const el = document.getElementById(id);
+            if (el) {
+                el.classList.add('hidden');
+            }
         });
         drawZoneBtn.classList.remove('hidden');
         if (zonePoly) gameMap.removeLayer(zonePoly);

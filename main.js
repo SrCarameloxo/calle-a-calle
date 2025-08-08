@@ -733,5 +733,4 @@ actionsDiv.appendChild(deleteBtn);
   
   googleLoginBtn.addEventListener('click', signInWithGoogle);
   supabaseClient.auth.onAuthStateChange(handleAuthStateChange);
-});```
-
+});

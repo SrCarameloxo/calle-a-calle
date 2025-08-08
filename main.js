@@ -223,6 +223,7 @@ window.addEventListener('DOMContentLoaded', () => {
       playing = true; qIdx = 0; streetsGuessedCorrectly = 0; currentStreak = 0;
       updatePanelUI(() => {
           gameInterface.classList.remove('hidden');
+          progressBar.style.width = '0%'; // Asegurar que la barra empieza a cero
       });
       gameMap.fitBounds(zonePoly.getBounds(), { padding: [50, 50] });
       nextQ();
@@ -342,7 +343,6 @@ window.addEventListener('DOMContentLoaded', () => {
             streakDisplay.textContent = `¡Racha de ${currentStreak}!`;
             streakDisplay.classList.add('visible');
         }
-        // CORRECCIÓN: La barra de progreso avanza aquí
         const progress = totalQuestions > 0 ? (streetsGuessedCorrectly / totalQuestions) * 100 : 0;
         progressBar.style.width = `${progress}%`;
 
@@ -424,7 +424,7 @@ window.addEventListener('DOMContentLoaded', () => {
         gameInterface.classList.add('hidden');
         finalScoreEl.textContent = `¡Partida terminada! Puntuación: ${streetsGuessedCorrectly} / ${totalQuestions}`;
         endGameOptions.classList.remove('hidden');
-        backToMenuBtn.classList.remove('hidden'); // CORRECCIÓN: Mostrar botón aquí
+        backToMenuBtn.classList.remove('hidden');
 
         if (zonePoly) {
             zonePoly.setStyle({ color: '#696969', weight: 2, dashArray: '5, 5', fillOpacity: 0.05 });
@@ -445,24 +445,51 @@ window.addEventListener('DOMContentLoaded', () => {
       const bounds = L.latLngBounds();
       const reviewColors = ['#E63946', '#457B9D', '#F4A261', '#2A9D8F', '#E9C46A', '#264653', '#F77F00', '#7209B7'];
       reviewLayer = L.layerGroup().addTo(gameMap);
+      const labels = new Map();
 
-      lastGameStreetList.forEach((street, index) => {
-          const color = reviewColors[index % reviewColors.length];
+      lastGameStreetList.forEach(street => {
+          let longestSegment = { length: 0, points: null };
           street.geometries.forEach(geom => {
+              if (geom.points.length > 1) {
+                  let segmentLength = 0;
+                  for (let i = 0; i < geom.points.length - 1; i++) {
+                      segmentLength += L.latLng(geom.points[i]).distanceTo(L.latLng(geom.points[i+1]));
+                  }
+                  if (segmentLength > longestSegment.length) {
+                      longestSegment = { length: segmentLength, points: geom.points };
+                  }
+              }
+          });
+          if (!labels.has(street.googleName)) {
+              labels.set(street.googleName, longestSegment);
+          }
+      });
+
+      let colorIndex = 0;
+      labels.forEach((segment, name) => {
+          const color = reviewColors[colorIndex % reviewColors.length];
+          const allGeomsOfThisStreet = lastGameStreetList.filter(s => s.googleName === name).flatMap(s => s.geometries);
+          
+          allGeomsOfThisStreet.forEach(geom => {
               const layer = geom.isClosed 
                   ? L.polygon(geom.points, { color, weight: 4, fillOpacity: 0.3 })
                   : L.polyline(geom.points, { color, weight: 8 });
-              
-              layer.bindTooltip(street.googleName, { permanent: true, direction: 'center', className: 'street-tooltip' }).openTooltip();
               layer.addTo(reviewLayer);
               bounds.extend(layer.getBounds());
           });
+
+          if (segment.points) {
+              const center = L.polyline(segment.points).getCenter();
+              L.marker(center, { opacity: 0 }).addTo(reviewLayer).bindTooltip(name, { permanent: true, direction: 'center', className: 'street-tooltip' }).openTooltip();
+          }
+          colorIndex++;
       });
 
       if (bounds.isValid()) gameMap.fitBounds(bounds, { padding: [50, 50] });
       
       updatePanelUI(() => {
           endGameOptions.classList.add('hidden');
+          backToMenuBtn.classList.add('hidden');
           backFromReviewBtn.classList.remove('hidden');
       });
   }
@@ -473,7 +500,7 @@ window.addEventListener('DOMContentLoaded', () => {
       if (oldZonePoly && !gameMap.hasLayer(oldZonePoly)) {
           oldZonePoly.addTo(gameMap);
       }
-      gameMap.fitBounds(oldZonePoly.getBounds(), { padding: [50, 50] });
+      if (oldZonePoly) gameMap.fitBounds(oldZonePoly.getBounds(), { padding: [50, 50] });
 
       updatePanelUI(() => {
           backFromReviewBtn.classList.add('hidden');
@@ -493,7 +520,7 @@ window.addEventListener('DOMContentLoaded', () => {
   function nextQ(){
     checkAndRecenterMap();
     clear();
-    if(qIdx >= totalQuestions){ 
+    if(qIdx >= totalQuestions){
         setTimeout(endGame, 500);
         return; 
     }
@@ -525,7 +552,6 @@ window.addEventListener('DOMContentLoaded', () => {
         zonePoly = oldZonePoly = null;
         zonePoints = [];
         playing = false;
-        // Resetear la barra de progreso a cero para la próxima partida
         progressBar.style.width = '0%';
     });
   }
@@ -570,15 +596,13 @@ window.addEventListener('DOMContentLoaded', () => {
     gameMap.fitBounds(zonePoly.getBounds(), { padding: [50, 50] });
   }
 
-  // --- FUNCIONES RESTAURADAS Y/O MOVIDAS ---
-
   function repeatLastZone() {
       if (lastGameZonePoints.length < 3 || lastGameStreetList.length === 0) return;
       clear(true);
       if (zonePoly) gameMap.removeLayer(zonePoly);
       
       updatePanelUI(() => {
-          ['drawZone', 'end-game-options', 'start-options', 'loaded-zone-options', 'back-to-menu-btn'].forEach(id => document.getElementById(id).classList.add('hidden'));
+          ['drawZone', 'end-game-options', 'start-options', 'loaded-zone-options', 'back-to-menu-btn', 'back-from-review-btn'].forEach(id => document.getElementById(id).classList.add('hidden'));
       });
       
       zonePoints = [...lastGameZonePoints];

@@ -282,7 +282,7 @@ window.addEventListener('DOMContentLoaded', () => {
 
   function startDrawing(){
     updatePanelUI(() => {
-        ['end-game-options', 'drawZone', 'loaded-zone-options', 'game-interface', 'back-to-menu-btn', 'back-from-review-btn'].forEach(id => {
+        ['end-game-options', 'drawZone', 'loaded-zone-options', 'game-interface', 'back-from-review-btn'].forEach(id => {
             const el = document.getElementById(id);
             if (el) el.classList.add('hidden');
         });

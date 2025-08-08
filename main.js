@@ -79,7 +79,6 @@ window.addEventListener('DOMContentLoaded', () => {
   async function fetchUserProfile(user) {
     if (!user) return;
     try {
-        // CORRECCIÓN: Cambiado 'show_draw_help' a 'mostrar_ayuda_dibujo' para coincidir con la DB
         const { data: profile, error } = await supabaseClient.from('profiles').select('role, subscribed_city, mostrar_ayuda_dibujo').eq('id', user.id).single();
         if (error) {
             if (error.code === 'PGRST116') {
@@ -91,7 +90,7 @@ window.addEventListener('DOMContentLoaded', () => {
         userProfile.id = user.id;
         userProfile.role = profile.role;
         userProfile.subscribedCity = profile.subscribed_city;
-        userProfile.showDrawHelp = profile.mostrar_ayuda_dibujo; // CORRECCIÓN
+        userProfile.showDrawHelp = profile.mostrar_ayuda_dibujo;
         
         if (profile.role === 'admin') adminPanelBtn.classList.remove('hidden');
         if (profile.subscribed_city) {
@@ -189,7 +188,7 @@ window.addEventListener('DOMContentLoaded', () => {
     scoreDisplayToggle.addEventListener('click', toggleScoreDisplay);
 
     reviewGameBtn.addEventListener('click', enterReviewMode);
-    repeatZoneBtn.addEventListener('click', repeatLastZone); // CORRECCIÓN: Typo corregido
+    repeatZoneBtn.addEventListener('click', repeatLastZone);
     saveZoneBtn.addEventListener('click', saveCurrentZone);
     backToMenuBtn.addEventListener('click', resetToInitialView);
 
@@ -201,7 +200,6 @@ window.addEventListener('DOMContentLoaded', () => {
       drawHelpContainer.classList.add('hidden');
       if (userProfile.id) {
           userProfile.showDrawHelp = false;
-          // CORRECCIÓN: Cambiado 'show_draw_help' a 'mostrar_ayuda_dibujo'
           const { error } = await supabaseClient.from('profiles').update({ mostrar_ayuda_dibujo: false }).eq('id', userProfile.id);
           if(error) console.error("Error al guardar preferencia de ayuda:", error);
       }
@@ -471,7 +469,7 @@ window.addEventListener('DOMContentLoaded', () => {
       
       updatePanelUI(() => {
           endGameOptions.classList.add('hidden');
-          backToMenuBtn.classList.remove('hidden'); // CORRECCIÓN: Mostrar botón para salir
+          backToMenuBtn.classList.remove('hidden');
       });
   }
 
@@ -487,7 +485,13 @@ window.addEventListener('DOMContentLoaded', () => {
   function nextQ(){
     checkAndRecenterMap();
     clear();
-    if(qIdx >= totalQuestions){ endGame(); return; }
+    if(qIdx >= totalQuestions){ 
+        // Actualizar la barra al 100% al final
+        progressBar.style.width = '100%';
+        progressCounter.textContent = `${totalQuestions} / ${totalQuestions}`;
+        setTimeout(endGame, 500); // Dar tiempo a ver la barra llena
+        return; 
+    }
     
     gameMap.on('click', onMapClick);
     const s = streetList[qIdx];
@@ -498,13 +502,12 @@ window.addEventListener('DOMContentLoaded', () => {
         updateScoreDisplay();
         if (currentStreak < 3) streakDisplay.classList.remove('visible');
 
-        // CORRECCIÓN: La barra de progreso se basa en preguntas completadas (qIdx)
         const progress = totalQuestions > 0 ? (qIdx / totalQuestions) * 100 : 0;
         progressBar.style.width = `${progress}%`;
         progressCounter.textContent = `${qIdx + 1} / ${totalQuestions}`;
     });
 
-    qIdx++; // Se incrementa después de usar el valor actual
+    qIdx++;
     nextBtn.disabled = true;
   }
   
@@ -516,7 +519,8 @@ window.addEventListener('DOMContentLoaded', () => {
         });
         drawZoneBtn.classList.remove('hidden');
         if (zonePoly) gameMap.removeLayer(zonePoly);
-        zonePoly = null;
+        if (oldZonePoly) gameMap.removeLayer(oldZonePoly);
+        zonePoly = oldZonePoly = null;
         zonePoints = [];
         playing = false;
     });
@@ -563,6 +567,24 @@ window.addEventListener('DOMContentLoaded', () => {
   }
 
   // --- FUNCIONES RESTAURADAS ---
+
+  // CORRECCIÓN: La función repeatLastZone estaba ausente
+  function repeatLastZone() {
+      if (lastGameZonePoints.length < 3 || lastGameStreetList.length === 0) return;
+      clear(true);
+      if (zonePoly) gameMap.removeLayer(zonePoly);
+      
+      updatePanelUI(() => {
+          ['drawZone', 'end-game-options', 'start-options', 'loaded-zone-options', 'back-to-menu-btn'].forEach(id => document.getElementById(id).classList.add('hidden'));
+      });
+      
+      zonePoints = [...lastGameZonePoints];
+      zonePoly = L.polygon(zonePoints, { color: COL_ZONE, weight: 2, fillOpacity: 0.1 }).addTo(gameMap);
+      streetList = [...lastGameStreetList].sort(() => Math.random() - 0.5);
+      totalQuestions = streetList.length;
+      
+      startGameFlow();
+  }
 
   async function reportIncident() {
     if (lastGameZonePoints.length === 0) {

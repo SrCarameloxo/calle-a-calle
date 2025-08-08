@@ -58,18 +58,28 @@ button.game-control-btn {
 button.game-control-btn:not(:disabled):active { transform: scale(0.97); }
 button.game-control-btn:disabled { opacity: .4; cursor: default; }
 
-/* --- Colores de Botones (Regla Actualizada) --- */
-#drawZone, #start, #next, #startLoadedZone { background: #007BFF; color: #fff; }
-#drawZone:not(:disabled):hover, #start:not(:disabled):hover, #next:not(:disabled):hover, #startLoadedZone:not(:disabled):hover { background-color: #0069d9; }
+/* --- Paleta de Colores Lógica para Botones --- */
 
+/* Azul para Navegación/Inicio */
+#drawZone, #start, #next, #startLoadedZone, #back-to-menu-btn { background: #007BFF; color: #fff; }
+#drawZone:not(:disabled):hover, #start:not(:disabled):hover, #next:not(:disabled):hover, #startLoadedZone:not(:disabled):hover, #back-to-menu-btn:not(:disabled):hover { background-color: #0069d9; }
+
+/* Rojo para Cancelar/Retroceder */
 #undoPoint, #drawNewZone { background-color: #c82333; color: #fff; }
 #undoPoint:not(:disabled):hover, #drawNewZone:not(:disabled):hover { background-color: #a71d2a; }
 
-#repeatZone, #review-game-btn { background-color: #28a745; color: #fff; }
-#repeatZone:not(:disabled):hover, #review-game-btn:not(:disabled):hover { background-color: #218838; }
+/* Verde para Jugar/Repetir */
+#repeatZone { background-color: #28a745; color: #fff; }
+#repeatZone:not(:disabled):hover { background-color: #218838; }
 
-#saveZoneBtn, #back-to-menu-btn { background-color: #ffc107; color: black; }
-#saveZoneBtn:not(:disabled):hover, #back-to-menu-btn:not(:disabled):hover { background-color: #e0a800; }
+/* Amarillo para Utilidades */
+#saveZoneBtn { background-color: #ffc107; color: black; }
+#saveZoneBtn:not(:disabled):hover { background-color: #e0a800; }
+
+/* Morado para Revisión */
+#review-game-btn { background-color: #663399; color: #fff; }
+#review-game-btn:not(:disabled):hover { background-color: #562b83; }
+
 
 /* --- TÍTULO Y OTROS --- */
 .gradient-text {
@@ -86,6 +96,16 @@ button.game-control-btn:disabled { opacity: .4; cursor: default; }
     100% { stroke-width: 8; stroke: #007a2f; opacity: 0.8; }
 }
 .street-reveal-animation { animation: pulseAndFlash 0.8s ease-out; }
+.street-tooltip {
+    background-color: rgba(0, 0, 0, 0.7);
+    color: white;
+    border: none;
+    font-weight: bold;
+    padding: 4px 8px;
+    border-radius: 4px;
+    box-shadow: none;
+}
+
 
 /* --- ESTILOS CHECKBOX --- */
 .checkbox-wrapper { padding: 10px 0; }
@@ -114,6 +134,7 @@ button.game-control-btn:disabled { opacity: .4; cursor: default; }
     cursor: pointer;
     border-radius: 4px;
     padding: 2px 4px;
+    text-align: center;
 }
 .score-display-toggle:hover {
     background-color: rgba(0,0,0,0.05);
@@ -137,11 +158,12 @@ button.game-control-btn:disabled { opacity: .4; cursor: default; }
     font-size: 1.2rem;
     line-height: 1;
     color: #555;
+    padding: 0;
+    margin: 0;
 }
 #dismiss-draw-help:hover {
     color: #000;
 }
-
 
 /* Contenedor principal del componente de la barra */
 #progress-component {
@@ -164,7 +186,7 @@ button.game-control-btn:disabled { opacity: .4; cursor: default; }
 
 /* Texto de la racha (oculto por defecto) */
 .streak-text {
-    color: #f97738; /* Color naranja */
+    color: #f97738;
     font-weight: bold;
     opacity: 0; 
     transition: opacity 0.3s ease;

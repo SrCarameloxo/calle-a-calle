@@ -223,7 +223,7 @@ window.addEventListener('DOMContentLoaded', () => {
       playing = true; qIdx = 0; streetsGuessedCorrectly = 0; currentStreak = 0;
       updatePanelUI(() => {
           gameInterface.classList.remove('hidden');
-          progressBar.style.width = '0%'; // Asegurar que la barra empieza a cero
+          progressBar.style.width = '0%';
       });
       gameMap.fitBounds(zonePoly.getBounds(), { padding: [50, 50] });
       nextQ();
@@ -424,8 +424,7 @@ window.addEventListener('DOMContentLoaded', () => {
         gameInterface.classList.add('hidden');
         finalScoreEl.textContent = `¡Partida terminada! Puntuación: ${streetsGuessedCorrectly} / ${totalQuestions}`;
         endGameOptions.classList.remove('hidden');
-        backToMenuBtn.classList.remove('hidden');
-
+        
         if (zonePoly) {
             zonePoly.setStyle({ color: '#696969', weight: 2, dashArray: '5, 5', fillOpacity: 0.05 });
             oldZonePoly = zonePoly;
@@ -448,7 +447,7 @@ window.addEventListener('DOMContentLoaded', () => {
       const labels = new Map();
 
       lastGameStreetList.forEach(street => {
-          let longestSegment = { length: 0, points: null };
+          let longestSegment = { length: 0, layer: null };
           street.geometries.forEach(geom => {
               if (geom.points.length > 1) {
                   let segmentLength = 0;
@@ -456,17 +455,18 @@ window.addEventListener('DOMContentLoaded', () => {
                       segmentLength += L.latLng(geom.points[i]).distanceTo(L.latLng(geom.points[i+1]));
                   }
                   if (segmentLength > longestSegment.length) {
-                      longestSegment = { length: segmentLength, points: geom.points };
+                      const layer = geom.isClosed ? L.polygon(geom.points) : L.polyline(geom.points);
+                      longestSegment = { length: segmentLength, layer: layer };
                   }
               }
           });
-          if (!labels.has(street.googleName)) {
+          if (longestSegment.layer && (!labels.has(street.googleName) || longestSegment.length > labels.get(street.googleName).length)) {
               labels.set(street.googleName, longestSegment);
           }
       });
 
       let colorIndex = 0;
-      labels.forEach((segment, name) => {
+      labels.forEach((segmentData, name) => {
           const color = reviewColors[colorIndex % reviewColors.length];
           const allGeomsOfThisStreet = lastGameStreetList.filter(s => s.googleName === name).flatMap(s => s.geometries);
           
@@ -478,10 +478,7 @@ window.addEventListener('DOMContentLoaded', () => {
               bounds.extend(layer.getBounds());
           });
 
-          if (segment.points) {
-              const center = L.polyline(segment.points).getCenter();
-              L.marker(center, { opacity: 0 }).addTo(reviewLayer).bindTooltip(name, { permanent: true, direction: 'center', className: 'street-tooltip' }).openTooltip();
-          }
+          segmentData.layer.bindTooltip(name, { permanent: true, direction: 'center', className: 'street-tooltip' }).openTooltip();
           colorIndex++;
       });
 
@@ -489,7 +486,6 @@ window.addEventListener('DOMContentLoaded', () => {
       
       updatePanelUI(() => {
           endGameOptions.classList.add('hidden');
-          backToMenuBtn.classList.add('hidden');
           backFromReviewBtn.classList.remove('hidden');
       });
   }
@@ -520,7 +516,7 @@ window.addEventListener('DOMContentLoaded', () => {
   function nextQ(){
     checkAndRecenterMap();
     clear();
-    if(qIdx >= totalQuestions){
+    if(qIdx >= totalQuestions){ 
         setTimeout(endGame, 500);
         return; 
     }
@@ -533,6 +529,7 @@ window.addEventListener('DOMContentLoaded', () => {
         gameQuestion.textContent = `¿Dónde está «${s.googleName}»?`;
         updateScoreDisplay();
         if (currentStreak < 3) streakDisplay.classList.remove('visible');
+        
         progressCounter.textContent = `${qIdx + 1} / ${totalQuestions}`;
     });
 

@@ -140,7 +140,22 @@ window.addEventListener('DOMContentLoaded', () => {
   }
   
   function setupMenu() {
-    openMenuBtn.addEventListener('click', () => menuContentPanel.classList.toggle('hidden'));
+    const handleOutsideClick = (event) => {
+        if (!menuContentPanel.classList.contains('hidden') && !menuContentPanel.contains(event.target) && !openMenuBtn.contains(event.target)) {
+            menuContentPanel.classList.add('hidden');
+            document.removeEventListener('click', handleOutsideClick);
+        }
+    };
+    openMenuBtn.addEventListener('click', (event) => {
+        event.stopPropagation();
+        const isHidden = menuContentPanel.classList.toggle('hidden');
+        if (!isHidden) {
+            document.addEventListener('click', handleOutsideClick);
+        } else {
+            document.removeEventListener('click', handleOutsideClick);
+        }
+    });
+
     document.querySelectorAll('.menu-tab-btn').forEach(button => {
       button.addEventListener('click', async () => {
         const panelId = button.dataset.panel;
@@ -225,7 +240,7 @@ window.addEventListener('DOMContentLoaded', () => {
           gameInterface.classList.remove('hidden');
           progressBar.style.width = '0%';
       });
-      gameMap.fitBounds(zonePoly.getBounds(), { padding: [50, 50] });
+      recenterMapWithPadding();
       nextQ();
   }
 
@@ -466,7 +481,9 @@ window.addEventListener('DOMContentLoaded', () => {
           });
       });
 
-      if (bounds.isValid()) gameMap.fitBounds(bounds, { padding: [50, 50] });
+      if (bounds.isValid()) {
+          recenterMapWithPadding(bounds);
+      }
       
       updatePanelUI(() => {
           endGameOptions.classList.add('hidden');
@@ -480,25 +497,28 @@ window.addEventListener('DOMContentLoaded', () => {
       if (oldZonePoly && !gameMap.hasLayer(oldZonePoly)) {
           oldZonePoly.addTo(gameMap);
       }
-      if (oldZonePoly) gameMap.fitBounds(oldZonePoly.getBounds(), { padding: [50, 50] });
+      if (oldZonePoly) recenterMapWithPadding(oldZonePoly.getBounds());
 
       updatePanelUI(() => {
           backFromReviewBtn.classList.add('hidden');
           endGameOptions.classList.remove('hidden');
       });
   }
+  
+  function recenterMapWithPadding(bounds = null) {
+      if (!gameMap) return;
+      const targetBounds = bounds || (zonePoly ? zonePoly.getBounds() : null);
+      if (!targetBounds || !targetBounds.isValid()) return;
 
-  function checkAndRecenterMap() {
-      if (!gameMap || !zonePoly) return;
-      const mapBounds = gameMap.getBounds();
-      const polyBounds = zonePoly.getBounds();
-      if (!mapBounds.contains(polyBounds)) {
-          gameMap.flyToBounds(polyBounds, { padding: [50, 50], duration: 1.2 });
-      }
+      const panelWidth = gameUiContainer.offsetWidth;
+      gameMap.fitBounds(targetBounds, {
+          paddingTopLeft: [panelWidth + 20, 20],
+          paddingBottomRight: [20, 20]
+      });
   }
 
   function nextQ(){
-    checkAndRecenterMap();
+    recenterMapWithPadding();
     clear();
     if(qIdx >= totalQuestions){
         setTimeout(endGame, 500);
@@ -573,7 +593,7 @@ window.addEventListener('DOMContentLoaded', () => {
     });
     
     menuContentPanel.classList.add('hidden'); 
-    gameMap.fitBounds(zonePoly.getBounds(), { padding: [50, 50] });
+    recenterMapWithPadding(zonePoly.getBounds());
   }
 
   function repeatLastZone() {

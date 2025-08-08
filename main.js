@@ -127,7 +127,6 @@ window.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  // --- FUNCIÓN RESTAURADA ---
   function startDynamicBackground(bMap) {
       const initialCenter = bMap.getCenter();
       const startTime = Date.now();
@@ -145,7 +144,7 @@ window.addEventListener('DOMContentLoaded', () => {
     backgroundMap = L.map('background-map', { zoomControl: false, dragging: false, scrollWheelZoom: false, doubleClickZoom: false, touchZoom: false });
     L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager_nolabels/{z}/{x}/{y}{r}.png', { attribution: '', maxZoom: 19 }).addTo(backgroundMap);
     backgroundMap.setView([38.88, -6.97], 15);
-    setTimeout(() => startDynamicBackground(backgroundMap), 1000); // LLAMADA RESTAURADA
+    setTimeout(() => startDynamicBackground(backgroundMap), 1000);
   }
   
   function setupMenu() {
@@ -197,8 +196,6 @@ window.addEventListener('DOMContentLoaded', () => {
     setupMenu();
   }
 
-  // --- NUEVAS FUNCIONES Y LÓGICA DE JUEGO MEJORADA ---
-
   async function dismissDrawHelp() {
       drawHelpContainer.classList.add('hidden');
       if (userProfile.id) {
@@ -217,6 +214,11 @@ window.addEventListener('DOMContentLoaded', () => {
       if (feedbackText) {
           scoreDisplayToggle.textContent = feedbackText;
           if (feedbackColor) scoreDisplayToggle.style.color = feedbackColor;
+          
+          setTimeout(() => {
+              updateScoreDisplay(); // Vuelve al formato de puntuación después de un tiempo
+          }, 3000);
+
       } else {
           scoreDisplayToggle.style.color = '#555';
           if(showScoreAsPercentage){
@@ -330,23 +332,6 @@ window.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  function repeatLastZone() {
-      if (lastGameZonePoints.length < 3 || lastGameStreetList.length === 0) return;
-      clear(true);
-      if (zonePoly) gameMap.removeLayer(zonePoly);
-      
-      updatePanelUI(() => {
-          ['drawZone', 'end-game-options', 'start-options', 'loaded-zone-options'].forEach(id => document.getElementById(id).classList.add('hidden'));
-      });
-      
-      zonePoints = [...lastGameZonePoints];
-      zonePoly = L.polygon(zonePoints, { color: COL_ZONE, weight: 2, fillOpacity: 0.1 }).addTo(gameMap);
-      streetList = [...lastGameStreetList].sort(() => Math.random() - 0.5);
-      totalQuestions = streetList.length;
-      
-      startGameFlow();
-  }
-
   function onMapClick(e){
     if(!playing) return; 
     gameMap.off('click', onMapClick);
@@ -405,7 +390,7 @@ window.addEventListener('DOMContentLoaded', () => {
           }
           const data = await response.json();
           streetList = data.streets;
-          totalQuestions = streetList.length;
+          totalQuestions = data.streets.length;
       } catch (error) {
           console.error(error);
           alert(`Error al cargar las calles: ${error.message}`);
@@ -509,7 +494,7 @@ window.addEventListener('DOMContentLoaded', () => {
 
     updatePanelUI(() => {
         gameQuestion.textContent = `¿Dónde está «${s.googleName}»?`;
-        updateScoreDisplay(); // Reset score display
+        updateScoreDisplay();
         if (currentStreak < 3) streakDisplay.classList.remove('visible');
 
         const progress = totalQuestions > 0 ? (qIdx / totalQuestions) * 100 : 0;
@@ -520,13 +505,104 @@ window.addEventListener('DOMContentLoaded', () => {
     nextBtn.disabled = true;
   }
   
+  function resetToInitialView() {
+    clear(true);
+    updatePanelUI(() => {
+        ['start-options', 'loaded-zone-options', 'checkbox-wrapper', 'game-interface', 'end-game-options', 'back-to-menu-btn'].forEach(id => {
+            document.getElementById(id).classList.add('hidden');
+        });
+        drawZoneBtn.classList.remove('hidden');
+        if (zonePoly) gameMap.removeLayer(zonePoly);
+        zonePoly = null;
+        zonePoints = [];
+        playing = false;
+    });
+  }
+
+  function playFromHistory(zoneString) {
+    gameMap.off('click', addVertex);
+    const points = zoneString.split(';').map(pair => {
+      const [lat, lng] = pair.split(',');
+      return { lat: parseFloat(lat), lng: parseFloat(lng) };
+    });
+    if (points.length < 3) return;
+    
+    updatePanelUI(() => {
+        ['drawZone', 'start-options', 'game-interface', 'end-game-options'].forEach(id => document.getElementById(id).classList.add('hidden'));
+        clear(true);
+        if (zonePoly) gameMap.removeLayer(zonePoly);
+        tempMarkers.forEach(m => gameMap.removeLayer(m));
+        tempMarkers = [];
+        zonePoints = points.map(p => L.latLng(p.lat, p.lng));
+        zonePoly = L.polygon(zonePoints, { color: COL_ZONE, weight: 2, fillOpacity: 0.1 }).addTo(gameMap);
+        
+        startLoadedZoneBtn.onclick = async () => {
+            updatePanelUI(() => {
+                loadedZoneOptions.classList.add('hidden');
+                checkboxWrapper.classList.add('hidden');
+            });
+            await preloadStreets(); 
+            if (totalQuestions > 0) {
+                startGameFlow();
+            } else {
+                alert('No se encontraron calles válidas en esta zona.');
+                resetToInitialView();
+            }
+        };
+        drawNewZoneBtn.onclick = resetToInitialView;
+        loadedZoneOptions.classList.remove('hidden');
+        checkboxWrapper.classList.remove('hidden');
+        includePOICheckbox.disabled = false;
+    });
+    
+    menuContentPanel.classList.add('hidden'); 
+    gameMap.fitBounds(zonePoly.getBounds(), { padding: [50, 50] });
+  }
+
+  // --- FUNCIONES RESTAURADAS ---
+
+  async function reportIncident() {
+    if (lastGameZonePoints.length === 0) {
+      alert("Debes jugar en una zona primero para poder reportar una incidencia sobre ella.");
+      return;
+    }
+    const description = prompt("Por favor, describe la incidencia (ej. 'Falta la calle X', 'La calle Y no debería estar', etc.):");
+    if (!description || description.trim() === '') return;
+    try {
+        const { data: { session } } = await supabaseClient.auth.getSession();
+        if (!session) {
+            alert("Necesitas estar conectado para reportar una incidencia.");
+            return;
+        }
+        const zoneString = lastGameZonePoints.map(p => `${p.lat},${p.lng}`).join(';');
+        const requestBody = {
+            zone_points: zoneString,
+            description: description,
+            city: userProfile.subscribedCity
+        };
+        const response = await fetch('/api/reportIncident', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
+            body: JSON.stringify(requestBody)
+        });
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || 'Error del servidor');
+        }
+        alert("¡Gracias! Tu incidencia ha sido enviada con éxito.");
+    } catch (error) {
+      console.error('Error al enviar la incidencia:', error.message);
+      alert(`Hubo un error al enviar tu reporte: ${error.message}`);
+    }
+  }
+  
   async function saveCurrentZone() {
-    const zoneName = prompt("Dale un nombre a esta zona:", "Mi barrio");
-    if (!zoneName || zoneName.trim() === '') return;
     if (lastGameZonePoints.length < 3) {
         alert("La zona es demasiado pequeña para guardarla.");
         return;
     }
+    const zoneName = prompt("Dale un nombre a esta zona:", "Mi barrio");
+    if (!zoneName || zoneName.trim() === '') return;
     try {
         const { data: { session } } = await supabaseClient.auth.getSession();
         if (!session) return;
@@ -633,61 +709,7 @@ window.addEventListener('DOMContentLoaded', () => {
         statsContent.innerHTML = '<p class="text-red-400">Error al cargar estadísticas.</p>';
     }
   }
-  
-  function resetToInitialView() {
-    clear(true);
-    updatePanelUI(() => {
-        ['start-options', 'loaded-zone-options', 'checkbox-wrapper', 'game-interface', 'end-game-options', 'back-to-menu-btn'].forEach(id => {
-            document.getElementById(id).classList.add('hidden');
-        });
-        drawZoneBtn.classList.remove('hidden');
-        if (zonePoly) gameMap.removeLayer(zonePoly);
-        zonePoly = null;
-        zonePoints = [];
-        playing = false;
-    });
-  }
 
-  function playFromHistory(zoneString) {
-    gameMap.off('click', addVertex);
-    const points = zoneString.split(';').map(pair => {
-      const [lat, lng] = pair.split(',');
-      return { lat: parseFloat(lat), lng: parseFloat(lng) };
-    });
-    if (points.length < 3) return;
-    
-    updatePanelUI(() => {
-        ['drawZone', 'start-options', 'game-interface', 'end-game-options'].forEach(id => document.getElementById(id).classList.add('hidden'));
-        clear(true);
-        if (zonePoly) gameMap.removeLayer(zonePoly);
-        tempMarkers.forEach(m => gameMap.removeLayer(m));
-        tempMarkers = [];
-        zonePoints = points.map(p => L.latLng(p.lat, p.lng));
-        zonePoly = L.polygon(zonePoints, { color: COL_ZONE, weight: 2, fillOpacity: 0.1 }).addTo(gameMap);
-        
-        startLoadedZoneBtn.onclick = async () => {
-            updatePanelUI(() => {
-                loadedZoneOptions.classList.add('hidden');
-                checkboxWrapper.classList.add('hidden');
-            });
-            await preloadStreets(); 
-            if (totalQuestions > 0) {
-                startGameFlow();
-            } else {
-                alert('No se encontraron calles válidas en esta zona.');
-                resetToInitialView();
-            }
-        };
-        drawNewZoneBtn.onclick = resetToInitialView;
-        loadedZoneOptions.classList.remove('hidden');
-        checkboxWrapper.classList.remove('hidden');
-        includePOICheckbox.disabled = false;
-    });
-    
-    menuContentPanel.classList.add('hidden'); 
-    gameMap.fitBounds(zonePoly.getBounds(), { padding: [50, 50] });
-  }
-  
   googleLoginBtn.addEventListener('click', signInWithGoogle);
   supabaseClient.auth.onAuthStateChange(handleAuthStateChange);
 });

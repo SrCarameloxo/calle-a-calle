@@ -49,13 +49,30 @@
 
         <div id="loaded-zone-options" class="hidden">
             <button id="startLoadedZone" class="game-control-btn">Iniciar Juego en esta Zona</button>
-            <button id="drawNewZone" class="game-control-btn" style="background-color: #6c757d;">O Dibujar una Zona Nueva</button>
+            <button id="drawNewZone" class="game-control-btn">O Dibujar una Zona Nueva</button>
         </div>
+        
         <button id="repeatZone" class="game-control-btn hidden" disabled>Repetir Zona</button>
         <button id="saveZoneBtn" class="game-control-btn hidden">Guardar Zona</button>
+        
+        <!-- INICIO: Estructura de juego rediseñada -->
         <button id="next" class="game-control-btn hidden" disabled>Siguiente</button>
-        <p id="question"></p>
-        <p id="score-display" class="hidden">Calles acertadas: <span id="score">0 / 0</span></p>
+        
+        <div id="game-interface" class="hidden">
+          <p id="game-question" class="question-text"></p>
+          <p id="game-feedback" class="feedback-text"></p>
+          
+          <div id="progress-component">
+              <div class="progress-info">
+                  <span id="streak-display" class="streak-text"></span>
+                  <span id="progress-counter" class="counter-text"></span>
+              </div>
+              <div class="progress-bar-rail">
+                  <div id="progress-bar" class="progress-bar-fill"></div>
+              </div>
+          </div>
+        </div>
+        <!-- FIN: Estructura de juego rediseñada -->
         
         <div id="loader-container" class="loader hidden">
           <div class="earth">
@@ -68,7 +85,7 @@
             <p>Conectando...</p>
           </div>
         </div>
-        <p id="fb"></p>
+
     </div>
     
     <div id="game-map-container"></div>

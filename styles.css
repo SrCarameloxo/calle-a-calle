@@ -57,25 +57,28 @@ button.game-control-btn {
 }
 button.game-control-btn:not(:disabled):active { transform: scale(0.97); }
 button.game-control-btn:disabled { opacity: .4; cursor: default; }
-#drawZone, #start, #next { background: #007BFF; color: #fff; }
-#drawZone:not(:disabled):hover, #start:not(:disabled):hover, #next:not(:disabled):hover { background-color: #0069d9; }
-#undoPoint { background-color: #c82333; color: #fff; }
-#undoPoint:not(:disabled):hover { background-color: #a71d2a; }
+
+/* --- Colores de Botones (Regla Actualizada) --- */
+#drawZone, #start, #next, #startLoadedZone { background: #007BFF; color: #fff; }
+#drawZone:not(:disabled):hover, #start:not(:disabled):hover, #next:not(:disabled):hover, #startLoadedZone:not(:disabled):hover { background-color: #0069d9; }
+
+#undoPoint, #drawNewZone { background-color: #c82333; color: #fff; }
+#undoPoint:not(:disabled):hover, #drawNewZone:not(:disabled):hover { background-color: #a71d2a; }
+
 #repeatZone { background-color: #28a745; color: #fff; }
 #repeatZone:not(:disabled):hover { background-color: #218838; }
 #saveZoneBtn { background-color: #ffc107; color: black; }
 #saveZoneBtn:not(:disabled):hover { background-color: #e0a800; }
 
-/* --- OTROS ESTILOS DE TEXTO E UI --- */
+/* --- TÍTULO Y ELEMENTOS ANTIGUOS --- */
 .gradient-text {
     font-size: 2.25rem; font-weight: 700; text-align: center;
     background: linear-gradient(to right, #3b82f6, #8b5cf6);
     -webkit-background-clip: text; background-clip: text; color: transparent;
     margin-bottom: 1rem;
 }
-#question { font-weight: 700; margin: .5rem 0; color: #333; }
-#fb { margin: .5rem 0; font-size: 0.9rem; color: #555; }
-#score-display { font-size: 1.1rem; font-weight: bold; color: #333; }
+/* Los IDs #question, #fb y #score-display ya no se usan y se pueden eliminar si se desea */
+
 
 /* --- ESTILOS ANIMACIÓN DE CALLE --- */
 @keyframes pulseAndFlash {
@@ -93,6 +96,74 @@ button.game-control-btn:disabled { opacity: .4; cursor: default; }
 .checkmark:after { content: ""; display: none; width: 6px; height: 12px; border: solid white; border-width: 0 3px 3px 0; transform: rotate(45deg); }
 .custom-checkbox:checked ~ .checkmark { background-color: #3b82f6; box-shadow: 0 3px 7px rgba(59, 130, 246, 0.3); }
 .custom-checkbox:checked ~ .checkmark:after { display: block; }
+
+
+/* --- INICIO: NUEVOS ESTILOS PARA LA INTERFAZ DE JUEGO --- */
+
+.question-text { 
+    font-weight: 700; 
+    margin: .5rem 0; 
+    color: #333; 
+}
+.feedback-text { 
+    margin: .5rem 0; 
+    font-size: 0.9rem; 
+    color: #555; 
+    min-height: 20px; 
+    transition: color 0.3s; 
+}
+
+/* Contenedor principal del componente de la barra */
+#progress-component {
+    width: 100%;
+    margin-top: 1rem; /* Espacio para separarlo del texto de arriba */
+    margin-bottom: 0.5rem;
+}
+
+/* Fila de información (Racha y Contador) */
+.progress-info {
+    display: flex;
+    justify-content: space-between; /* Pone un elemento a cada lado */
+    align-items: center;
+    padding: 0 2px;
+    margin-bottom: 4px;
+    font-size: 0.8rem;
+    color: #555;
+    font-weight: 600;
+}
+
+/* Texto de la racha (oculto por defecto) */
+.streak-text {
+    color: #f97738; /* Color naranja para coincidir con la barra */
+    font-weight: bold;
+    opacity: 0; /* Oculto por defecto */
+    transition: opacity 0.3s ease;
+}
+.streak-text.visible {
+    opacity: 1; /* Clase para hacerlo visible con animación */
+}
+
+/* El raíl o "camino" para la barra */
+.progress-bar-rail {
+    width: 100%;
+    height: 12px;
+    background-color: transparent; /* Fondo invisible */
+    border-radius: 6px;
+    box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.2); /* Sombra interior para dar efecto de "camino" */
+    overflow: hidden; /* Asegura que la barra interior no se salga */
+}
+
+/* La barra de relleno naranja */
+.progress-bar-fill {
+    height: 100%;
+    width: 0%; /* Empieza vacía */
+    background: linear-gradient(90deg, #f97738 0%, #f9c74f 100%); /* Gradiente naranja */
+    border-radius: 6px;
+    transition: width 0.5s cubic-bezier(0.25, 1, 0.5, 1); /* Transición suave al crecer */
+}
+
+/* --- FIN: NUEVOS ESTILOS --- */
+
 
 /* --- ESTILOS PARA LOS NUEVOS BOTONES Y MENÚ --- */
 #open-menu-btn {
@@ -138,7 +209,6 @@ button.game-control-btn:disabled { opacity: .4; cursor: default; }
 .content-panel { display: none; }
 .content-panel.active { display: block; }
 
-/* --- INICIO CAMBIO: Estilos para la lista de zonas guardadas --- */
 .saved-zone-item { 
     display: flex; 
     justify-content: space-between; 
@@ -151,23 +221,21 @@ button.game-control-btn:disabled { opacity: .4; cursor: default; }
 }
 .saved-zone-item:hover { background-color: rgba(59, 130, 246, 0.3); }
 
-/* Contenedor para los botones de acción (lápiz, papelera) */
 .zone-actions {
     display: flex;
     align-items: center;
-    gap: 0.5rem; /* Espacio entre botones */
+    gap: 0.5rem;
 }
 
 .zone-action-btn { 
     background: none; 
     border: none; 
     padding: 0.25rem; 
-    color: #cbd5e0; /* Un color gris claro */
+    color: #cbd5e0;
     cursor: pointer;
     transition: color 0.2s;
 }
-.zone-action-btn:hover { color: #ffffff; } /* Blanco al pasar el ratón */
-/* --- FIN CAMBIO --- */
+.zone-action-btn:hover { color: #ffffff; }
 
 
 /* --- Nueva Animación de Carga (Earth Loader) --- */

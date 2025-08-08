@@ -158,7 +158,7 @@ module.exports = async (request, response) => {
             if (seenIds.has(entity.id)) continue;
             
             const mainOsmName = entity.osmNames[0];
-            const cacheKey = `street_v11:${currentCity}:${entity.id.replace(/\s/g, '_')}`;
+            const cacheKey = `street_v12:${currentCity}:${entity.id.replace(/\s/g, '_')}`; // Versión de caché incrementada
             streetData = await kv.get(cacheKey);
 
             if (!streetData) {
@@ -182,43 +182,52 @@ module.exports = async (request, response) => {
                 if (rule) {
                     processedStreet.displayName = rule.display_name.toUpperCase();
                 } else {
-                    const samplePoints = geometries.flatMap(g => g.points).filter((_, i, arr) => i % Math.max(1, Math.floor(arr.length / 5)) === 0).map(p => ({ lat: p[0], lng: p[1] }));
-                    const geocodedResults = await Promise.all(samplePoints.map(pt => geocode(pt, process.env.GOOGLE_API_KEY)));
-                    const geocodedNames = geocodedResults.filter(Boolean).map(geo => geo.name);
+                    // --- INICIO: NUEVA LÓGICA DE VOTACIÓN ADAPTATIVA ---
+                    const samplePoints = geometries.flatMap(g => g.points)
+                        .filter((_, i, arr) => i % Math.max(1, Math.floor(arr.length / 6)) === 0)
+                        .slice(0, 6)
+                        .map(p => ({ lat: p[0], lng: p[1] }));
 
-                    if (geocodedNames.length > 0) {
-                        const nameCounts = geocodedNames.reduce((acc, name) => { acc[name] = (acc[name] || 0) + 1; return acc; }, {});
-                        const mostCommonGoogleName = Object.keys(nameCounts).reduce((a, b) => nameCounts[a] > nameCounts[b] ? a : b);
+                    // Fase 1: Comprobación Rápida
+                    const quickCheckPoints = samplePoints.slice(0, 3);
+                    const quickCheckResults = await Promise.all(quickCheckPoints.map(pt => geocode(pt, process.env.GOOGLE_API_KEY)));
+                    const quickCheckNames = quickCheckResults.filter(Boolean).map(geo => geo.name);
+
+                    if (quickCheckNames.length === 3 && new Set(quickCheckNames).size === 1) {
+                        // Consenso absoluto, usamos este nombre y terminamos
+                        processedStreet.displayName = quickCheckNames[0];
+                    } else {
+                        // Fase 2: Investigación Profunda si no hay consenso
+                        const deepDivePoints = samplePoints.slice(3);
+                        const deepDiveResults = deepDivePoints.length > 0 ? await Promise.all(deepDivePoints.map(pt => geocode(pt, process.env.GOOGLE_API_KEY))) : [];
+                        const deepDiveNames = deepDiveResults.filter(Boolean).map(geo => geo.name);
                         
-                        // --- INICIO DEL BLOQUE MODIFICADO ---
+                        const allNames = quickCheckNames.concat(deepDiveNames);
 
-                        const osmParts = extractNameParts(mainOsmName);
-                        const googleParts = extractNameParts(mostCommonGoogleName);
+                        if (allNames.length > 0) {
+                            const nameCounts = allNames.reduce((acc, name) => {
+                                acc[name] = (acc[name] || 0) + 1;
+                                return acc;
+                            }, {});
 
-                        // 1. Verificamos que los nombres base sean muy similares (permitimos errores tipográficos menores).
-                        const baseNamesAreSimilar = levenshtein(osmParts.baseName, googleParts.baseName) <= 2;
+                            const winner = Object.keys(nameCounts).reduce((a, b) => nameCounts[a] > nameCounts[b] ? a : b);
+                            const voteCount = nameCounts[winner];
+                            const confidenceThreshold = 3;
 
-                        // 2. Comparamos los tipos. Si OSM tiene un tipo y Google tiene otro DIFERENTE, es una señal de alerta.
-                        //    (Permitimos que uno de los dos no tenga tipo, eso puede ser normal).
-                        const typesAreDifferent = osmParts.type && googleParts.type && osmParts.type !== googleParts.type;
-
-                        // REGLA DE LA BALANZA:
-                        // Confiamos en el nombre de Google si:
-                        // a) Los nombres base son similares Y
-                        // b) Los tipos de vía NO son diferentes (es decir, o son iguales, o uno no existe).
-                        if (baseNamesAreSimilar && !typesAreDifferent) {
-                            // Corrección de Alta Confianza -> Usamos el nombre de Google.
-                            processedStreet.displayName = mostCommonGoogleName;
+                            if (voteCount >= confidenceThreshold) {
+                                processedStreet.displayName = winner;
+                            } else {
+                                // Fallback a OSM si no hay un ganador claro
+                                console.warn(`ADVERTENCIA: No se pudo verificar con Google la calle '${mainOsmName}' en ${currentCity}. Votos: ${JSON.stringify(nameCounts)}. Usando nombre de OSM como fallback.`);
+                                processedStreet.displayName = mainOsmName.toUpperCase();
+                            }
                         } else {
-                            // Corrección de Baja Confianza o nombres base diferentes -> Usamos el nombre original de OSM.
+                            // Fallback si Google no devuelve ningún nombre
+                            console.warn(`ADVERTENCIA: Google no devolvió resultados para '${mainOsmName}' en ${currentCity}. Usando nombre de OSM como fallback.`);
                             processedStreet.displayName = mainOsmName.toUpperCase();
                         }
-
-                        // --- FIN DEL BLOQUE MODIFICADO ---
-
-                    } else {
-                        processedStreet.displayName = mainOsmName.toUpperCase();
                     }
+                    // --- FIN: NUEVA LÓGICA DE VOTACIÓN ADAPTATIVA ---
                 }
                 
                 streetData = processedStreet;

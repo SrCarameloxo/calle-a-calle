@@ -460,7 +460,7 @@ window.addEventListener('DOMContentLoaded', () => {
   function enterReviewMode() {
       if(reviewLayer) gameMap.removeLayer(reviewLayer);
       const bounds = L.latLngBounds();
-      const reviewColors = ['#E63946', '#457B9D', '#F4A261', '#2A9D8F', '#E9C46A', '#264653', '#F77F00', '#7209B7'];
+      const reviewColors = [ '#e6194b', '#3cb44b', '#ffe119', '#4363d8', '#f58231', '#911eb4', '#46f0f0', '#f032e6', '#bcf60c', '#fabebe', '#008080', '#e6beff'];
       reviewLayer = L.layerGroup().addTo(gameMap);
       const etiquetasYaPuestas = new Set();
 
@@ -474,7 +474,8 @@ window.addEventListener('DOMContentLoaded', () => {
                   : L.polyline(geom.points, { color, weight: 8 });
               
               if (!etiquetaPuesta) {
-                  layer.bindTooltip(street.googleName, { permanent: true, direction: 'center', className: 'street-tooltip' }).openTooltip();
+                  const tooltipClass = `street-tooltip street-tooltip-color-${index % reviewColors.length}`;
+                  layer.bindTooltip(street.googleName, { permanent: true, direction: 'center', className: tooltipClass }).openTooltip();
                   etiquetasYaPuestas.add(street.googleName);
                   etiquetaPuesta = true;
               }

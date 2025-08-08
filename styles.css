@@ -374,3 +374,18 @@ button.game-control-btn:disabled { opacity: .4; cursor: default; }
   80% { left: 8em; opacity: 100%; transform: skewX(25deg) rotate(-25deg); }
   100% { left: 5em; opacity: 100%; transform: skewX(0deg) rotate(0deg); }
 }
+
+/* --- INICIO: Clases de color para Tooltips --- */
+.street-tooltip-color-0 { background-color: rgba(230, 57, 70, 0.8) !important; }
+.street-tooltip-color-1 { background-color: rgba(29, 53, 87, 0.8) !important; }
+.street-tooltip-color-2 { background-color: rgba(69, 123, 157, 0.8) !important; }
+.street-tooltip-color-3 { background-color: rgba(168, 218, 220, 0.8) !important; color: #333 !important; }
+.street-tooltip-color-4 { background-color: rgba(255, 190, 11, 0.8) !important; color: #333 !important; }
+.street-tooltip-color-5 { background-color: rgba(251, 133, 0, 0.8) !important; }
+.street-tooltip-color-6 { background-color: rgba(114, 9, 183, 0.8) !important; }
+.street-tooltip-color-7 { background-color: rgba(91, 207, 133, 0.8) !important; color: #333 !important; }
+.street-tooltip-color-8 { background-color: rgba(108, 117, 125, 0.8) !important; }
+.street-tooltip-color-9 { background-color: rgba(247, 127, 0, 0.8) !important; }
+.street-tooltip-color-10 { background-color: rgba(64, 224, 208, 0.8) !important; color: #333 !important; }
+.street-tooltip-color-11 { background-color: rgba(240, 113, 152, 0.8) !important; }
+/* --- FIN: Clases de color para Tooltips --- */

@@ -44,7 +44,7 @@ window.addEventListener('DOMContentLoaded', () => {
   const repeatZoneBtn = document.getElementById('repeatZone');
   const saveZoneBtn = document.getElementById('saveZoneBtn');
   const backToMenuBtn = document.getElementById('back-to-menu-btn');
-  const backFromReviewBtn = document.getElementById('back-from-review-btn'); // Nuevo selector
+  const backFromReviewBtn = document.getElementById('back-from-review-btn');
 
   let backgroundMap, gameMap = null;
   const COL_ZONE = '#663399', COL_TRACE = '#007a2f', COL_DASH = '#1976d2';
@@ -183,7 +183,7 @@ window.addEventListener('DOMContentLoaded', () => {
     repeatZoneBtn.addEventListener('click', repeatLastZone);
     saveZoneBtn.addEventListener('click', saveCurrentZone);
     backToMenuBtn.addEventListener('click', resetToInitialView);
-    backFromReviewBtn.addEventListener('click', exitReviewMode); // Conectar nuevo botón
+    backFromReviewBtn.addEventListener('click', exitReviewMode);
 
     setupStartButton(startBtn);
     setupMenu();
@@ -342,6 +342,10 @@ window.addEventListener('DOMContentLoaded', () => {
             streakDisplay.textContent = `¡Racha de ${currentStreak}!`;
             streakDisplay.classList.add('visible');
         }
+        // CORRECCIÓN: La barra de progreso avanza aquí
+        const progress = totalQuestions > 0 ? (streetsGuessedCorrectly / totalQuestions) * 100 : 0;
+        progressBar.style.width = `${progress}%`;
+
       } else {
         currentStreak = 0;
         streakDisplay.classList.remove('visible');
@@ -420,6 +424,7 @@ window.addEventListener('DOMContentLoaded', () => {
         gameInterface.classList.add('hidden');
         finalScoreEl.textContent = `¡Partida terminada! Puntuación: ${streetsGuessedCorrectly} / ${totalQuestions}`;
         endGameOptions.classList.remove('hidden');
+        backToMenuBtn.classList.remove('hidden'); // CORRECCIÓN: Mostrar botón aquí
 
         if (zonePoly) {
             zonePoly.setStyle({ color: '#696969', weight: 2, dashArray: '5, 5', fillOpacity: 0.05 });
@@ -462,10 +467,14 @@ window.addEventListener('DOMContentLoaded', () => {
       });
   }
 
-  // --- NUEVA FUNCIÓN ---
   function exitReviewMode() {
       if(reviewLayer) gameMap.removeLayer(reviewLayer);
       reviewLayer = null;
+      if (oldZonePoly && !gameMap.hasLayer(oldZonePoly)) {
+          oldZonePoly.addTo(gameMap);
+      }
+      gameMap.fitBounds(oldZonePoly.getBounds(), { padding: [50, 50] });
+
       updatePanelUI(() => {
           backFromReviewBtn.classList.add('hidden');
           endGameOptions.classList.remove('hidden');
@@ -485,8 +494,6 @@ window.addEventListener('DOMContentLoaded', () => {
     checkAndRecenterMap();
     clear();
     if(qIdx >= totalQuestions){ 
-        progressBar.style.width = '100%';
-        progressCounter.textContent = `${totalQuestions} / ${totalQuestions}`;
         setTimeout(endGame, 500);
         return; 
     }
@@ -499,9 +506,6 @@ window.addEventListener('DOMContentLoaded', () => {
         gameQuestion.textContent = `¿Dónde está «${s.googleName}»?`;
         updateScoreDisplay();
         if (currentStreak < 3) streakDisplay.classList.remove('visible');
-
-        const progress = totalQuestions > 0 ? (qIdx / totalQuestions) * 100 : 0;
-        progressBar.style.width = `${progress}%`;
         progressCounter.textContent = `${qIdx + 1} / ${totalQuestions}`;
     });
 
@@ -521,6 +525,8 @@ window.addEventListener('DOMContentLoaded', () => {
         zonePoly = oldZonePoly = null;
         zonePoints = [];
         playing = false;
+        // Resetear la barra de progreso a cero para la próxima partida
+        progressBar.style.width = '0%';
     });
   }
 
@@ -564,7 +570,7 @@ window.addEventListener('DOMContentLoaded', () => {
     gameMap.fitBounds(zonePoly.getBounds(), { padding: [50, 50] });
   }
 
-  // --- FUNCIONES RESTAURADAS ---
+  // --- FUNCIONES RESTAURADAS Y/O MOVIDAS ---
 
   function repeatLastZone() {
       if (lastGameZonePoints.length < 3 || lastGameStreetList.length === 0) return;

@@ -35,6 +35,11 @@
         <h1 class="gradient-text">Calle a Calle</h1>
         <button id="drawZone" class="game-control-btn">Establecer zona</button>
         
+        <div id="draw-help-container" class="hidden">
+            <button id="dismiss-draw-help" title="No volver a mostrar">&times;</button>
+            <p>Haz clic en el mapa para añadir vértices. Con 3 puntos podrás empezar. Haz clic en el primer punto para cerrar la zona.</p>
+        </div>
+        
         <div id="start-options" class="hidden">
           <button id="start" class="game-control-btn" disabled>Start</button>
           <button id="undoPoint" class="game-control-btn">Retroceder Punto</button>
@@ -48,19 +53,15 @@
         </div>
 
         <div id="loaded-zone-options" class="hidden">
-            <button id="startLoadedZone" class="game-control-btn">Iniciar Juego en esta Zona</button>
-            <button id="drawNewZone" class="game-control-btn">O Dibujar una Zona Nueva</button>
+            <button id="startLoadedZone" class="game-control-btn">Start</button>
+            <button id="drawNewZone" class="game-control-btn">Volver</button>
         </div>
         
-        <button id="repeatZone" class="game-control-btn hidden" disabled>Repetir Zona</button>
-        <button id="saveZoneBtn" class="game-control-btn hidden">Guardar Zona</button>
-        
         <!-- INICIO: Estructura de juego rediseñada -->
-        <button id="next" class="game-control-btn hidden" disabled>Siguiente</button>
-        
         <div id="game-interface" class="hidden">
+          <button id="next" class="game-control-btn" disabled>Siguiente</button>
           <p id="game-question" class="question-text"></p>
-          <p id="game-feedback" class="feedback-text"></p>
+          <p id="score-display-toggle" class="score-display-toggle"></p>
           
           <div id="progress-component">
               <div class="progress-info">
@@ -74,6 +75,16 @@
         </div>
         <!-- FIN: Estructura de juego rediseñada -->
         
+        <!-- INICIO: Opciones de Fin de Partida -->
+        <div id="end-game-options" class="hidden">
+            <p id="final-score" class="question-text"></p>
+            <button id="review-game-btn" class="game-control-btn">Revisar Partida</button>
+            <button id="repeatZone" class="game-control-btn" disabled>Repetir Zona</button>
+            <button id="saveZoneBtn" class="game-control-btn">Guardar Zona</button>
+            <button id="back-to-menu-btn" class="game-control-btn">Volver al Menú</button>
+        </div>
+        <!-- FIN: Opciones de Fin de Partida -->
+
         <div id="loader-container" class="loader hidden">
           <div class="earth">
             <div class="earth-loader">

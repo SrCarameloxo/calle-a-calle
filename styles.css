@@ -65,20 +65,19 @@ button.game-control-btn:disabled { opacity: .4; cursor: default; }
 #undoPoint, #drawNewZone { background-color: #c82333; color: #fff; }
 #undoPoint:not(:disabled):hover, #drawNewZone:not(:disabled):hover { background-color: #a71d2a; }
 
-#repeatZone { background-color: #28a745; color: #fff; }
-#repeatZone:not(:disabled):hover { background-color: #218838; }
-#saveZoneBtn { background-color: #ffc107; color: black; }
-#saveZoneBtn:not(:disabled):hover { background-color: #e0a800; }
+#repeatZone, #review-game-btn { background-color: #28a745; color: #fff; }
+#repeatZone:not(:disabled):hover, #review-game-btn:not(:disabled):hover { background-color: #218838; }
 
-/* --- TÍTULO Y ELEMENTOS ANTIGUOS --- */
+#saveZoneBtn, #back-to-menu-btn { background-color: #ffc107; color: black; }
+#saveZoneBtn:not(:disabled):hover, #back-to-menu-btn:not(:disabled):hover { background-color: #e0a800; }
+
+/* --- TÍTULO Y OTROS --- */
 .gradient-text {
     font-size: 2.25rem; font-weight: 700; text-align: center;
     background: linear-gradient(to right, #3b82f6, #8b5cf6);
     -webkit-background-clip: text; background-clip: text; color: transparent;
     margin-bottom: 1rem;
 }
-/* Los IDs #question, #fb y #score-display ya no se usan y se pueden eliminar si se desea */
-
 
 /* --- ESTILOS ANIMACIÓN DE CALLE --- */
 @keyframes pulseAndFlash {
@@ -105,25 +104,56 @@ button.game-control-btn:disabled { opacity: .4; cursor: default; }
     margin: .5rem 0; 
     color: #333; 
 }
-.feedback-text { 
+
+.score-display-toggle { 
     margin: .5rem 0; 
     font-size: 0.9rem; 
     color: #555; 
     min-height: 20px; 
-    transition: color 0.3s; 
+    transition: color 0.3s;
+    cursor: pointer;
+    border-radius: 4px;
+    padding: 2px 4px;
 }
+.score-display-toggle:hover {
+    background-color: rgba(0,0,0,0.05);
+}
+
+#draw-help-container {
+    padding: 0.75rem;
+    background-color: #eef2f7;
+    border: 1px solid #d1dce8;
+    border-radius: 6px;
+    margin-bottom: 1rem;
+    font-size: 0.9rem;
+    position: relative;
+}
+#dismiss-draw-help {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    background: none;
+    border: none;
+    font-size: 1.2rem;
+    line-height: 1;
+    color: #555;
+}
+#dismiss-draw-help:hover {
+    color: #000;
+}
+
 
 /* Contenedor principal del componente de la barra */
 #progress-component {
     width: 100%;
-    margin-top: 1rem; /* Espacio para separarlo del texto de arriba */
+    margin-top: 1rem;
     margin-bottom: 0.5rem;
 }
 
 /* Fila de información (Racha y Contador) */
 .progress-info {
     display: flex;
-    justify-content: space-between; /* Pone un elemento a cada lado */
+    justify-content: space-between;
     align-items: center;
     padding: 0 2px;
     margin-bottom: 4px;
@@ -134,38 +164,38 @@ button.game-control-btn:disabled { opacity: .4; cursor: default; }
 
 /* Texto de la racha (oculto por defecto) */
 .streak-text {
-    color: #f97738; /* Color naranja para coincidir con la barra */
+    color: #f97738; /* Color naranja */
     font-weight: bold;
-    opacity: 0; /* Oculto por defecto */
+    opacity: 0; 
     transition: opacity 0.3s ease;
 }
 .streak-text.visible {
-    opacity: 1; /* Clase para hacerlo visible con animación */
+    opacity: 1; 
 }
 
 /* El raíl o "camino" para la barra */
 .progress-bar-rail {
     width: 100%;
     height: 12px;
-    background-color: transparent; /* Fondo invisible */
+    background-color: transparent; 
     border-radius: 6px;
-    box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.2); /* Sombra interior para dar efecto de "camino" */
-    overflow: hidden; /* Asegura que la barra interior no se salga */
+    box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.2); 
+    overflow: hidden; 
 }
 
 /* La barra de relleno naranja */
 .progress-bar-fill {
     height: 100%;
-    width: 0%; /* Empieza vacía */
-    background: linear-gradient(90deg, #f97738 0%, #f9c74f 100%); /* Gradiente naranja */
+    width: 0%; 
+    background: linear-gradient(90deg, #f97738 0%, #f9c74f 100%);
     border-radius: 6px;
-    transition: width 0.5s cubic-bezier(0.25, 1, 0.5, 1); /* Transición suave al crecer */
+    transition: width 0.5s cubic-bezier(0.25, 1, 0.5, 1);
 }
 
 /* --- FIN: NUEVOS ESTILOS --- */
 
 
-/* --- ESTILOS PARA LOS NUEVOS BOTONES Y MENÚ --- */
+/* --- ESTILOS PARA MENÚ LATERAL Y OTROS BOTONES --- */
 #open-menu-btn {
   position: absolute; top: 20px; right: 20px; z-index: 12;
   background: none; border: none; padding: 5px;

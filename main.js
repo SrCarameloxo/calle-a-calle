@@ -444,42 +444,26 @@ window.addEventListener('DOMContentLoaded', () => {
       const bounds = L.latLngBounds();
       const reviewColors = ['#E63946', '#457B9D', '#F4A261', '#2A9D8F', '#E9C46A', '#264653', '#F77F00', '#7209B7'];
       reviewLayer = L.layerGroup().addTo(gameMap);
-      const labels = new Map();
+      const etiquetasYaPuestas = new Set();
 
-      lastGameStreetList.forEach(street => {
-          let longestSegment = { length: 0, layer: null };
+      lastGameStreetList.forEach((street, index) => {
+          const color = reviewColors[index % reviewColors.length];
+          let etiquetaPuesta = etiquetasYaPuestas.has(street.googleName);
+
           street.geometries.forEach(geom => {
-              if (geom.points.length > 1) {
-                  let segmentLength = 0;
-                  for (let i = 0; i < geom.points.length - 1; i++) {
-                      segmentLength += L.latLng(geom.points[i]).distanceTo(L.latLng(geom.points[i+1]));
-                  }
-                  if (segmentLength > longestSegment.length) {
-                      const layer = geom.isClosed ? L.polygon(geom.points) : L.polyline(geom.points);
-                      longestSegment = { length: segmentLength, layer: layer };
-                  }
-              }
-          });
-          if (longestSegment.layer && (!labels.has(street.googleName) || longestSegment.length > labels.get(street.googleName).length)) {
-              labels.set(street.googleName, longestSegment);
-          }
-      });
-
-      let colorIndex = 0;
-      labels.forEach((segmentData, name) => {
-          const color = reviewColors[colorIndex % reviewColors.length];
-          const allGeomsOfThisStreet = lastGameStreetList.filter(s => s.googleName === name).flatMap(s => s.geometries);
-          
-          allGeomsOfThisStreet.forEach(geom => {
               const layer = geom.isClosed 
                   ? L.polygon(geom.points, { color, weight: 4, fillOpacity: 0.3 })
                   : L.polyline(geom.points, { color, weight: 8 });
+              
+              if (!etiquetaPuesta) {
+                  layer.bindTooltip(street.googleName, { permanent: true, direction: 'center', className: 'street-tooltip' }).openTooltip();
+                  etiquetasYaPuestas.add(street.googleName);
+                  etiquetaPuesta = true;
+              }
+              
               layer.addTo(reviewLayer);
               bounds.extend(layer.getBounds());
           });
-
-          segmentData.layer.bindTooltip(name, { permanent: true, direction: 'center', className: 'street-tooltip' }).openTooltip();
-          colorIndex++;
       });
 
       if (bounds.isValid()) gameMap.fitBounds(bounds, { padding: [50, 50] });
@@ -516,7 +500,7 @@ window.addEventListener('DOMContentLoaded', () => {
   function nextQ(){
     checkAndRecenterMap();
     clear();
-    if(qIdx >= totalQuestions){ 
+    if(qIdx >= totalQuestions){
         setTimeout(endGame, 500);
         return; 
     }
@@ -529,7 +513,6 @@ window.addEventListener('DOMContentLoaded', () => {
         gameQuestion.textContent = `¿Dónde está «${s.googleName}»?`;
         updateScoreDisplay();
         if (currentStreak < 3) streakDisplay.classList.remove('visible');
-        
         progressCounter.textContent = `${qIdx + 1} / ${totalQuestions}`;
     });
 
@@ -540,7 +523,7 @@ window.addEventListener('DOMContentLoaded', () => {
   function resetToInitialView() {
     clear(true);
     updatePanelUI(() => {
-        ['start-options', 'loaded-zone-options', 'checkbox-wrapper', 'game-interface', 'end-game-options', 'back-to-menu-btn', 'back-from-review-btn'].forEach(id => {
+        ['start-options', 'loaded-zone-options', 'checkbox-wrapper', 'game-interface', 'end-game-options', 'back-from-review-btn'].forEach(id => {
             document.getElementById(id).classList.add('hidden');
         });
         drawZoneBtn.classList.remove('hidden');

@@ -190,20 +190,31 @@ module.exports = async (request, response) => {
                         const nameCounts = geocodedNames.reduce((acc, name) => { acc[name] = (acc[name] || 0) + 1; return acc; }, {});
                         const mostCommonGoogleName = Object.keys(nameCounts).reduce((a, b) => nameCounts[a] > nameCounts[b] ? a : b);
                         
+                        // --- INICIO DEL BLOQUE MODIFICADO ---
+
                         const osmParts = extractNameParts(mainOsmName);
                         const googleParts = extractNameParts(mostCommonGoogleName);
-                        
-                        const osmBaseName = osmParts.baseName;
-                        const googleBaseName = googleParts.baseName;
 
-                        const distance = levenshtein(osmBaseName, googleBaseName);
-                        const threshold = Math.max(osmBaseName.length, googleBaseName.length) * 0.5;
+                        // 1. Verificamos que los nombres base sean muy similares (permitimos errores tipográficos menores).
+                        const baseNamesAreSimilar = levenshtein(osmParts.baseName, googleParts.baseName) <= 2;
 
-                        if (distance > threshold) {
-                            processedStreet.displayName = mainOsmName.toUpperCase();
-                        } else {
+                        // 2. Comparamos los tipos. Si OSM tiene un tipo y Google tiene otro DIFERENTE, es una señal de alerta.
+                        //    (Permitimos que uno de los dos no tenga tipo, eso puede ser normal).
+                        const typesAreDifferent = osmParts.type && googleParts.type && osmParts.type !== googleParts.type;
+
+                        // REGLA DE LA BALANZA:
+                        // Confiamos en el nombre de Google si:
+                        // a) Los nombres base son similares Y
+                        // b) Los tipos de vía NO son diferentes (es decir, o son iguales, o uno no existe).
+                        if (baseNamesAreSimilar && !typesAreDifferent) {
+                            // Corrección de Alta Confianza -> Usamos el nombre de Google.
                             processedStreet.displayName = mostCommonGoogleName;
+                        } else {
+                            // Corrección de Baja Confianza o nombres base diferentes -> Usamos el nombre original de OSM.
+                            processedStreet.displayName = mainOsmName.toUpperCase();
                         }
+
+                        // --- FIN DEL BLOQUE MODIFICADO ---
 
                     } else {
                         processedStreet.displayName = mainOsmName.toUpperCase();

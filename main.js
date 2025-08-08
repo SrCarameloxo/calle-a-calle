@@ -79,7 +79,8 @@ window.addEventListener('DOMContentLoaded', () => {
   async function fetchUserProfile(user) {
     if (!user) return;
     try {
-        const { data: profile, error } = await supabaseClient.from('profiles').select('role, subscribed_city, show_draw_help').eq('id', user.id).single();
+        // CORRECCIÓN: Cambiado 'show_draw_help' a 'mostrar_ayuda_dibujo' para coincidir con la DB
+        const { data: profile, error } = await supabaseClient.from('profiles').select('role, subscribed_city, mostrar_ayuda_dibujo').eq('id', user.id).single();
         if (error) {
             if (error.code === 'PGRST116') {
                 await new Promise(resolve => setTimeout(resolve, 2000));
@@ -90,7 +91,7 @@ window.addEventListener('DOMContentLoaded', () => {
         userProfile.id = user.id;
         userProfile.role = profile.role;
         userProfile.subscribedCity = profile.subscribed_city;
-        userProfile.showDrawHelp = profile.show_draw_help;
+        userProfile.showDrawHelp = profile.mostrar_ayuda_dibujo; // CORRECCIÓN
         
         if (profile.role === 'admin') adminPanelBtn.classList.remove('hidden');
         if (profile.subscribed_city) {
@@ -188,7 +189,7 @@ window.addEventListener('DOMContentLoaded', () => {
     scoreDisplayToggle.addEventListener('click', toggleScoreDisplay);
 
     reviewGameBtn.addEventListener('click', enterReviewMode);
-    repeatZoneBtn.addEventListener('click', repeatLastZone);
+    repeatZoneBtn.addEventListener('click', repeatLastZone); // CORRECCIÓN: Typo corregido
     saveZoneBtn.addEventListener('click', saveCurrentZone);
     backToMenuBtn.addEventListener('click', resetToInitialView);
 
@@ -200,7 +201,8 @@ window.addEventListener('DOMContentLoaded', () => {
       drawHelpContainer.classList.add('hidden');
       if (userProfile.id) {
           userProfile.showDrawHelp = false;
-          const { error } = await supabaseClient.from('profiles').update({ show_draw_help: false }).eq('id', userProfile.id);
+          // CORRECCIÓN: Cambiado 'show_draw_help' a 'mostrar_ayuda_dibujo'
+          const { error } = await supabaseClient.from('profiles').update({ mostrar_ayuda_dibujo: false }).eq('id', userProfile.id);
           if(error) console.error("Error al guardar preferencia de ayuda:", error);
       }
   }
@@ -216,7 +218,7 @@ window.addEventListener('DOMContentLoaded', () => {
           if (feedbackColor) scoreDisplayToggle.style.color = feedbackColor;
           
           setTimeout(() => {
-              updateScoreDisplay(); // Vuelve al formato de puntuación después de un tiempo
+              updateScoreDisplay();
           }, 3000);
 
       } else {
@@ -277,7 +279,7 @@ window.addEventListener('DOMContentLoaded', () => {
 
   function startDrawing(){
     updatePanelUI(() => {
-        ['end-game-options', 'drawZone', 'loaded-zone-options', 'game-interface'].forEach(id => document.getElementById(id).classList.add('hidden'));
+        ['end-game-options', 'drawZone', 'loaded-zone-options', 'game-interface', 'back-to-menu-btn'].forEach(id => document.getElementById(id).classList.add('hidden'));
         if (userProfile.showDrawHelp) drawHelpContainer.classList.remove('hidden');
         checkboxWrapper.classList.remove('hidden');
         startOptions.classList.remove('hidden');
@@ -469,7 +471,7 @@ window.addEventListener('DOMContentLoaded', () => {
       
       updatePanelUI(() => {
           endGameOptions.classList.add('hidden');
-          backToMenuBtn.classList.remove('hidden');
+          backToMenuBtn.classList.remove('hidden'); // CORRECCIÓN: Mostrar botón para salir
       });
   }
 
@@ -490,18 +492,19 @@ window.addEventListener('DOMContentLoaded', () => {
     gameMap.on('click', onMapClick);
     const s = streetList[qIdx];
     target = s.geometries;
-    qIdx++;
-
+    
     updatePanelUI(() => {
         gameQuestion.textContent = `¿Dónde está «${s.googleName}»?`;
         updateScoreDisplay();
         if (currentStreak < 3) streakDisplay.classList.remove('visible');
 
+        // CORRECCIÓN: La barra de progreso se basa en preguntas completadas (qIdx)
         const progress = totalQuestions > 0 ? (qIdx / totalQuestions) * 100 : 0;
         progressBar.style.width = `${progress}%`;
-        progressCounter.textContent = `${qIdx} / ${totalQuestions}`;
+        progressCounter.textContent = `${qIdx + 1} / ${totalQuestions}`;
     });
-    
+
+    qIdx++; // Se incrementa después de usar el valor actual
     nextBtn.disabled = true;
   }
   

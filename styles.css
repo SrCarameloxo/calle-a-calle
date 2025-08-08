@@ -61,8 +61,8 @@ button.game-control-btn:disabled { opacity: .4; cursor: default; }
 /* --- Paleta de Colores Lógica para Botones --- */
 
 /* Azul para Navegación/Inicio */
-#drawZone, #start, #next, #startLoadedZone, #back-to-menu-btn { background: #007BFF; color: #fff; }
-#drawZone:not(:disabled):hover, #start:not(:disabled):hover, #next:not(:disabled):hover, #startLoadedZone:not(:disabled):hover, #back-to-menu-btn:not(:disabled):hover { background-color: #0069d9; }
+#drawZone, #start, #next, #startLoadedZone, #back-to-menu-btn, #back-from-review-btn { background: #007BFF; color: #fff; }
+#drawZone:not(:disabled):hover, #start:not(:disabled):hover, #next:not(:disabled):hover, #startLoadedZone:not(:disabled):hover, #back-to-menu-btn:not(:disabled):hover, #back-from-review-btn:not(:disabled):hover { background-color: #0069d9; }
 
 /* Rojo para Cancelar/Retroceder */
 #undoPoint, #drawNewZone { background-color: #c82333; color: #fff; }

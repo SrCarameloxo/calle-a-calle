@@ -30,7 +30,6 @@ window.addEventListener('DOMContentLoaded', () => {
   const drawHelpContainer = document.getElementById('draw-help-container');
   const dismissDrawHelpBtn = document.getElementById('dismiss-draw-help');
 
-  // --- Selectores de la nueva interfaz de juego ---
   const gameInterface = document.getElementById('game-interface');
   const gameQuestion = document.getElementById('game-question');
   const scoreDisplayToggle = document.getElementById('score-display-toggle');
@@ -39,15 +38,14 @@ window.addEventListener('DOMContentLoaded', () => {
   const progressCounter = document.getElementById('progress-counter');
   const streakDisplay = document.getElementById('streak-display');
   
-  // --- Selectores de fin de partida ---
   const endGameOptions = document.getElementById('end-game-options');
   const finalScoreEl = document.getElementById('final-score');
   const reviewGameBtn = document.getElementById('review-game-btn');
   const repeatZoneBtn = document.getElementById('repeatZone');
   const saveZoneBtn = document.getElementById('saveZoneBtn');
   const backToMenuBtn = document.getElementById('back-to-menu-btn');
+  const backFromReviewBtn = document.getElementById('back-from-review-btn'); // Nuevo selector
 
-  // --- Variables de estado ---
   let backgroundMap, gameMap = null;
   const COL_ZONE = '#663399', COL_TRACE = '#007a2f', COL_DASH = '#1976d2';
   let drawing=false, zonePoly=null, tempMarkers=[], zonePoints=[], oldZonePoly=null, reviewLayer=null;
@@ -80,13 +78,7 @@ window.addEventListener('DOMContentLoaded', () => {
     if (!user) return;
     try {
         const { data: profile, error } = await supabaseClient.from('profiles').select('role, subscribed_city, mostrar_ayuda_dibujo').eq('id', user.id).single();
-        if (error) {
-            if (error.code === 'PGRST116') {
-                await new Promise(resolve => setTimeout(resolve, 2000));
-                return fetchUserProfile(user);
-            }
-            throw error;
-        }
+        if (error) { throw error; }
         userProfile.id = user.id;
         userProfile.role = profile.role;
         userProfile.subscribedCity = profile.subscribed_city;
@@ -191,6 +183,7 @@ window.addEventListener('DOMContentLoaded', () => {
     repeatZoneBtn.addEventListener('click', repeatLastZone);
     saveZoneBtn.addEventListener('click', saveCurrentZone);
     backToMenuBtn.addEventListener('click', resetToInitialView);
+    backFromReviewBtn.addEventListener('click', exitReviewMode); // Conectar nuevo botón
 
     setupStartButton(startBtn);
     setupMenu();
@@ -214,11 +207,7 @@ window.addEventListener('DOMContentLoaded', () => {
       if (feedbackText) {
           scoreDisplayToggle.textContent = feedbackText;
           if (feedbackColor) scoreDisplayToggle.style.color = feedbackColor;
-          
-          setTimeout(() => {
-              updateScoreDisplay();
-          }, 3000);
-
+          setTimeout(() => { updateScoreDisplay(); }, 3000);
       } else {
           scoreDisplayToggle.style.color = '#555';
           if(showScoreAsPercentage){
@@ -277,7 +266,7 @@ window.addEventListener('DOMContentLoaded', () => {
 
   function startDrawing(){
     updatePanelUI(() => {
-        ['end-game-options', 'drawZone', 'loaded-zone-options', 'game-interface', 'back-to-menu-btn'].forEach(id => document.getElementById(id).classList.add('hidden'));
+        ['end-game-options', 'drawZone', 'loaded-zone-options', 'game-interface', 'back-to-menu-btn', 'back-from-review-btn'].forEach(id => document.getElementById(id).classList.add('hidden'));
         if (userProfile.showDrawHelp) drawHelpContainer.classList.remove('hidden');
         checkboxWrapper.classList.remove('hidden');
         startOptions.classList.remove('hidden');
@@ -447,7 +436,7 @@ window.addEventListener('DOMContentLoaded', () => {
   }
 
   function enterReviewMode() {
-      clear(true);
+      if(reviewLayer) gameMap.removeLayer(reviewLayer);
       const bounds = L.latLngBounds();
       const reviewColors = ['#E63946', '#457B9D', '#F4A261', '#2A9D8F', '#E9C46A', '#264653', '#F77F00', '#7209B7'];
       reviewLayer = L.layerGroup().addTo(gameMap);
@@ -469,7 +458,17 @@ window.addEventListener('DOMContentLoaded', () => {
       
       updatePanelUI(() => {
           endGameOptions.classList.add('hidden');
-          backToMenuBtn.classList.remove('hidden');
+          backFromReviewBtn.classList.remove('hidden');
+      });
+  }
+
+  // --- NUEVA FUNCIÓN ---
+  function exitReviewMode() {
+      if(reviewLayer) gameMap.removeLayer(reviewLayer);
+      reviewLayer = null;
+      updatePanelUI(() => {
+          backFromReviewBtn.classList.add('hidden');
+          endGameOptions.classList.remove('hidden');
       });
   }
 
@@ -486,10 +485,9 @@ window.addEventListener('DOMContentLoaded', () => {
     checkAndRecenterMap();
     clear();
     if(qIdx >= totalQuestions){ 
-        // Actualizar la barra al 100% al final
         progressBar.style.width = '100%';
         progressCounter.textContent = `${totalQuestions} / ${totalQuestions}`;
-        setTimeout(endGame, 500); // Dar tiempo a ver la barra llena
+        setTimeout(endGame, 500);
         return; 
     }
     
@@ -514,7 +512,7 @@ window.addEventListener('DOMContentLoaded', () => {
   function resetToInitialView() {
     clear(true);
     updatePanelUI(() => {
-        ['start-options', 'loaded-zone-options', 'checkbox-wrapper', 'game-interface', 'end-game-options', 'back-to-menu-btn'].forEach(id => {
+        ['start-options', 'loaded-zone-options', 'checkbox-wrapper', 'game-interface', 'end-game-options', 'back-to-menu-btn', 'back-from-review-btn'].forEach(id => {
             document.getElementById(id).classList.add('hidden');
         });
         drawZoneBtn.classList.remove('hidden');
@@ -568,7 +566,6 @@ window.addEventListener('DOMContentLoaded', () => {
 
   // --- FUNCIONES RESTAURADAS ---
 
-  // CORRECCIÓN: La función repeatLastZone estaba ausente
   function repeatLastZone() {
       if (lastGameZonePoints.length < 3 || lastGameStreetList.length === 0) return;
       clear(true);

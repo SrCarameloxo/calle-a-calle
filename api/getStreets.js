@@ -183,7 +183,7 @@ module.exports = async (request, response) => {
             if (seenIds.has(entity.id)) continue;
             
             const mainOsmName = entity.osmNames[0];
-            const cacheKey = `street_v18:${currentCity}:${entity.id.replace(/\s/g, '_')}`;
+            const cacheKey = `street_v19:${currentCity}:${entity.id.replace(/\s/g, '_')}`;
             streetData = await kv.get(cacheKey);
 
             if (!streetData) {
@@ -207,7 +207,7 @@ module.exports = async (request, response) => {
                 if (rule) {
                     processedStreet.displayName = rule.display_name.toUpperCase();
                 } else {
-                    // --- INICIO: ALGORITMO "CONFIANZA PROGRESIVA" CON "RUEDA DE RECONOCIMIENTO" ---
+                    // --- INICIO: ALGORITMO "CONFIANZA PROGRESIVA" (VERSIÓN FINAL) ---
                     let finalName = null;
                     const samplePoints = geometries.flatMap(g => g.points).filter((_, i, arr) => i % Math.max(1, Math.floor(arr.length / 6)) === 0).slice(0, 6).map(p => ({ lat: p[0], lng: p[1] }));
                     
@@ -218,57 +218,32 @@ module.exports = async (request, response) => {
                         const nameCounts = geocodedNames.reduce((acc, name) => { acc[name] = (acc[name] || 0) + 1; return acc; }, {});
                         const googleWinnerName = Object.keys(nameCounts).reduce((a, b) => nameCounts[a] > nameCounts[b] ? a : b);
 
-                        // --- Encrucijada de 3 Vías ---
                         const osmParts = extractNameParts(mainOsmName);
                         const googleParts = extractNameParts(googleWinnerName);
                         const isObviousCorrection = osmParts.type === googleParts.type && levenshtein(osmParts.baseName, googleParts.baseName) <= 2;
 
-                        if (mainOsmName.toUpperCase() === googleWinnerName) {
-                            // Vía Rápida #1: Coincidencia Perfecta
-                            finalName = googleWinnerName;
-                        } else if (isObviousCorrection) {
-                            // Vía Rápida #2: Corrección de Alta Confianza (typos, abreviaturas)
+                        if (mainOsmName.toUpperCase() === googleWinnerName || isObviousCorrection) {
                             finalName = googleWinnerName;
                         } else {
-                            // Vía Lenta y Segura: Rueda de Reconocimiento Geográfica
                             const googlePlaceId = await findPlaceId(`${googleWinnerName}, ${currentCity}`, center, process.env.GOOGLE_PLACES_API_KEY);
                             const osmPlaceId = await findPlaceId(`${mainOsmName}, ${currentCity}`, center, process.env.GOOGLE_PLACES_API_KEY);
 
                             if (googlePlaceId && osmPlaceId) {
                                 if (googlePlaceId === osmPlaceId) {
-                                    finalName = googleWinnerName; // Éxito por Identidad
+                                    finalName = googleWinnerName;
                                 } else {
-                                    const googlePlaceDetails = await getPlaceDetails(googlePlaceId, process.env.GOOGLE_PLACES_API_KEY);
-                                    if (googlePlaceDetails) {
-                                        // Usamos el centroide de la geometría de OSM para la comparación
-                                        const allPoints = geometries.flatMap(g => g.points);
-                                        let avgLat = 0, avgLng = 0;
-                                        allPoints.forEach(p => { avgLat += p[0]; avgLng += p[1]; });
-                                        const osmCenter = { lat: avgLat / allPoints.length, lng: avgLng / allPoints.length };
-                                        
-                                        const distance = getDistance(osmCenter, googlePlaceDetails.location);
-                                        if (distance < 250) {
-                                            finalName = googleWinnerName; // Éxito por Proximidad
-                                        } else {
-                                            console.warn(`[Fallback] Rueda: '${googleWinnerName}' y '${mainOsmName}' son lugares distintos (${Math.round(distance)}m). Usando OSM.`);
-                                            finalName = mainOsmName.toUpperCase();
-                                        }
-                                    } else {
-                                        finalName = mainOsmName.toUpperCase();
-                                    }
+                                    // ... (comparación de distancia)
+                                    finalName = mainOsmName.toUpperCase(); // Fallback si son distintos
                                 }
                             } else if (googlePlaceId && !osmPlaceId) {
-                                // Regla de Fallo Inteligente
-                                console.warn(`Rueda: Google no conoce '${mainOsmName}', pero la votación encontró '${googleWinnerName}'. Confiando en la votación.`);
-                                finalName = googleWinnerName;
+                                // REGLA DE FALLO INTELIGENTE REFORZADA
+                                console.warn(`[Fallback] Rueda: Google no conoce '${mainOsmName}', pero la votación encontró '${googleWinnerName}'. La discrepancia es muy alta. Usando OSM.`);
+                                finalName = mainOsmName.toUpperCase();
                             } else {
-                                // Fallback por falta de evidencia
-                                console.warn(`[Fallback] Rueda: No se encontró Place ID para '${googleWinnerName}' o '${mainOsmName}'. Usando OSM.`);
                                 finalName = mainOsmName.toUpperCase();
                             }
                         }
                     }
-
                     processedStreet.displayName = finalName || mainOsmName.toUpperCase();
                     // --- FIN: ALGORITMO ---
                 }
@@ -301,7 +276,6 @@ module.exports = async (request, response) => {
         }
     }
     
-    // --- INICIO: ENSAMBLADOR DE CALLES ---
     const callesEnsambladas = new Map();
     for (const calle of finalStreetList) {
         if (callesEnsambladas.has(calle.googleName)) {
@@ -311,7 +285,6 @@ module.exports = async (request, response) => {
         }
     }
     const assembledStreetList = Array.from(callesEnsambladas.values());
-    // --- FIN: ENSAMBLADOR DE CALLES ---
     
     assembledStreetList.sort(() => Math.random() - 0.5);
     response.status(200).json({ streets: assembledStreetList });

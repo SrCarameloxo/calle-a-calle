@@ -207,7 +207,6 @@ module.exports = async (request, response) => {
                 if (rule) {
                     processedStreet.displayName = rule.display_name.toUpperCase();
                 } else {
-                    // --- INICIO: ALGORITMO "CONFIANZA PROGRESIVA" (VERSIÓN FINAL) ---
                     let finalName = null;
                     const samplePoints = geometries.flatMap(g => g.points).filter((_, i, arr) => i % Math.max(1, Math.floor(arr.length / 6)) === 0).slice(0, 6).map(p => ({ lat: p[0], lng: p[1] }));
                     
@@ -232,20 +231,34 @@ module.exports = async (request, response) => {
                                 if (googlePlaceId === osmPlaceId) {
                                     finalName = googleWinnerName;
                                 } else {
-                                    // ... (comparación de distancia)
-                                    finalName = mainOsmName.toUpperCase(); // Fallback si son distintos
+                                    const googlePlaceDetails = await getPlaceDetails(googlePlaceId, process.env.GOOGLE_PLACES_API_KEY);
+                                    if (googlePlaceDetails) {
+                                        const allPoints = geometries.flatMap(g => g.points);
+                                        let avgLat = 0, avgLng = 0;
+                                        allPoints.forEach(p => { avgLat += p[0]; avgLng += p[1]; });
+                                        const osmCenter = { lat: avgLat / allPoints.length, lng: avgLng / allPoints.length };
+                                        const distance = getDistance(osmCenter, googlePlaceDetails.location);
+
+                                        if (distance < 250) {
+                                            finalName = googleWinnerName;
+                                        } else {
+                                            finalName = mainOsmName.toUpperCase();
+                                        }
+                                    } else {
+                                        finalName = mainOsmName.toUpperCase();
+                                    }
                                 }
                             } else if (googlePlaceId && !osmPlaceId) {
-                                // REGLA DE FALLO INTELIGENTE REFORZADA
-                                console.warn(`[Fallback] Rueda: Google no conoce '${mainOsmName}', pero la votación encontró '${googleWinnerName}'. La discrepancia es muy alta. Usando OSM.`);
-                                finalName = mainOsmName.toUpperCase();
+                                // REGLA DE FALLO INTELIGENTE (LA CORRECCIÓN)
+                                console.warn(`Rueda: Google no conoce '${mainOsmName}', pero la votación encontró '${googleWinnerName}'. Confiando en la votación.`);
+                                finalName = googleWinnerName;
                             } else {
+                                console.warn(`[Fallback] Rueda: No se encontró Place ID para '${googleWinnerName}' o la evidencia es insuficiente. Usando OSM.`);
                                 finalName = mainOsmName.toUpperCase();
                             }
                         }
                     }
                     processedStreet.displayName = finalName || mainOsmName.toUpperCase();
-                    // --- FIN: ALGORITMO ---
                 }
                 
                 streetData = processedStreet;

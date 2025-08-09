@@ -183,7 +183,9 @@ module.exports = async (request, response) => {
             if (seenIds.has(entity.id)) continue;
             
             const mainOsmName = entity.osmNames[0];
-            const cacheKey = `street_v20:${currentCity}:${entity.id.replace(/\s/g, '_')}`;
+            
+            // --- CAMBIO DE VERSIÓN DE CACHÉ ---
+            const cacheKey = `street_v21:${currentCity}:${entity.id.replace(/\s/g, '_')}`;
             streetData = await kv.get(cacheKey);
 
             if (!streetData) {
@@ -222,13 +224,21 @@ module.exports = async (request, response) => {
                         
                         const osmBaseWords = new Set(osmParts.baseName.split(' '));
                         const googleBaseWords = new Set(googleParts.baseName.split(' '));
+                        
+                        // --- INICIO DE LA LÓGICA AÑADIDA ---
                         const intersection = new Set([...osmBaseWords].filter(x => googleBaseWords.has(x)));
+                        const totalWords = Math.max(osmBaseWords.size, googleBaseWords.size);
+                        // La nueva regla: si el nombre tiene más de 2 palabras y solo difiere en una, es un match.
+                        const isWordMarginMatch = (totalWords > 2 && intersection.size >= totalWords - 1);
+                        // --- FIN DE LA LÓGICA AÑADIDA ---
+                        
                         const union = new Set([...osmBaseWords, ...googleBaseWords]);
                         const jaccardIndex = union.size > 0 ? intersection.size / union.size : 0;
                         
-                        const isObviousCorrection = osmParts.type === googleParts.type && jaccardIndex >= 0.5; // CORRECCIÓN: Cambiado > a >=
+                        const isObviousCorrection = osmParts.type === googleParts.type && jaccardIndex >= 0.5;
 
-                        if (mainOsmName.toUpperCase() === googleWinnerName || isObviousCorrection) {
+                        // --- MODIFICACIÓN DE LA CONDICIÓN PRINCIPAL ---
+                        if (mainOsmName.toUpperCase() === googleWinnerName || isObviousCorrection || isWordMarginMatch) {
                             finalName = googleWinnerName;
                         } else {
                             const googlePlaceId = await findPlaceId(`${googleWinnerName}, ${currentCity}`, center, process.env.GOOGLE_PLACES_API_KEY);

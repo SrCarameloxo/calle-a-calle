@@ -37,17 +37,18 @@ function calculateOptimalSearch(zonePoints) {
   return { center, radius: Math.round(maxDistance + 200) };
 }
 
-// Función para comprobar si un punto está dentro de un polígono (ray casting algorithm)
-function isPointInPolygon(point, polygon) {
-    let x = point.lat, y = point.lng;
-    let inside = false;
-    for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
-        let xi = polygon[i][0], yi = polygon[i][1];
-        let xj = polygon[j][0], yj = polygon[j][1];
-        let intersect = ((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
-        if (intersect) inside = !inside;
+function levenshtein(a, b) {
+  if (a.length === 0) return b.length; if (b.length === 0) return a.length;
+  const matrix = Array(a.length + 1).fill(null).map(() => Array(b.length + 1).fill(null));
+  for (let i = 0; i <= b.length; i++) matrix[0][i] = i;
+  for (let j = 0; j <= a.length; j++) matrix[j][0] = j;
+  for (let j = 1; j <= a.length; j++) {
+    for (let i = 1; i <= b.length; i++) {
+      const cost = a[j - 1] === b[i - 1] ? 0 : 1;
+      matrix[j][i] = Math.min(matrix[j][i - 1] + 1, matrix[j - 1][i] + 1, matrix[j - 1][i - 1] + cost);
     }
-    return inside;
+  }
+  return matrix[a.length][b.length];
 }
 
 function getCityFromResult(result) {
@@ -72,7 +73,7 @@ async function geocode(pt, apiKey) {
 }
 
 async function findPlaceId(streetName, center, apiKey) {
-    const url = `https://maps.googleapis.com/maps/api/place/textsearch/json?query=${encodeURIComponent(streetName)}&location=${center.lat},${center.lng}&radius=500&key=${apiKey}`;
+    const url = `https://maps.googleapis.com/maps/api/place/textsearch/json?query=${encodeURIComponent(streetName)}&location=${center.lat},${center.lng}&radius=250&key=${apiKey}`;
     const res = await fetch(url);
     const data = await res.json();
     if (data.status === 'OK' && data.results.length > 0) {
@@ -145,17 +146,44 @@ module.exports = async (request, response) => {
 
     let finalStreetList = [];
     const seenIds = new Set();
+    const LINE_TYPES = new Set(['CALLE', 'AVENIDA', 'PASEO', 'RONDA', 'CAMINO', 'CAÑADA', 'CALLEJA', 'CALLEJON']);
+    const AREA_TYPES = new Set(['PLAZA', 'PARQUE', 'JARDIN', 'GLORIETA']);
 
     for (const [baseName, group] of groupedByBaseName.entries()) {
-        // ... (la lógica de agrupación se mantiene igual)
-        const entitiesToProcess = [{ id: baseName, osmNames: group.map(item => item.osmName) }];
+        const groupTypes = new Set(group.map(item => item.parts.type));
+        
+        let shouldSplit = false;
+        if (groupTypes.size > 1) {
+            const hasAreaType = [...groupTypes].some(type => AREA_TYPES.has(type));
+            const hasLineType = [...groupTypes].some(type => LINE_TYPES.has(type) || type === null);
+            if (hasAreaType && hasLineType) {
+                shouldSplit = true;
+            }
+            if (!hasAreaType && new Set([...groupTypes].filter(t => t !== null)).size > 1) {
+                shouldSplit = true;
+            }
+        }
+
+        let entitiesToProcess = [];
+        if (shouldSplit) {
+            entitiesToProcess = group.map(item => ({
+                id: `${item.parts.type || 'WAY'}_${item.parts.baseName}`,
+                osmNames: [item.osmName]
+            }));
+        } else {
+            entitiesToProcess = [{
+                id: baseName,
+                osmNames: group.map(item => item.osmName)
+            }];
+        }
         
         for (const entity of entitiesToProcess) {
             let streetData = null;
+
             if (seenIds.has(entity.id)) continue;
             
             const mainOsmName = entity.osmNames[0];
-            const cacheKey = `street_v21:${currentCity}:${entity.id.replace(/\s/g, '_')}`;
+            const cacheKey = `street_v20:${currentCity}:${entity.id.replace(/\s/g, '_')}`;
             streetData = await kv.get(cacheKey);
 
             if (!streetData) {
@@ -179,9 +207,8 @@ module.exports = async (request, response) => {
                 if (rule) {
                     processedStreet.displayName = rule.display_name.toUpperCase();
                 } else {
-                    // --- INICIO: ALGORITMO DE VERIFICACIÓN GEOGRÁFICA ---
-                    let finalName = mainOsmName.toUpperCase();
-                    const samplePoints = geometries.flatMap(g => g.points).filter((_, i, arr) => i % Math.max(1, Math.floor(arr.length / 5)) === 0).slice(0, 5).map(p => ({ lat: p[0], lng: p[1] }));
+                    let finalName = null;
+                    const samplePoints = geometries.flatMap(g => g.points).filter((_, i, arr) => i % Math.max(1, Math.floor(arr.length / 6)) === 0).slice(0, 6).map(p => ({ lat: p[0], lng: p[1] }));
                     
                     const geocodeResults = await Promise.all(samplePoints.map(pt => geocode(pt, process.env.GOOGLE_API_KEY)));
                     const geocodedNames = geocodeResults.filter(Boolean).map(geo => geo.name);
@@ -190,41 +217,37 @@ module.exports = async (request, response) => {
                         const nameCounts = geocodedNames.reduce((acc, name) => { acc[name] = (acc[name] || 0) + 1; return acc; }, {});
                         const googleWinnerName = Object.keys(nameCounts).reduce((a, b) => nameCounts[a] > nameCounts[b] ? a : b);
 
-                        if (mainOsmName.toUpperCase() !== googleWinnerName) {
-                            const placeId = await findPlaceId(`${googleWinnerName}, ${currentCity}`, center, process.env.GOOGLE_PLACES_API_KEY);
-                            if (placeId) {
-                                const placeDetails = await getPlaceDetails(placeId, process.env.GOOGLE_PLACES_API_KEY);
-                                if (placeDetails && placeDetails.types.includes('route')) {
-                                    const googlePoint = placeDetails.location;
-                                    
-                                    // Comprobar si el punto de Google está cerca de CUALQUIER segmento de OSM
-                                    let isCloseEnough = false;
-                                    for (const geom of geometries) {
-                                        const polyline = L.polyline(geom.points);
-                                        const closestPoint = L.GeometryUtil.closest(L.map(document.createElement('div')), polyline, L.latLng(googlePoint.lat, googlePoint.lng));
-                                        if (closestPoint.distance < 50) { // Umbral de 50 metros
-                                            isCloseEnough = true;
-                                            break;
-                                        }
-                                    }
+                        const osmParts = extractNameParts(mainOsmName);
+                        const googleParts = extractNameParts(googleWinnerName);
+                        
+                        const osmBaseWords = new Set(osmParts.baseName.split(' '));
+                        const googleBaseWords = new Set(googleParts.baseName.split(' '));
+                        const intersection = new Set([...osmBaseWords].filter(x => googleBaseWords.has(x)));
+                        const union = new Set([...osmBaseWords, ...googleBaseWords]);
+                        const jaccardIndex = union.size > 0 ? intersection.size / union.size : 0;
+                        
+                        const isObviousCorrection = osmParts.type === googleParts.type && jaccardIndex >= 0.5; // CORRECCIÓN: Cambiado > a >=
 
-                                    if (isCloseEnough) {
-                                        finalName = googleWinnerName;
-                                    } else {
-                                        console.warn(`[Fallback] Geométrica: Google Place para '${googleWinnerName}' está demasiado lejos de la geometría de OSM para '${mainOsmName}'. Usando OSM.`);
-                                    }
+                        if (mainOsmName.toUpperCase() === googleWinnerName || isObviousCorrection) {
+                            finalName = googleWinnerName;
+                        } else {
+                            const googlePlaceId = await findPlaceId(`${googleWinnerName}, ${currentCity}`, center, process.env.GOOGLE_PLACES_API_KEY);
+                            const osmPlaceId = await findPlaceId(`${mainOsmName}, ${currentCity}`, center, process.env.GOOGLE_PLACES_API_KEY);
+
+                            if (googlePlaceId && !osmPlaceId) {
+                                finalName = googleWinnerName;
+                            } else if (googlePlaceId && osmPlaceId) {
+                                if (googlePlaceId === osmPlaceId) {
+                                    finalName = googleWinnerName;
                                 } else {
-                                    console.warn(`[Fallback] Geométrica: Google Place para '${googleWinnerName}' no es una ruta. Usando OSM.`);
+                                    finalName = mainOsmName.toUpperCase();
                                 }
                             } else {
-                                console.warn(`[Fallback] Geométrica: No se encontró Place ID para '${googleWinnerName}'. Usando OSM.`);
+                                finalName = mainOsmName.toUpperCase();
                             }
-                        } else {
-                            finalName = googleWinnerName;
                         }
                     }
-                    processedStreet.displayName = finalName;
-                    // --- FIN: ALGORITMO ---
+                    processedStreet.displayName = finalName || mainOsmName.toUpperCase();
                 }
                 
                 streetData = processedStreet;
@@ -237,8 +260,13 @@ module.exports = async (request, response) => {
 
             if (!streetData) continue;
             
-            const isArea = streetData.geometries.some(g => g.isClosed);
-            if (!POIsAllowed && isArea) {
+            const hasLines = streetData.geometries.some(g => !g.isClosed);
+            const hasAreas = streetData.geometries.some(g => g.isClosed);
+            if (hasLines && hasAreas) {
+                streetData.geometries = streetData.geometries.filter(g => !g.isClosed);
+            }
+            const finalGeomHasArea = streetData.geometries.some(g => g.isClosed);
+            if (!POIsAllowed && finalGeomHasArea) {
                 continue;
             }
 

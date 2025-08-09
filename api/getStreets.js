@@ -288,7 +288,7 @@ module.exports = async (request, response) => {
                                         const osmCenter = { lat: avgLat / allPoints.length, lng: avgLng / allPoints.length };
                                         
                                         const distance = getDistance(osmCenter, googlePlaceDetails.location); // Esta línea ahora funcionará
-                                        if (distance < 50) {
+                                        if (distance < 30) {
                                             finalName = googleWinnerName; // Éxito por Proximidad
                                         } else {
                                             console.warn(`[Fallback] Rueda: '${googleWinnerName}' y '${mainOsmName}' son lugares distintos (${Math.round(distance)}m). Usando OSM.`);

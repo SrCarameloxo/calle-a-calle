@@ -227,7 +227,7 @@ module.exports = async (request, response) => {
                         const union = new Set([...osmBaseWords, ...googleBaseWords]);
                         const jaccardIndex = intersection.size / union.size; // Métrica de similitud de palabras
                         
-                        const isObviousCorrection = osmParts.type === googleParts.type && jaccardIndex > 0.6; // Umbral de similitud
+                        const isObviousCorrection = osmParts.type === googleParts.type && jaccardIndex > 0.5; // Umbral de similitud
                         // FIN: LÓGICA DE "CORRECCIÓN OBVIA" MEJORADA
 
                         if (mainOsmName.toUpperCase() === googleWinnerName || isObviousCorrection) {

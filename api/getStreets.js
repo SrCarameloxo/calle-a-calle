@@ -51,6 +51,38 @@ function levenshtein(a, b) {
   return matrix[a.length][b.length];
 }
 
+/**
+ * [NUEVA FUNCIÓN]
+ * Compara dos nombres base de calles basándose en el número de palabras coincidentes.
+ * @param {string} baseNameA El primer nombre base (ej: "SANTA INGRACIA").
+ * @param {string} baseNameB El segundo nombre base (ej: "SANTA INGRACIA IISGUERO").
+ * @returns {boolean} True si los nombres se consideran similares según la regla de coincidencia de palabras.
+ */
+function areNamesSimilarByWordCount(baseNameA, baseNameB) {
+  if (!baseNameA || !baseNameB) return false;
+
+  const wordsA = baseNameA.toUpperCase().split(' ').filter(Boolean);
+  const wordsB = baseNameB.toUpperCase().split(' ').filter(Boolean);
+
+  const setB = new Set(wordsB);
+  const commonWordsCount = wordsA.filter(word => setB.has(word)).length;
+  
+  const totalWords = Math.max(wordsA.length, wordsB.length);
+
+  // Si tiene 2 palabras, exigimos que ambas coincidan para evitar falsos positivos.
+  if (totalWords === 2) {
+    return commonWordsCount === 2;
+  }
+
+  // Si tiene 3 o más palabras, aplicamos la regla N-1.
+  if (totalWords >= 3) {
+    return commonWordsCount >= totalWords - 1;
+  }
+  
+  return false; 
+}
+
+
 function getCityFromResult(result) {
     const cityComponent = result.address_components.find(c => c.types.includes('locality'));
     return cityComponent ? cityComponent.long_name : null;
@@ -218,16 +250,21 @@ module.exports = async (request, response) => {
                         const nameCounts = geocodedNames.reduce((acc, name) => { acc[name] = (acc[name] || 0) + 1; return acc; }, {});
                         const googleWinnerName = Object.keys(nameCounts).reduce((a, b) => nameCounts[a] > nameCounts[b] ? a : b);
 
-                        // --- Encrucijada de 3 Vías ---
+                        // --- [INICIO SECCIÓN MODIFICADA] Encrucijada de 3 Vías ---
                         const osmParts = extractNameParts(mainOsmName);
                         const googleParts = extractNameParts(googleWinnerName);
-                        const isObviousCorrection = osmParts.type === googleParts.type && levenshtein(osmParts.baseName, googleParts.baseName) <= 2;
+                        
+                        // Condición 1: Corrección de typos a nivel de caracteres
+                        const isTypoCorrection = osmParts.type === googleParts.type && levenshtein(osmParts.baseName, googleParts.baseName) <= 2;
+                        
+                        // Condición 2: Coincidencia por recuento de palabras (tu nueva lógica)
+                        const isWordCountMatch = osmParts.type === googleParts.type && areNamesSimilarByWordCount(osmParts.baseName, googleParts.baseName);
 
                         if (mainOsmName.toUpperCase() === googleWinnerName) {
                             // Vía Rápida #1: Coincidencia Perfecta
                             finalName = googleWinnerName;
-                        } else if (isObviousCorrection) {
-                            // Vía Rápida #2: Corrección de Alta Confianza (typos, abreviaturas)
+                        } else if (isTypoCorrection || isWordCountMatch) {
+                            // Vía Rápida #2: Corrección de Alta Confianza (cubre typos Y diferencias de palabras)
                             finalName = googleWinnerName;
                         } else {
                             // Vía Lenta y Segura: Rueda de Reconocimiento Geográfica
@@ -267,6 +304,7 @@ module.exports = async (request, response) => {
                                 finalName = mainOsmName.toUpperCase();
                             }
                         }
+                        // --- [FIN SECCIÓN MODIFICADA] ---
                     }
 
                     processedStreet.displayName = finalName || mainOsmName.toUpperCase();

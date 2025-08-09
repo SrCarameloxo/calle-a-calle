@@ -228,7 +228,7 @@ module.exports = async (request, response) => {
             if (seenIds.has(entity.id)) continue;
             
             const mainOsmName = entity.osmNames[0];
-            const cacheKey = `street_v21:${currentCity}:${entity.id.replace(/\s/g, '_')}`; // <-- CACHE INVALIDADA
+            const cacheKey = `street_v22-final:${currentCity}:${entity.id.replace(/\s/g, '_')}`; // <-- CACHE INVALIDADA
             streetData = await kv.get(cacheKey);
 
             if (!streetData) {

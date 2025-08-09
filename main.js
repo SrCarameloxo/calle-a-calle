@@ -442,6 +442,7 @@ window.addEventListener('DOMContentLoaded', () => {
         gameInterface.classList.add('hidden');
         finalScoreEl.textContent = `¡Partida terminada! Puntuación: ${streetsGuessedCorrectly} / ${totalQuestions}`;
         endGameOptions.classList.remove('hidden');
+        backToMenuBtn.classList.remove('hidden');
         
         if (zonePoly) {
             zonePoly.setStyle({ color: '#696969', weight: 2, dashArray: '5, 5', fillOpacity: 0.05 });

@@ -239,7 +239,7 @@ module.exports = async (request, response) => {
                 if (rule) {
                     processedStreet.displayName = rule.display_name.toUpperCase();
                 } else {
-                    // --- INICIO: ALGORITMO "CONFIANZA PROGRESIVA" CON "RUEDA DE RECONOCIMIENTO" ---
+                    // --- INICIO: ALGORITMO "CONFIANZA PROGRESIVA" (VERSIÓN MEJORADA) ---
                     let finalName = null;
                     const samplePoints = geometries.flatMap(g => g.points).filter((_, i, arr) => i % Math.max(1, Math.floor(arr.length / 6)) === 0).slice(0, 6).map(p => ({ lat: p[0], lng: p[1] }));
                     
@@ -250,61 +250,38 @@ module.exports = async (request, response) => {
                         const nameCounts = geocodedNames.reduce((acc, name) => { acc[name] = (acc[name] || 0) + 1; return acc; }, {});
                         const googleWinnerName = Object.keys(nameCounts).reduce((a, b) => nameCounts[a] > nameCounts[b] ? a : b);
 
-                        // --- [INICIO SECCIÓN MODIFICADA] Encrucijada de 3 Vías ---
                         const osmParts = extractNameParts(mainOsmName);
                         const googleParts = extractNameParts(googleWinnerName);
                         
-                        // Condición 1: Corrección de typos a nivel de caracteres
                         const isTypoCorrection = osmParts.type === googleParts.type && levenshtein(osmParts.baseName, googleParts.baseName) <= 2;
-                        
-                        // Condición 2: Coincidencia por recuento de palabras (tu nueva lógica)
                         const isWordCountMatch = osmParts.type === googleParts.type && areNamesSimilarByWordCount(osmParts.baseName, googleParts.baseName);
+                        
+                        // Nueva condición: ¿El nombre de OSM no apareció nunca en la votación?
+                        const osmNameWasNeverVoted = !geocodedNames.includes(mainOsmName.toUpperCase());
 
                         if (mainOsmName.toUpperCase() === googleWinnerName) {
-                            // Vía Rápida #1: Coincidencia Perfecta
+                            // Vía Rápida #1: Coincidencia Perfecta. El nombre de OSM y Google es el mismo.
                             finalName = googleWinnerName;
                         } else if (isTypoCorrection || isWordCountMatch) {
-                            // Vía Rápida #2: Corrección de Alta Confianza (cubre typos Y diferencias de palabras)
+                            // Vía Rápida #2: Corrección de Alta Confianza. Es un typo o una diferencia de palabras menores.
+                            finalName = googleWinnerName;
+                        } else if (osmNameWasNeverVoted && geocodedNames.length >= 2) {
+                            // VÍA RÁPIDA #3 (NUEVA): Consenso de Google contra OSM.
+                            // Si el nombre de OSM no salió NUNCA en la votación, y tenemos al menos
+                            // dos votos de Google, confiamos en el ganador de la votación.
+                            // Este es el caso que resuelve "Calle Fernando..." -> "Calle Brezos".
+                            console.warn(`[Confianza por Votación] OSM:'${mainOsmName}' -> Google:'${googleWinnerName}'`);
                             finalName = googleWinnerName;
                         } else {
-                            // Vía Lenta y Segura: Rueda de Reconocimiento Geográfica
-                            const googlePlaceId = await findPlaceId(`${googleWinnerName}, ${currentCity}`, center, process.env.GOOGLE_PLACES_API_KEY);
-                            const osmPlaceId = await findPlaceId(`${mainOsmName}, ${currentCity}`, center, process.env.GOOGLE_PLACES_API_KEY);
-
-                            if (googlePlaceId && osmPlaceId) {
-                                if (googlePlaceId === osmPlaceId) {
-                                    finalName = googleWinnerName; // Éxito por Identidad
-                                } else {
-                                    const googlePlaceDetails = await getPlaceDetails(googlePlaceId, process.env.GOOGLE_PLACES_API_KEY);
-                                    if (googlePlaceDetails) {
-                                        // Usamos el centroide de la geometría de OSM para la comparación
-                                        const allPoints = geometries.flatMap(g => g.points);
-                                        let avgLat = 0, avgLng = 0;
-                                        allPoints.forEach(p => { avgLat += p[0]; avgLng += p[1]; });
-                                        const osmCenter = { lat: avgLat / allPoints.length, lng: avgLng / allPoints.length };
-                                        
-                                        const distance = getDistance(osmCenter, googlePlaceDetails.location);
-                                        if (distance < 250) {
-                                            finalName = googleWinnerName; // Éxito por Proximidad
-                                        } else {
-                                            console.warn(`[Fallback] Rueda: '${googleWinnerName}' y '${mainOsmName}' son lugares distintos (${Math.round(distance)}m). Usando OSM.`);
-                                            finalName = mainOsmName.toUpperCase();
-                                        }
-                                    } else {
-                                        finalName = mainOsmName.toUpperCase();
-                                    }
-                                }
-                            } else if (googlePlaceId && !osmPlaceId) {
-                                // Regla de Fallo Inteligente
-                                console.warn(`Rueda: Google no conoce '${mainOsmName}', pero la votación encontró '${googleWinnerName}'. Confiando en la votación.`);
-                                finalName = googleWinnerName;
-                            } else {
-                                // Fallback por falta de evidencia
-                                console.warn(`[Fallback] Rueda: No se encontró Place ID para '${googleWinnerName}' o '${mainOsmName}'. Usando OSM.`);
-                                finalName = mainOsmName.toUpperCase();
-                            }
+                            // Vía de último recurso: No hay consenso claro. Nos quedamos con el nombre de OSM
+                            // para no inventar un nombre incorrecto.
+                            console.warn(`[Fallback] Votación no concluyente para '${mainOsmName}'. Usando OSM.`);
+                            finalName = mainOsmName.toUpperCase();
                         }
-                        // --- [FIN SECCIÓN MODIFICADA] ---
+
+                    } else {
+                         // Si Google no devuelve ningún nombre, no tenemos más remedio que usar el de OSM.
+                        finalName = mainOsmName.toUpperCase();
                     }
 
                     processedStreet.displayName = finalName || mainOsmName.toUpperCase();

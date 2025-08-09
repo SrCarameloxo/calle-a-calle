@@ -73,7 +73,7 @@ async function geocode(pt, apiKey) {
 }
 
 async function findPlaceId(streetName, center, apiKey) {
-    const url = `https://maps.googleapis.com/maps/api/place/textsearch/json?query=${encodeURIComponent(streetName)}&location=${center.lat},${center.lng}&radius=150&key=${apiKey}`;
+    const url = `https://maps.googleapis.com/maps/api/place/textsearch/json?query=${encodeURIComponent(streetName)}&location=${center.lat},${center.lng}&radius=250&key=${apiKey}`;
     const res = await fetch(url);
     const data = await res.json();
     if (data.status === 'OK' && data.results.length > 0) {
@@ -183,7 +183,7 @@ module.exports = async (request, response) => {
             if (seenIds.has(entity.id)) continue;
             
             const mainOsmName = entity.osmNames[0];
-            const cacheKey = `street_v14:${currentCity}:${entity.id.replace(/\s/g, '_')}`;
+            const cacheKey = `street_v16:${currentCity}:${entity.id.replace(/\s/g, '_')}`;
             streetData = await kv.get(cacheKey);
 
             if (!streetData) {
@@ -207,73 +207,69 @@ module.exports = async (request, response) => {
                 if (rule) {
                     processedStreet.displayName = rule.display_name.toUpperCase();
                 } else {
-                    // --- INICIO: ALGORITMO DE "CONFIANZA PROGRESIVA" ---
-                    
-                    // Paso 1: Votación Rápida
-                    const samplePoints = geometries.flatMap(g => g.points).filter((_, i, arr) => i % Math.max(1, Math.floor(arr.length / 6)) === 0).slice(0, 6).map(p => ({ lat: p[0], lng: p[1] }));
-                    const quickCheckPoints = samplePoints.slice(0, 3);
-                    const quickCheckResults = await Promise.all(quickCheckPoints.map(pt => geocode(pt, process.env.GOOGLE_API_KEY)));
-                    const quickCheckNames = quickCheckResults.filter(Boolean).map(geo => geo.name);
-
+                    // --- INICIO: ALGORITMO "CONFIANZA PROGRESIVA" CON "RUEDA DE RECONOCIMIENTO" ---
                     let finalName = null;
+                    const samplePoints = geometries.flatMap(g => g.points).filter((_, i, arr) => i % Math.max(1, Math.floor(arr.length / 6)) === 0).slice(0, 6).map(p => ({ lat: p[0], lng: p[1] }));
 
-                    if (quickCheckNames.length === 3 && new Set(quickCheckNames).size === 1) {
-                        finalName = quickCheckNames[0];
+                    // Paso 1: Votación Rápida
+                    const quickCheckPoints = samplePoints.slice(0, 3);
+                    let geocodedNames = [];
+                    if (quickCheckPoints.length > 0) {
+                        const quickCheckResults = await Promise.all(quickCheckPoints.map(pt => geocode(pt, process.env.GOOGLE_API_KEY)));
+                        geocodedNames = quickCheckResults.filter(Boolean).map(geo => geo.name);
+                    }
+
+                    // Paso 2: Decisión Temprana o Investigación Profunda
+                    if (geocodedNames.length === 3 && new Set(geocodedNames).size === 1) {
+                        finalName = geocodedNames[0];
                     } else {
-                        // Paso 2: Encrucijada y posible desambiguación
-                        const allGeocodeResults = [...quickCheckNames];
                         const deepDivePoints = samplePoints.slice(3);
                         if (deepDivePoints.length > 0) {
                             const deepDiveResults = await Promise.all(deepDivePoints.map(pt => geocode(pt, process.env.GOOGLE_API_KEY)));
-                            allGeocodeResults.push(...deepDiveResults.filter(Boolean).map(geo => geo.name));
-                        }
-
-                        if (allGeocodeResults.length > 0) {
-                            const nameCounts = allGeocodeResults.reduce((acc, name) => { acc[name] = (acc[name] || 0) + 1; return acc; }, {});
-                            const googleWinnerName = Object.keys(nameCounts).reduce((a, b) => nameCounts[a] > nameCounts[b] ? a : b);
-
-                            // Paso 2.1: ¿Coincidencia perfecta o corrección obvia?
-                            const osmParts = extractNameParts(mainOsmName);
-                            const googleParts = extractNameParts(googleWinnerName);
-                            const isObviousCorrection = osmParts.type === googleParts.type && levenshtein(osmParts.baseName, googleParts.baseName) <= 2;
-                            
-                            if (mainOsmName.toUpperCase() === googleWinnerName || isObviousCorrection) {
-                                finalName = googleWinnerName;
-                            } else {
-                                // Paso 3: Desambiguación Geográfica con API Places
-                                const placeId = await findPlaceId(`${googleWinnerName}, ${currentCity}`, center, process.env.GOOGLE_PLACES_API_KEY);
-                                if (placeId) {
-                                    const placeDetails = await getPlaceDetails(placeId, process.env.GOOGLE_PLACES_API_KEY);
-                                    if (placeDetails && placeDetails.types.includes('route')) {
-                                        // Calcular centroide de la geometría de OSM
-                                        const allPoints = geometries.flatMap(g => g.points);
-                                        let avgLat = 0, avgLng = 0;
-                                        allPoints.forEach(p => { avgLat += p[0]; avgLng += p[1]; });
-                                        const osmCenter = { lat: avgLat / allPoints.length, lng: avgLng / allPoints.length };
-                                        
-                                        const googleCenter = placeDetails.location;
-                                        const distance = getDistance(osmCenter, googleCenter);
-
-                                        if (distance < 250) { // Umbral de distancia generoso
-                                            finalName = googleWinnerName;
-                                        } else {
-                                            console.warn(`[Fallback] Desambiguación: Google Place para '${googleWinnerName}' está a ${Math.round(distance)}m. Usando OSM: '${mainOsmName}'.`);
-                                            finalName = mainOsmName.toUpperCase();
-                                        }
-                                    } else {
-                                        console.warn(`[Fallback] Desambiguación: Google Place para '${googleWinnerName}' no es una ruta. Usando OSM: '${mainOsmName}'.`);
-                                        finalName = mainOsmName.toUpperCase();
-                                    }
-                                } else {
-                                    console.warn(`[Fallback] Desambiguación: No se encontró Place ID para '${googleWinnerName}'. Usando OSM: '${mainOsmName}'.`);
-                                    finalName = mainOsmName.toUpperCase();
-                                }
-                            }
+                            geocodedNames.push(...deepDiveResults.filter(Boolean).map(geo => geo.name));
                         }
                     }
 
+                    if (geocodedNames.length > 0 && !finalName) {
+                        const nameCounts = geocodedNames.reduce((acc, name) => { acc[name] = (acc[name] || 0) + 1; return acc; }, {});
+                        const googleWinnerName = Object.keys(nameCounts).reduce((a, b) => nameCounts[a] > nameCounts[b] ? a : b);
+                        
+                        // Paso 3: Rueda de Reconocimiento si es necesario
+                        if (mainOsmName.toUpperCase() === googleWinnerName) {
+                            finalName = googleWinnerName;
+                        } else {
+                            const googlePlaceId = await findPlaceId(`${googleWinnerName}, ${currentCity}`, center, process.env.GOOGLE_PLACES_API_KEY);
+                            const osmPlaceId = await findPlaceId(`${mainOsmName}, ${currentCity}`, center, process.env.GOOGLE_PLACES_API_KEY);
+
+                            if (googlePlaceId && osmPlaceId) {
+                                if (googlePlaceId === osmPlaceId) {
+                                    finalName = googleWinnerName;
+                                } else {
+                                    const osmPlaceDetails = await getPlaceDetails(osmPlaceId, process.env.GOOGLE_PLACES_API_KEY);
+                                    const googlePlaceDetails = await getPlaceDetails(googlePlaceId, process.env.GOOGLE_PLACES_API_KEY);
+                                    if (osmPlaceDetails && googlePlaceDetails) {
+                                        const distance = getDistance(osmPlaceDetails.location, googlePlaceDetails.location);
+                                        if (distance < 250) {
+                                            finalName = googleWinnerName;
+                                        } else {
+                                            console.warn(`[Fallback] Rueda Reconocimiento: '${googleWinnerName}' y '${mainOsmName}' son lugares distintos (${Math.round(distance)}m). Usando OSM.`);
+                                            finalName = mainOsmName.toUpperCase();
+                                        }
+                                    } else {
+                                        finalName = mainOsmName.toUpperCase();
+                                    }
+                                }
+                            } else if (googlePlaceId && !osmPlaceId) {
+                                console.warn(`Rueda Reconocimiento: Google no conoce '${mainOsmName}', pero sí '${googleWinnerName}'. Confiando en la votación.`);
+                                finalName = googleWinnerName;
+                            } else {
+                                console.warn(`[Fallback] Rueda Reconocimiento: No se encontró Place ID para '${googleWinnerName}'. Usando OSM.`);
+                                finalName = mainOsmName.toUpperCase();
+                            }
+                        }
+                    }
                     processedStreet.displayName = finalName || mainOsmName.toUpperCase();
-                    // --- FIN: ALGORITMO DE "CONFIANZA PROGRESIVA" ---
+                    // --- FIN: ALGORITMO ---
                 }
                 
                 streetData = processedStreet;

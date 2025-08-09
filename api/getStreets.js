@@ -51,6 +51,13 @@ function levenshtein(a, b) {
   return matrix[a.length][b.length];
 }
 
+/**
+ * [NUEVA FUNCIÓN]
+ * Compara dos nombres base de calles basándose en el número de palabras coincidentes.
+ * @param {string} baseNameA El primer nombre base (ej: "SANTA INGRACIA").
+ * @param {string} baseNameB El segundo nombre base (ej: "SANTA INGRACIA IISGUERO").
+ * @returns {boolean} True si los nombres se consideran similares según la regla de coincidencia de palabras.
+ */
 function areNamesSimilarByWordCount(baseNameA, baseNameB) {
   if (!baseNameA || !baseNameB) return false;
 
@@ -62,9 +69,12 @@ function areNamesSimilarByWordCount(baseNameA, baseNameB) {
   
   const totalWords = Math.max(wordsA.length, wordsB.length);
 
+  // Si tiene 2 palabras, exigimos que ambas coincidan para evitar falsos positivos.
   if (totalWords === 2) {
     return commonWordsCount === 2;
   }
+
+  // Si tiene 3 o más palabras, aplicamos la regla N-1.
   if (totalWords >= 3) {
     return commonWordsCount >= totalWords - 1;
   }
@@ -116,29 +126,6 @@ async function getPlaceDetails(placeId, apiKey) {
         };
     }
     return null;
-}
-
-async function getOsmGeometryForName(name, center, radius) {
-    const queryName = name.replace(/"/g, '\\"');
-    const geometryQuery = `[out:json][timeout:25]; way["name"="${queryName}"](around:${radius}, ${center.lat}, ${center.lng}); out body; >; out skel qt;`;
-    const res = await fetch('https://overpass-api.de/api/interpreter', { method: 'POST', body: geometryQuery });
-    if (!res.ok) return [];
-    const geomData = await res.json();
-    const elementsById = geomData.elements.reduce((acc, el) => { acc[el.id] = el; return acc; }, {});
-    return geomData.elements
-        .filter(el => el.type === 'way')
-        .map(el => ({
-            points: (el.nodes || []).map(id => elementsById[id]).filter(Boolean).map(n => [n.lat, n.lon])
-        }))
-        .filter(g => g.points.length > 1);
-}
-
-function getCentroid(geometries) {
-    const allPoints = geometries.flatMap(g => g.points);
-    if (allPoints.length === 0) return null;
-    let avgLat = 0, avgLng = 0;
-    allPoints.forEach(p => { avgLat += p[0]; avgLng += p[1]; });
-    return { lat: avgLat / allPoints.length, lng: avgLng / allPoints.length };
 }
 
 
@@ -228,7 +215,7 @@ module.exports = async (request, response) => {
             if (seenIds.has(entity.id)) continue;
             
             const mainOsmName = entity.osmNames[0];
-            const cacheKey = `street_v22-final:${currentCity}:${entity.id.replace(/\s/g, '_')}`; // <-- CACHE INVALIDADA
+            const cacheKey = `street_v18:${currentCity}:${entity.id.replace(/\s/g, '_')}`;
             streetData = await kv.get(cacheKey);
 
             if (!streetData) {
@@ -252,6 +239,7 @@ module.exports = async (request, response) => {
                 if (rule) {
                     processedStreet.displayName = rule.display_name.toUpperCase();
                 } else {
+                    // --- INICIO: ALGORITMO "CONFIANZA PROGRESIVA" CON "RUEDA DE RECONOCIMIENTO" ---
                     let finalName = null;
                     const samplePoints = geometries.flatMap(g => g.points).filter((_, i, arr) => i % Math.max(1, Math.floor(arr.length / 6)) === 0).slice(0, 6).map(p => ({ lat: p[0], lng: p[1] }));
                     
@@ -262,52 +250,65 @@ module.exports = async (request, response) => {
                         const nameCounts = geocodedNames.reduce((acc, name) => { acc[name] = (acc[name] || 0) + 1; return acc; }, {});
                         const googleWinnerName = Object.keys(nameCounts).reduce((a, b) => nameCounts[a] > nameCounts[b] ? a : b);
 
+                        // --- [INICIO SECCIÓN MODIFICADA] Encrucijada de 3 Vías ---
                         const osmParts = extractNameParts(mainOsmName);
                         const googleParts = extractNameParts(googleWinnerName);
                         
+                        // Condición 1: Corrección de typos a nivel de caracteres
                         const isTypoCorrection = osmParts.type === googleParts.type && levenshtein(osmParts.baseName, googleParts.baseName) <= 2;
+                        
+                        // Condición 2: Coincidencia por recuento de palabras (tu nueva lógica)
                         const isWordCountMatch = osmParts.type === googleParts.type && areNamesSimilarByWordCount(osmParts.baseName, googleParts.baseName);
 
                         if (mainOsmName.toUpperCase() === googleWinnerName) {
+                            // Vía Rápida #1: Coincidencia Perfecta
                             finalName = googleWinnerName;
                         } else if (isTypoCorrection || isWordCountMatch) {
+                            // Vía Rápida #2: Corrección de Alta Confianza (cubre typos Y diferencias de palabras)
                             finalName = googleWinnerName;
                         } else {
-                            // Vía Lenta y Segura: Se comprueba con Google Places y la nueva prueba de reciprocidad.
+                            // Vía Lenta y Segura: Rueda de Reconocimiento Geográfica
                             const googlePlaceId = await findPlaceId(`${googleWinnerName}, ${currentCity}`, center, process.env.GOOGLE_PLACES_API_KEY);
                             const osmPlaceId = await findPlaceId(`${mainOsmName}, ${currentCity}`, center, process.env.GOOGLE_PLACES_API_KEY);
-                            
-                            if (googlePlaceId && osmPlaceId && googlePlaceId === osmPlaceId) {
+
+                            if (googlePlaceId && osmPlaceId) {
+                                if (googlePlaceId === osmPlaceId) {
+                                    finalName = googleWinnerName; // Éxito por Identidad
+                                } else {
+                                    const googlePlaceDetails = await getPlaceDetails(googlePlaceId, process.env.GOOGLE_PLACES_API_KEY);
+                                    if (googlePlaceDetails) {
+                                        // Usamos el centroide de la geometría de OSM para la comparación
+                                        const allPoints = geometries.flatMap(g => g.points);
+                                        let avgLat = 0, avgLng = 0;
+                                        allPoints.forEach(p => { avgLat += p[0]; avgLng += p[1]; });
+                                        const osmCenter = { lat: avgLat / allPoints.length, lng: avgLng / allPoints.length };
+                                        
+                                        const distance = getDistance(osmCenter, googlePlaceDetails.location);
+                                        if (distance < 250) {
+                                            finalName = googleWinnerName; // Éxito por Proximidad
+                                        } else {
+                                            console.warn(`[Fallback] Rueda: '${googleWinnerName}' y '${mainOsmName}' son lugares distintos (${Math.round(distance)}m). Usando OSM.`);
+                                            finalName = mainOsmName.toUpperCase();
+                                        }
+                                    } else {
+                                        finalName = mainOsmName.toUpperCase();
+                                    }
+                                }
+                            } else if (googlePlaceId && !osmPlaceId) {
+                                // Regla de Fallo Inteligente
+                                console.warn(`Rueda: Google no conoce '${mainOsmName}', pero la votación encontró '${googleWinnerName}'. Confiando en la votación.`);
                                 finalName = googleWinnerName;
                             } else {
-                                // Los nombres son distintos. Realizar la PRUEBA DE RECIPROCIDAD GEOGRÁFICA.
-                                const googleWinnerGeomFromOsm = await getOsmGeometryForName(googleWinnerName, center, radius);
-                                if (googleWinnerGeomFromOsm.length > 0) {
-                                    const originalCentroid = getCentroid(geometries);
-                                    const googleWinnerCentroid = getCentroid(googleWinnerGeomFromOsm);
-                                    const distance = getDistance(originalCentroid, googleWinnerCentroid);
-                                    
-                                    if (distance > 200) {
-                                        // CONTAMINACIÓN CRUZADA DETECTADA
-                                        console.warn(`[Contaminación Detectada] Google sugiere '${googleWinnerName}' para '${mainOsmName}', pero sus geometrías en OSM están a ${Math.round(distance)}m. Se mantendrá el nombre de OSM.`);
-                                        finalName = mainOsmName.toUpperCase();
-                                    } else {
-                                        // CORRECCIÓN VÁLIDA (Caso "Calle Brezos")
-                                        console.warn(`[Corrección Verificada] Las geometrías para '${mainOsmName}' y '${googleWinnerName}' son cercanas (${Math.round(distance)}m). Se acepta el nombre de Google.`);
-                                        finalName = googleWinnerName;
-                                    }
-                                } else {
-                                    // GOOGLE SUGIERE UN NOMBRE QUE OSM NO CONOCE
-                                    console.warn(`[Corrección Pura] OSM no conoce '${googleWinnerName}'. Se acepta la sugerencia de Google sobre '${mainOsmName}'.`);
-                                    finalName = googleWinnerName;
-                                }
+                                // Fallback por falta de evidencia
+                                console.warn(`[Fallback] Rueda: No se encontró Place ID para '${googleWinnerName}' o '${mainOsmName}'. Usando OSM.`);
+                                finalName = mainOsmName.toUpperCase();
                             }
                         }
-                    } else {
-                        finalName = mainOsmName.toUpperCase();
+                        // --- [FIN SECCIÓN MODIFICADA] ---
                     }
 
                     processedStreet.displayName = finalName || mainOsmName.toUpperCase();
+                    // --- FIN: ALGORITMO ---
                 }
                 
                 streetData = processedStreet;

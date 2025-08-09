@@ -183,7 +183,7 @@ module.exports = async (request, response) => {
             if (seenIds.has(entity.id)) continue;
             
             const mainOsmName = entity.osmNames[0];
-            const cacheKey = `street_v16:${currentCity}:${entity.id.replace(/\s/g, '_')}`;
+            const cacheKey = `street_v17:${currentCity}:${entity.id.replace(/\s/g, '_')}`;
             streetData = await kv.get(cacheKey);
 
             if (!streetData) {
@@ -210,31 +210,14 @@ module.exports = async (request, response) => {
                     // --- INICIO: ALGORITMO "CONFIANZA PROGRESIVA" CON "RUEDA DE RECONOCIMIENTO" ---
                     let finalName = null;
                     const samplePoints = geometries.flatMap(g => g.points).filter((_, i, arr) => i % Math.max(1, Math.floor(arr.length / 6)) === 0).slice(0, 6).map(p => ({ lat: p[0], lng: p[1] }));
+                    
+                    const geocodeResults = await Promise.all(samplePoints.map(pt => geocode(pt, process.env.GOOGLE_API_KEY)));
+                    const geocodedNames = geocodeResults.filter(Boolean).map(geo => geo.name);
 
-                    // Paso 1: Votación Rápida
-                    const quickCheckPoints = samplePoints.slice(0, 3);
-                    let geocodedNames = [];
-                    if (quickCheckPoints.length > 0) {
-                        const quickCheckResults = await Promise.all(quickCheckPoints.map(pt => geocode(pt, process.env.GOOGLE_API_KEY)));
-                        geocodedNames = quickCheckResults.filter(Boolean).map(geo => geo.name);
-                    }
-
-                    // Paso 2: Decisión Temprana o Investigación Profunda
-                    if (geocodedNames.length === 3 && new Set(geocodedNames).size === 1) {
-                        finalName = geocodedNames[0];
-                    } else {
-                        const deepDivePoints = samplePoints.slice(3);
-                        if (deepDivePoints.length > 0) {
-                            const deepDiveResults = await Promise.all(deepDivePoints.map(pt => geocode(pt, process.env.GOOGLE_API_KEY)));
-                            geocodedNames.push(...deepDiveResults.filter(Boolean).map(geo => geo.name));
-                        }
-                    }
-
-                    if (geocodedNames.length > 0 && !finalName) {
+                    if (geocodedNames.length > 0) {
                         const nameCounts = geocodedNames.reduce((acc, name) => { acc[name] = (acc[name] || 0) + 1; return acc; }, {});
                         const googleWinnerName = Object.keys(nameCounts).reduce((a, b) => nameCounts[a] > nameCounts[b] ? a : b);
-                        
-                        // Paso 3: Rueda de Reconocimiento si es necesario
+
                         if (mainOsmName.toUpperCase() === googleWinnerName) {
                             finalName = googleWinnerName;
                         } else {
@@ -263,11 +246,12 @@ module.exports = async (request, response) => {
                                 console.warn(`Rueda Reconocimiento: Google no conoce '${mainOsmName}', pero sí '${googleWinnerName}'. Confiando en la votación.`);
                                 finalName = googleWinnerName;
                             } else {
-                                console.warn(`[Fallback] Rueda Reconocimiento: No se encontró Place ID para '${googleWinnerName}'. Usando OSM.`);
+                                console.warn(`[Fallback] Rueda Reconocimiento: No se encontró Place ID para '${googleWinnerName}' o para '${mainOsmName}'. Usando OSM.`);
                                 finalName = mainOsmName.toUpperCase();
                             }
                         }
                     }
+
                     processedStreet.displayName = finalName || mainOsmName.toUpperCase();
                     // --- FIN: ALGORITMO ---
                 }

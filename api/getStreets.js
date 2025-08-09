@@ -183,7 +183,7 @@ module.exports = async (request, response) => {
             if (seenIds.has(entity.id)) continue;
             
             const mainOsmName = entity.osmNames[0];
-            const cacheKey = `street_v19:${currentCity}:${entity.id.replace(/\s/g, '_')}`;
+            const cacheKey = `street_v20:${currentCity}:${entity.id.replace(/\s/g, '_')}`;
             streetData = await kv.get(cacheKey);
 
             if (!streetData) {
@@ -219,7 +219,16 @@ module.exports = async (request, response) => {
 
                         const osmParts = extractNameParts(mainOsmName);
                         const googleParts = extractNameParts(googleWinnerName);
-                        const isObviousCorrection = osmParts.type === googleParts.type && levenshtein(osmParts.baseName, googleParts.baseName) <= 2;
+                        
+                        // INICIO: LÓGICA DE "CORRECCIÓN OBVIA" MEJORADA
+                        const osmBaseWords = new Set(osmParts.baseName.split(' '));
+                        const googleBaseWords = new Set(googleParts.baseName.split(' '));
+                        const intersection = new Set([...osmBaseWords].filter(x => googleBaseWords.has(x)));
+                        const union = new Set([...osmBaseWords, ...googleBaseWords]);
+                        const jaccardIndex = intersection.size / union.size; // Métrica de similitud de palabras
+                        
+                        const isObviousCorrection = osmParts.type === googleParts.type && jaccardIndex > 0.6; // Umbral de similitud
+                        // FIN: LÓGICA DE "CORRECCIÓN OBVIA" MEJORADA
 
                         if (mainOsmName.toUpperCase() === googleWinnerName || isObviousCorrection) {
                             finalName = googleWinnerName;
@@ -227,33 +236,15 @@ module.exports = async (request, response) => {
                             const googlePlaceId = await findPlaceId(`${googleWinnerName}, ${currentCity}`, center, process.env.GOOGLE_PLACES_API_KEY);
                             const osmPlaceId = await findPlaceId(`${mainOsmName}, ${currentCity}`, center, process.env.GOOGLE_PLACES_API_KEY);
 
-                            if (googlePlaceId && osmPlaceId) {
+                            if (googlePlaceId && !osmPlaceId) {
+                                finalName = googleWinnerName;
+                            } else if (googlePlaceId && osmPlaceId) {
                                 if (googlePlaceId === osmPlaceId) {
                                     finalName = googleWinnerName;
                                 } else {
-                                    const googlePlaceDetails = await getPlaceDetails(googlePlaceId, process.env.GOOGLE_PLACES_API_KEY);
-                                    if (googlePlaceDetails) {
-                                        const allPoints = geometries.flatMap(g => g.points);
-                                        let avgLat = 0, avgLng = 0;
-                                        allPoints.forEach(p => { avgLat += p[0]; avgLng += p[1]; });
-                                        const osmCenter = { lat: avgLat / allPoints.length, lng: avgLng / allPoints.length };
-                                        const distance = getDistance(osmCenter, googlePlaceDetails.location);
-
-                                        if (distance < 250) {
-                                            finalName = googleWinnerName;
-                                        } else {
-                                            finalName = mainOsmName.toUpperCase();
-                                        }
-                                    } else {
-                                        finalName = mainOsmName.toUpperCase();
-                                    }
+                                    finalName = mainOsmName.toUpperCase();
                                 }
-                            } else if (googlePlaceId && !osmPlaceId) {
-                                // REGLA DE FALLO INTELIGENTE (LA CORRECCIÓN)
-                                console.warn(`Rueda: Google no conoce '${mainOsmName}', pero la votación encontró '${googleWinnerName}'. Confiando en la votación.`);
-                                finalName = googleWinnerName;
                             } else {
-                                console.warn(`[Fallback] Rueda: No se encontró Place ID para '${googleWinnerName}' o la evidencia es insuficiente. Usando OSM.`);
                                 finalName = mainOsmName.toUpperCase();
                             }
                         }

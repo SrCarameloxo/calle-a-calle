@@ -18,6 +18,14 @@ const supabaseAdmin = createClient(
 
 // --- Funciones Auxiliares ---
 
+// [CORRECCIÓN] Se mueve la función getDistance aquí, al nivel superior, para que sea accesible globalmente en el fichero.
+const getDistance = (p1, p2) => {
+    const R = 6371e3; // Radio de la Tierra en metros
+    const φ1 = p1.lat * Math.PI / 180, φ2 = p2.lat * Math.PI / 180;
+    const Δλ = (p2.lng - p1.lng) * Math.PI / 180;
+    return Math.acos(Math.sin(φ1) * Math.sin(φ2) + Math.cos(φ1) * Math.cos(φ2) * Math.cos(Δλ)) * R;
+};
+
 function calculateOptimalSearch(zonePoints) {
   if (zonePoints.length === 0) return { center: { lat: 0, lng: 0 }, radius: 1500 };
   let minLat = Infinity, maxLat = -Infinity, minLng = Infinity, maxLng = -Infinity;
@@ -26,12 +34,8 @@ function calculateOptimalSearch(zonePoints) {
     minLng = Math.min(minLng, p.lng); maxLng = Math.max(maxLng, p.lng);
   });
   const center = { lat: minLat + (maxLat - minLat) / 2, lng: minLng + (maxLng - minLng) / 2 };
-  const getDistance = (p1, p2) => {
-    const R = 6371e3; // Radio de la Tierra en metros
-    const φ1 = p1.lat * Math.PI / 180, φ2 = p2.lat * Math.PI / 180;
-    const Δλ = (p2.lng - p1.lng) * Math.PI / 180;
-    return Math.acos(Math.sin(φ1) * Math.sin(φ2) + Math.cos(φ1) * Math.cos(φ2) * Math.cos(Δλ)) * R;
-  };
+  
+  // Ya no se define getDistance aquí, usará la que está en el nivel superior.
   let maxDistance = 0;
   zonePoints.forEach(p => { maxDistance = Math.max(maxDistance, getDistance(center, p)); });
   return { center, radius: Math.round(maxDistance + 200) };
@@ -283,7 +287,7 @@ module.exports = async (request, response) => {
                                         allPoints.forEach(p => { avgLat += p[0]; avgLng += p[1]; });
                                         const osmCenter = { lat: avgLat / allPoints.length, lng: avgLng / allPoints.length };
                                         
-                                        const distance = getDistance(osmCenter, googlePlaceDetails.location);
+                                        const distance = getDistance(osmCenter, googlePlaceDetails.location); // Esta línea ahora funcionará
                                         if (distance < 250) {
                                             finalName = googleWinnerName; // Éxito por Proximidad
                                         } else {
@@ -293,7 +297,7 @@ module.exports = async (request, response) => {
                                     } else {
                                         finalName = mainOsmName.toUpperCase();
                                     }
-                                }
+                                 }
                             } else if (googlePlaceId && !osmPlaceId) {
                                 // Regla de Fallo Inteligente
                                 console.warn(`Rueda: Google no conoce '${mainOsmName}', pero la votación encontró '${googleWinnerName}'. Confiando en la votación.`);

@@ -94,6 +94,30 @@ async function geocode(pt, apiKey) {
   return null;
 }
 
+async function findPlaceId(streetName, center, apiKey) {
+    const url = `https://maps.googleapis.com/maps/api/place/textsearch/json?query=${encodeURIComponent(streetName)}&location=${center.lat},${center.lng}&radius=250&key=${apiKey}`;
+    const res = await fetch(url);
+    const data = await res.json();
+    if (data.status === 'OK' && data.results.length > 0) {
+        const route = data.results.find(r => r.types.includes('route'));
+        return route ? route.place_id : null;
+    }
+    return null;
+}
+
+async function getPlaceDetails(placeId, apiKey) {
+    const url = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${placeId}&fields=geometry,types&key=${apiKey}`;
+    const res = await fetch(url);
+    const data = await res.json();
+    if (data.status === 'OK' && data.result && data.result.geometry) {
+        return {
+            location: data.result.geometry.location,
+            types: data.result.types
+        };
+    }
+    return null;
+}
+
 async function getOsmGeometryForName(name, center, radius) {
     const queryName = name.replace(/"/g, '\\"');
     const geometryQuery = `[out:json][timeout:25]; way["name"="${queryName}"](around:${radius}, ${center.lat}, ${center.lng}); out body; >; out skel qt;`;
@@ -204,7 +228,7 @@ module.exports = async (request, response) => {
             if (seenIds.has(entity.id)) continue;
             
             const mainOsmName = entity.osmNames[0];
-            const cacheKey = `street_v20:${currentCity}:${entity.id.replace(/\s/g, '_')}`; // <-- CACHE INVALIDADA
+            const cacheKey = `street_v21:${currentCity}:${entity.id.replace(/\s/g, '_')}`; // <-- CACHE INVALIDADA
             streetData = await kv.get(cacheKey);
 
             if (!streetData) {
@@ -249,31 +273,35 @@ module.exports = async (request, response) => {
                         } else if (isTypoCorrection || isWordCountMatch) {
                             finalName = googleWinnerName;
                         } else {
-                            // --- INICIO: PRUEBA DE RECIPROCIDAD GEOGRÁFICA ---
-                            const googleWinnerGeomFromOsm = await getOsmGeometryForName(googleWinnerName, center, radius);
-
-                            if (googleWinnerGeomFromOsm.length > 0) {
-                                const originalCentroid = getCentroid(geometries);
-                                const googleWinnerCentroid = getCentroid(googleWinnerGeomFromOsm);
-
-                                if (originalCentroid && googleWinnerCentroid) {
+                            // Vía Lenta y Segura: Se comprueba con Google Places y la nueva prueba de reciprocidad.
+                            const googlePlaceId = await findPlaceId(`${googleWinnerName}, ${currentCity}`, center, process.env.GOOGLE_PLACES_API_KEY);
+                            const osmPlaceId = await findPlaceId(`${mainOsmName}, ${currentCity}`, center, process.env.GOOGLE_PLACES_API_KEY);
+                            
+                            if (googlePlaceId && osmPlaceId && googlePlaceId === osmPlaceId) {
+                                finalName = googleWinnerName;
+                            } else {
+                                // Los nombres son distintos. Realizar la PRUEBA DE RECIPROCIDAD GEOGRÁFICA.
+                                const googleWinnerGeomFromOsm = await getOsmGeometryForName(googleWinnerName, center, radius);
+                                if (googleWinnerGeomFromOsm.length > 0) {
+                                    const originalCentroid = getCentroid(geometries);
+                                    const googleWinnerCentroid = getCentroid(googleWinnerGeomFromOsm);
                                     const distance = getDistance(originalCentroid, googleWinnerCentroid);
                                     
                                     if (distance > 200) {
-                                        console.warn(`[Contaminación Detectada] Google sugiere '${googleWinnerName}' para '${mainOsmName}', pero sus geometrías en OSM están a ${Math.round(distance)}m. Se usará el nombre de OSM.`);
+                                        // CONTAMINACIÓN CRUZADA DETECTADA
+                                        console.warn(`[Contaminación Detectada] Google sugiere '${googleWinnerName}' para '${mainOsmName}', pero sus geometrías en OSM están a ${Math.round(distance)}m. Se mantendrá el nombre de OSM.`);
                                         finalName = mainOsmName.toUpperCase();
                                     } else {
-                                        console.warn(`[Corrección Verificada] Google sugiere '${googleWinnerName}' y las geometrías son cercanas (${Math.round(distance)}m). Se usará el nombre de Google.`);
+                                        // CORRECCIÓN VÁLIDA (Caso "Calle Brezos")
+                                        console.warn(`[Corrección Verificada] Las geometrías para '${mainOsmName}' y '${googleWinnerName}' son cercanas (${Math.round(distance)}m). Se acepta el nombre de Google.`);
                                         finalName = googleWinnerName;
                                     }
                                 } else {
+                                    // GOOGLE SUGIERE UN NOMBRE QUE OSM NO CONOCE
+                                    console.warn(`[Corrección Pura] OSM no conoce '${googleWinnerName}'. Se acepta la sugerencia de Google sobre '${mainOsmName}'.`);
                                     finalName = googleWinnerName;
                                 }
-                            } else {
-                                console.warn(`[Corrección Pura] OSM no conoce '${googleWinnerName}'. Se acepta la sugerencia de Google sobre '${mainOsmName}'.`);
-                                finalName = googleWinnerName;
                             }
-                            // --- FIN: PRUEBA DE RECIPROCIDAD GEOGRÁFICA ---
                         }
                     } else {
                         finalName = mainOsmName.toUpperCase();

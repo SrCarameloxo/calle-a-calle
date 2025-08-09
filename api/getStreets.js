@@ -220,15 +220,13 @@ module.exports = async (request, response) => {
                         const osmParts = extractNameParts(mainOsmName);
                         const googleParts = extractNameParts(googleWinnerName);
                         
-                        // INICIO: LÓGICA DE "CORRECCIÓN OBVIA" MEJORADA
                         const osmBaseWords = new Set(osmParts.baseName.split(' '));
                         const googleBaseWords = new Set(googleParts.baseName.split(' '));
                         const intersection = new Set([...osmBaseWords].filter(x => googleBaseWords.has(x)));
                         const union = new Set([...osmBaseWords, ...googleBaseWords]);
-                        const jaccardIndex = intersection.size / union.size; // Métrica de similitud de palabras
+                        const jaccardIndex = union.size > 0 ? intersection.size / union.size : 0;
                         
-                        const isObviousCorrection = osmParts.type === googleParts.type && jaccardIndex > 0.5; // Umbral de similitud
-                        // FIN: LÓGICA DE "CORRECCIÓN OBVIA" MEJORADA
+                        const isObviousCorrection = osmParts.type === googleParts.type && jaccardIndex >= 0.5; // CORRECCIÓN: Cambiado > a >=
 
                         if (mainOsmName.toUpperCase() === googleWinnerName || isObviousCorrection) {
                             finalName = googleWinnerName;

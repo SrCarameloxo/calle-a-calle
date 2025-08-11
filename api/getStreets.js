@@ -219,7 +219,7 @@ module.exports = async (request, response) => {
             if (seenIds.has(entity.id)) continue;
             
             const mainOsmName = entity.osmNames[0];
-            const cacheKey = `street_v18:${currentCity}:${entity.id.replace(/\s/g, '_')}`;
+            const cacheKey = `street_v22:${currentCity}:${entity.id.replace(/\s/g, '_')}`; // Versión de caché incrementada
             streetData = await kv.get(cacheKey);
 
             if (!streetData) {
@@ -287,8 +287,9 @@ module.exports = async (request, response) => {
                                         allPoints.forEach(p => { avgLat += p[0]; avgLng += p[1]; });
                                         const osmCenter = { lat: avgLat / allPoints.length, lng: avgLng / allPoints.length };
                                         
-                                        const distance = getDistance(osmCenter, googlePlaceDetails.location); // Esta línea ahora funcionará
-                                        if (distance < 7) {
+                                        const distance = getDistance(osmCenter, googlePlaceDetails.location);
+                                        // [CAMBIO CLAVE] Distancia ajustada a 8 metros
+                                        if (distance < 8) {
                                             finalName = googleWinnerName; // Éxito por Proximidad
                                         } else {
                                             console.warn(`[Fallback] Rueda: '${googleWinnerName}' y '${mainOsmName}' son lugares distintos (${Math.round(distance)}m). Usando OSM.`);

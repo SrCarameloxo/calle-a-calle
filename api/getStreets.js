@@ -207,7 +207,7 @@ module.exports = async (request, response) => {
             if (seenIds.has(entity.id)) continue;
             
             const mainOsmName = entity.osmNames[0];
-            const cacheKey = `street_v20:${currentCity}:${entity.id.replace(/\s/g, '_')}`; // Versión de caché incrementada
+            const cacheKey = `street_v21:${currentCity}:${entity.id.replace(/\s/g, '_')}`; // Versión de caché incrementada
             streetData = await kv.get(cacheKey);
 
             if (!streetData) {
@@ -232,7 +232,6 @@ module.exports = async (request, response) => {
                     processedStreet.displayName = rule.display_name.toUpperCase();
                 } else {
                     let finalName = null;
-                    let isHighConfidenceMatch = false; // [NUEVO] Bandera para controlar la auditoría
                     const samplePoints = geometries.flatMap(g => g.points).filter((_, i, arr) => i % Math.max(1, Math.floor(arr.length / 6)) === 0).slice(0, 6).map(p => ({ lat: p[0], lng: p[1] }));
                     
                     const geocodeResults = await Promise.all(samplePoints.map(pt => geocode(pt, process.env.GOOGLE_API_KEY)));
@@ -250,10 +249,8 @@ module.exports = async (request, response) => {
 
                         if (mainOsmName.toUpperCase() === googleWinnerName) {
                             finalName = googleWinnerName;
-                            isHighConfidenceMatch = true; // Gana Certificado de Confianza
                         } else if (isTypoCorrection || isWordCountMatch) {
                             finalName = googleWinnerName;
-                            isHighConfidenceMatch = true; // Gana Certificado de Confianza
                         } else {
                             const [googlePlaceId, osmPlaceId] = await Promise.all([
                                 findPlaceId(`${googleWinnerName}, ${currentCity}`, center, process.env.GOOGLE_PLACES_API_KEY),
@@ -263,7 +260,6 @@ module.exports = async (request, response) => {
                             if (googlePlaceId && osmPlaceId) {
                                 if (googlePlaceId === osmPlaceId) {
                                     finalName = googleWinnerName;
-                                    isHighConfidenceMatch = true; // Gana Certificado de Confianza
                                 } else {
                                     const googlePlaceDetails = await getPlaceDetails(googlePlaceId, process.env.GOOGLE_PLACES_API_KEY);
                                     if (googlePlaceDetails) {
@@ -273,9 +269,11 @@ module.exports = async (request, response) => {
                                         const osmCenter = { lat: avgLat / allPoints.length, lng: avgLng / allPoints.length };
                                         
                                         const distance = getDistance(osmCenter, googlePlaceDetails.location);
+                                        // [CAMBIO CLAVE] Se reduce la distancia a 8 metros para ser ultra estricto.
                                         if (distance < 8) {
-                                            finalName = googleWinnerName; // Baja confianza, no gana certificado
+                                            finalName = googleWinnerName;
                                         } else {
+                                            console.warn(`[Fallback] Rueda: '${googleWinnerName}' y '${mainOsmName}' son lugares distintos (${Math.round(distance)}m). Usando OSM.`);
                                             finalName = mainOsmName.toUpperCase();
                                         }
                                     } else {
@@ -283,15 +281,13 @@ module.exports = async (request, response) => {
                                     }
                                  }
                             } else if (googlePlaceId && !osmPlaceId) {
-                                finalName = googleWinnerName; // Baja confianza, no gana certificado
+                                finalName = googleWinnerName;
                             } else {
                                 finalName = mainOsmName.toUpperCase();
                             }
                         }
                     }
-
                     processedStreet.displayName = finalName || mainOsmName.toUpperCase();
-                    processedStreet.isHighConfidenceMatch = isHighConfidenceMatch; // Guardamos el estado de confianza
                 }
                 
                 streetData = processedStreet;
@@ -304,40 +300,6 @@ module.exports = async (request, response) => {
 
             if (!streetData) continue;
             
-            // [LÓGICA MEJORADA] La auditoría solo se ejecuta si el match fue de baja confianza.
-            if (!streetData.isHighConfidenceMatch && streetData.geometries.length > 1) {
-                const auditedGeometries = [];
-                const finalDisplayNameParts = extractNameParts(streetData.displayName);
-
-                for (const segment of streetData.geometries) {
-                    if (!segment.points || segment.points.length === 0) continue;
-                    
-                    let avgLat = 0, avgLng = 0;
-                    segment.points.forEach(p => { avgLat += p[0]; avgLng += p[1]; });
-                    const segmentCenter = { lat: avgLat / segment.points.length, lng: avgLng / segment.points.length };
-
-                    const segmentGeocodeResult = await geocode(segmentCenter, process.env.GOOGLE_API_KEY);
-
-                    if (segmentGeocodeResult && segmentGeocodeResult.name) {
-                        const segmentNameParts = extractNameParts(segmentGeocodeResult.name);
-                        // Comparamos el nombre base o si es muy similar (para absorber pequeñas diferencias)
-                        if (segmentNameParts.baseName === finalDisplayNameParts.baseName || levenshtein(segmentNameParts.baseName, finalDisplayNameParts.baseName) <=2) {
-                            auditedGeometries.push(segment);
-                        } else {
-                             console.warn(`[Auditoría] Segmento rechazado. Grupo: '${streetData.displayName}', Segmento: '${segmentGeocodeResult.name}'`);
-                        }
-                    } else {
-                         console.warn(`[Auditoría] Segmento rechazado en '${streetData.displayName}' por fallo de geocodificación.`);
-                    }
-                }
-                streetData.geometries = auditedGeometries;
-            }
-
-            if (streetData.geometries.length === 0) {
-                console.warn(`[Auditoría] La calle '${streetData.displayName}' se descartó porque ningún segmento pasó la auditoría.`);
-                continue;
-            }
-
             const hasLines = streetData.geometries.some(g => !g.isClosed);
             const hasAreas = streetData.geometries.some(g => g.isClosed);
             if (hasLines && hasAreas) {

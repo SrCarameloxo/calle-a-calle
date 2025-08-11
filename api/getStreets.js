@@ -207,7 +207,7 @@ module.exports = async (request, response) => {
             if (seenIds.has(entity.id)) continue;
             
             const mainOsmName = entity.osmNames[0];
-            const cacheKey = `street_v24:${currentCity}:${entity.id.replace(/\s/g, '_')}`; // Versión de caché incrementada
+            const cacheKey = `street_v25:${currentCity}:${entity.id.replace(/\s/g, '_')}`; // Versión de caché incrementada
             streetData = await kv.get(cacheKey);
 
             if (!streetData) {
@@ -252,30 +252,14 @@ module.exports = async (request, response) => {
                         } else if (isTypoCorrection || isWordCountMatch) {
                             finalName = googleWinnerName;
                         } else {
-                            const googlePlaceId = await findPlaceId(`${googleWinnerName}, ${currentCity}`, center, process.env.GOOGLE_PLACES_API_KEY);
-                            const osmPlaceId = await findPlaceId(`${mainOsmName}, ${currentCity}`, center, process.env.GOOGLE_PLACES_API_KEY);
-                            const levenshteinDist = levenshtein(osmParts.baseName, googleParts.baseName);
-
-                            console.log(`\n--- INFORME DE CASO PARA: ${mainOsmName} ---`);
-                            console.table({
-                                "OSM Name": mainOsmName, "Google Name": googleWinnerName,
-                                "OSM Place ID": osmPlaceId || "No encontrado", "Google Place ID": googlePlaceId || "No encontrado",
-                                "Levenshtein Dist": levenshteinDist
-                            });
-                            
-                            // [NUEVO] "Cláusula de Sentido Común"
-                            const maxLen = Math.max(osmParts.baseName.length, googleParts.baseName.length);
-                            const areNamesFlagrantlyDifferent = maxLen > 0 && (levenshteinDist / maxLen > 0.6);
+                            const [googlePlaceId, osmPlaceId] = await Promise.all([
+                                findPlaceId(`${googleWinnerName}, ${currentCity}`, center, process.env.GOOGLE_PLACES_API_KEY),
+                                findPlaceId(`${mainOsmName}, ${currentCity}`, center, process.env.GOOGLE_PLACES_API_KEY)
+                            ]);
 
                             if (googlePlaceId && osmPlaceId) {
                                 if (googlePlaceId === osmPlaceId) {
-                                    if (areNamesFlagrantlyDifferent) {
-                                        console.log("VETO A ÉXITO POR IDENTIDAD: Los nombres son demasiado distintos a pesar de coincidir el Place ID. Usando OSM.");
-                                        finalName = mainOsmName.toUpperCase();
-                                    } else {
-                                        console.log("VEREDICTO: Éxito por Identidad. Los Place IDs coinciden.");
-                                        finalName = googleWinnerName;
-                                    }
+                                    finalName = googleWinnerName;
                                 } else {
                                     const googlePlaceDetails = await getPlaceDetails(googlePlaceId, process.env.GOOGLE_PLACES_API_KEY);
                                     if (googlePlaceDetails) {
@@ -286,32 +270,21 @@ module.exports = async (request, response) => {
                                         
                                         const distance = getDistance(osmCenter, googlePlaceDetails.location);
                                         if (distance < 8) {
-                                            console.log(`VEREDICTO: Éxito por Proximidad. La distancia es ${Math.round(distance)}m (< 8m).`);
                                             finalName = googleWinnerName;
                                         } else {
-                                            console.log(`VEREDICTO: Fallback a OSM. La distancia (${Math.round(distance)}m) es mayor que el umbral de 8m.`);
                                             finalName = mainOsmName.toUpperCase();
                                         }
                                     } else {
-                                        console.log("VEREDICTO: Fallback a OSM. No se pudieron obtener detalles del lugar de Google.");
                                         finalName = mainOsmName.toUpperCase();
                                     }
                                  }
                             } else if (googlePlaceId && !osmPlaceId) {
-                                if (areNamesFlagrantlyDifferent) {
-                                    console.log("VETO A FALLO INTELIGENTE: Los nombres son demasiado distintos. Usando OSM.");
-                                    finalName = mainOsmName.toUpperCase();
-                                } else {
-                                    console.log("VEREDICTO: Fallo Inteligente ACEPTADO. Se usará el nombre de Google porque el de OSM no se encontró en Places.");
-                                    finalName = googleWinnerName;
-                                }
+                                finalName = googleWinnerName;
                             } else {
-                                console.log("VEREDICTO: Fallback a OSM. No se encontró Place ID para ninguno de los nombres.");
                                 finalName = mainOsmName.toUpperCase();
                             }
                         }
                     }
-
                     processedStreet.displayName = finalName || mainOsmName.toUpperCase();
                 }
                 

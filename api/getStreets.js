@@ -219,7 +219,7 @@ module.exports = async (request, response) => {
             if (seenIds.has(entity.id)) continue;
             
             const mainOsmName = entity.osmNames[0];
-            const cacheKey = `street_v22:${currentCity}:${entity.id.replace(/\s/g, '_')}`; // Versión de caché incrementada
+            const cacheKey = `street_v23:${currentCity}:${entity.id.replace(/\s/g, '_')}`; // Versión de caché incrementada
             streetData = await kv.get(cacheKey);
 
             if (!streetData) {
@@ -275,8 +275,20 @@ module.exports = async (request, response) => {
                             const googlePlaceId = await findPlaceId(`${googleWinnerName}, ${currentCity}`, center, process.env.GOOGLE_PLACES_API_KEY);
                             const osmPlaceId = await findPlaceId(`${mainOsmName}, ${currentCity}`, center, process.env.GOOGLE_PLACES_API_KEY);
 
+                            // --- [INICIO] CHIVATO DE RECOPILACIÓN DE EVIDENCIA ---
+                            console.log(`\n--- INFORME DE CASO PARA: ${mainOsmName} ---`);
+                            console.table({
+                                "OSM Name": mainOsmName,
+                                "Google Name": googleWinnerName,
+                                "OSM Place ID": osmPlaceId || "No encontrado",
+                                "Google Place ID": googlePlaceId || "No encontrado",
+                                "Levenshtein Dist": levenshtein(osmParts.baseName, googleParts.baseName)
+                            });
+                            // --- [FIN] CHIVATO ---
+
                             if (googlePlaceId && osmPlaceId) {
                                 if (googlePlaceId === osmPlaceId) {
+                                    console.log("VEREDICTO: Éxito por Identidad. Los Place IDs coinciden.");
                                     finalName = googleWinnerName; // Éxito por Identidad
                                 } else {
                                     const googlePlaceDetails = await getPlaceDetails(googlePlaceId, process.env.GOOGLE_PLACES_API_KEY);
@@ -288,24 +300,23 @@ module.exports = async (request, response) => {
                                         const osmCenter = { lat: avgLat / allPoints.length, lng: avgLng / allPoints.length };
                                         
                                         const distance = getDistance(osmCenter, googlePlaceDetails.location);
-                                        // [CAMBIO CLAVE] Distancia ajustada a 8 metros
                                         if (distance < 8) {
+                                            console.log(`VEREDICTO: Éxito por Proximidad. La distancia es ${Math.round(distance)}m (< 8m).`);
                                             finalName = googleWinnerName; // Éxito por Proximidad
                                         } else {
-                                            console.warn(`[Fallback] Rueda: '${googleWinnerName}' y '${mainOsmName}' son lugares distintos (${Math.round(distance)}m). Usando OSM.`);
+                                            console.log(`VEREDICTO: Fallback a OSM. La distancia (${Math.round(distance)}m) es mayor que el umbral de 8m.`);
                                             finalName = mainOsmName.toUpperCase();
                                         }
                                     } else {
+                                        console.log("VEREDICTO: Fallback a OSM. No se pudieron obtener detalles del lugar de Google.");
                                         finalName = mainOsmName.toUpperCase();
                                     }
                                  }
                             } else if (googlePlaceId && !osmPlaceId) {
-                                // Regla de Fallo Inteligente
-                                console.warn(`Rueda: Google no conoce '${mainOsmName}', pero la votación encontró '${googleWinnerName}'. Confiando en la votación.`);
+                                console.log("VEREDICTO: Fallo Inteligente. Se usará el nombre de Google porque el de OSM no se encontró en Places.");
                                 finalName = googleWinnerName;
                             } else {
-                                // Fallback por falta de evidencia
-                                console.warn(`[Fallback] Rueda: No se encontró Place ID para '${googleWinnerName}' o '${mainOsmName}'. Usando OSM.`);
+                                console.log("VEREDICTO: Fallback a OSM. No se encontró Place ID para ninguno de los nombres.");
                                 finalName = mainOsmName.toUpperCase();
                             }
                         }

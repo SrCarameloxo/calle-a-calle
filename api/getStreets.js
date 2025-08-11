@@ -207,7 +207,7 @@ module.exports = async (request, response) => {
             if (seenIds.has(entity.id)) continue;
             
             const mainOsmName = entity.osmNames[0];
-            const cacheKey = `street_v25:${currentCity}:${entity.id.replace(/\s/g, '_')}`; // Versión de caché incrementada
+            const cacheKey = `street_v26:${currentCity}:${entity.id.replace(/\s/g, '_')}`; // Versión de caché incrementada
             streetData = await kv.get(cacheKey);
 
             if (!streetData) {
@@ -235,6 +235,20 @@ module.exports = async (request, response) => {
                     const samplePoints = geometries.flatMap(g => g.points).filter((_, i, arr) => i % Math.max(1, Math.floor(arr.length / 6)) === 0).slice(0, 6).map(p => ({ lat: p[0], lng: p[1] }));
                     
                     const geocodeResults = await Promise.all(samplePoints.map(pt => geocode(pt, process.env.GOOGLE_API_KEY)));
+
+                    // --- [INICIO] CHIVATO DE VOTACIÓN ---
+                    console.log(`\n--- CHIVATO: Votación de Google para '${mainOsmName}' ---`);
+                    const voteLog = samplePoints.map((point, index) => {
+                        const result = geocodeResults[index];
+                        return {
+                            "Punto #": index + 1,
+                            "Coordenadas": `${point.lat.toFixed(5)}, ${point.lng.toFixed(5)}`,
+                            "Nombre devuelto por Google": result ? result.name : "Sin resultado"
+                        };
+                    });
+                    console.table(voteLog);
+                    // --- [FIN] CHIVATO DE VOTACIÓN ---
+
                     const geocodedNames = geocodeResults.filter(Boolean).map(geo => geo.name);
 
                     if (geocodedNames.length > 0) {

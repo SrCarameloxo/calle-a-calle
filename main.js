@@ -68,7 +68,6 @@ window.addEventListener('DOMContentLoaded', () => {
     currentGameMode = mode;
     console.log(`Modo de juego cambiado a: ${currentGameMode}`);
     
-    // --- INICIO: CÓDIGO MODIFICADO ---
     const title = gameUiContainer.querySelector('.gradient-text');
     if (title) {
         title.classList.remove('revancha-gradient', 'instinto-gradient');
@@ -79,14 +78,12 @@ window.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // Lógica para el tick de selección
     document.querySelectorAll('.mode-select-btn').forEach(btn => {
         btn.classList.remove('active-mode');
         if (btn.dataset.mode === mode) {
             btn.classList.add('active-mode');
         }
     });
-    // --- FIN: CÓDIGO MODIFICADO ---
   }
 
   function updatePanelUI(updateFunction) {
@@ -281,10 +278,15 @@ window.addEventListener('DOMContentLoaded', () => {
     scoreDisplayToggle.addEventListener('click', toggleScoreDisplay);
 
     reviewGameBtn.addEventListener('click', enterReviewMode);
-    repeatZoneBtn.addEventListener('click', repeatLastZone);
     saveZoneBtn.addEventListener('click', saveCurrentZone);
     backToMenuBtn.addEventListener('click', resetToInitialView);
     backFromReviewBtn.addEventListener('click', exitReviewMode);
+    
+    // --- INICIO: CORRECCIÓN (BUG #1) ---
+    // Eliminamos el event listener de aquí para evitar conflictos.
+    // La lógica del botón 'repeatZone' se asignará dinámicamente en endGame.
+    // repeatZoneBtn.addEventListener('click', repeatLastZone);
+    // --- FIN: CORRECCIÓN (BUG #1) ---
 
     setupStartButton(startBtn);
     setupMenu();
@@ -604,15 +606,12 @@ window.addEventListener('DOMContentLoaded', () => {
         gameInterface.classList.add('hidden');
         finalScoreEl.textContent = `¡Partida terminada! Puntuación: ${streetsGuessedCorrectly} / ${totalQuestions}`;
         
-        // --- INICIO: CÓDIGO MODIFICADO ---
-        // Lógica de botones de fin de partida mejorada
         if (currentGameMode === 'revancha') {
             drawZoneBtn.classList.add('hidden');
             saveZoneBtn.classList.add('hidden');
             repeatZoneBtn.textContent = 'Jugar Revancha de Nuevo';
             repeatZoneBtn.onclick = () => {
                 endGameOptions.classList.add('hidden'); 
-                // No necesitamos setGameMode aquí, ya estamos en revancha
                 startRevanchaGame({
                      startGame: (revanchaStreets) => {
                         streetList = revanchaStreets;
@@ -629,7 +628,6 @@ window.addEventListener('DOMContentLoaded', () => {
             repeatZoneBtn.onclick = repeatLastZone; 
             repeatZoneBtn.disabled = (lastGameZonePoints.length < 3 || lastGameStreetList.length === 0);
         }
-        // --- FIN: CÓDIGO MODIFICADO ---
 
         endGameOptions.classList.remove('hidden');
         backToMenuBtn.classList.remove('hidden');

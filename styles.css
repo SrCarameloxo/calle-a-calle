@@ -415,7 +415,6 @@ button.game-control-btn:disabled { opacity: .4; cursor: default; }
 
 /* --- INICIO: CÓDIGO MODIFICADO --- */
 
-/* Contenedor para el contenido del botón de modo */
 .mode-select-content {
     display: flex;
     justify-content: space-between;
@@ -423,14 +422,12 @@ button.game-control-btn:disabled { opacity: .4; cursor: default; }
     width: 100%;
 }
 
-/* El "tick" de selección */
 .mode-tick {
     font-size: 1.5rem;
-    color: #3b82f6; /* Azul brillante */
-    visibility: hidden; /* Oculto por defecto */
+    color: #3b82f6;
+    visibility: hidden;
 }
 
-/* Cuando el botón tiene la clase 'active-mode', el tick se hace visible */
 .mode-select-btn.active-mode .mode-tick {
     visibility: visible;
 }

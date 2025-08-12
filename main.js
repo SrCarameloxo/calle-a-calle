@@ -226,11 +226,12 @@ window.addEventListener('DOMContentLoaded', () => {
           setTimeout(() => { updateScoreDisplay(); }, 3000);
       } else {
           scoreDisplayToggle.style.color = '#555';
+          const answeredQuestions = qIdx; // Number of questions answered so far
           if(showScoreAsPercentage){
-              const percentage = qIdx > 0 ? Math.round((streetsGuessedCorrectly / qIdx) * 100) : 0;
+              const percentage = answeredQuestions > 0 ? Math.round((streetsGuessedCorrectly / answeredQuestions) * 100) : 0;
               scoreDisplayToggle.textContent = `Aciertos: ${percentage}%`;
           } else {
-              scoreDisplayToggle.textContent = `Calles acertadas: ${streetsGuessedCorrectly} / ${qIdx}`;
+              scoreDisplayToggle.textContent = `Calles acertadas: ${streetsGuessedCorrectly} / ${answeredQuestions}`;
           }
       }
   }
@@ -364,6 +365,7 @@ window.addEventListener('DOMContentLoaded', () => {
             streakDisplay.textContent = `¡Racha de ${currentStreak}!`;
             streakDisplay.classList.add('visible');
         }
+
       } else {
         currentStreak = 0;
         streakDisplay.classList.remove('visible');
@@ -371,10 +373,10 @@ window.addEventListener('DOMContentLoaded', () => {
         document.getElementById('incorrect-sound')?.play().catch(e => {});
         feedbackOverlay.className = 'feedback-incorrect is-pulsing';
       }
-      
-      const progress = totalQuestions > 0 ? ((qIdx + 1) / totalQuestions) * 100 : 0;
-      progressBar.style.width = `${progress}%`;
 
+      const progress = totalQuestions > 0 ? ((qIdx) / totalQuestions) * 100 : 0;
+      progressBar.style.width = `${progress}%`;
+      
       if (streetCheck.point) guide = L.polyline([userMk.getLatLng(), streetCheck.point], { dashArray:'6 4', color:COL_DASH }).addTo(gameMap);
     } else {
       updateScoreDisplay('Error: No se pudo dibujar el lugar.', '#c82333');
@@ -382,8 +384,8 @@ window.addEventListener('DOMContentLoaded', () => {
 
     setTimeout(() => {
         feedbackOverlay.className = '';
-    }, 1000);
-    
+    }, 1200);
+
     nextBtn.disabled=false;
   }
 
@@ -634,7 +636,7 @@ window.addEventListener('DOMContentLoaded', () => {
 
   async function reportIncident() {
     const pointsToReport = playing ? zonePoints : lastGameZonePoints;
-
+    
     if (pointsToReport.length === 0) {
       alert("Debes jugar en una zona primero para poder reportar una incidencia sobre ella.");
       return;

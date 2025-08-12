@@ -103,6 +103,12 @@
         <svg viewBox="0 0 24 24" height="28" width="28" xmlns="http://www.w3.org/2000/svg"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1v12zM4 22v-7" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
     </button>
     
+    <!-- --- INICIO: CÓDIGO AÑADIDO --- -->
+    <div id="mode-indicator" class="hidden" title="Modo de Juego Actual">
+        <!-- El SVG del icono se cambiará con JS -->
+    </div>
+    <!-- --- FIN: CÓDIGO AÑADIDO --- -->
+
     <button id="open-menu-btn" title="Abrir menú">
         <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" fill="currentColor" viewBox="0 0 16 16">
           <path fill-rule="evenodd" d="M2.5 12a.5.5 0 0 1 .5-.5h10a.5.5 0 0 1 0 1H3a.5.5 0 0 1-.5-.5zm0-4a.5.5 0 0 1 .5-.5h10a.5.5 0 0 1 0 1H3a.5.5 0 0 1-.5-.5zm0-4a.5.5 0 0 1 .5-.5h10a.5.5 0 0 1 0 1H3a.5.5 0 0 1-.5-.5z"/>
@@ -114,6 +120,9 @@
             <button class="menu-tab-btn active" data-panel="profile-content">Perfil</button>
             <button class="menu-tab-btn" data-panel="stats-content">Estadísticas</button>
             <button class="menu-tab-btn" data-panel="saved-zones-content">Mis Zonas</button>
+            <!-- --- INICIO: CÓDIGO AÑADIDO --- -->
+            <button class="menu-tab-btn" data-panel="modes-content">Modos</button>
+            <!-- --- FIN: CÓDIGO AÑADIDO --- -->
         </div>
         <div class="menu-content-area">
             <div id="profile-content" class="content-panel active">
@@ -130,6 +139,25 @@
                 <h3 class="mb-4 text-xl font-bold">Mis Zonas Guardadas</h3>
                 <div id="saved-zones-list" class="space-y-2"></div>
             </div>
+            <!-- --- INICIO: CÓDIGO AÑADIDO --- -->
+            <div id="modes-content" class="content-panel">
+                <h3 class="mb-4 text-xl font-bold">Modos de Juego</h3>
+                <div id="game-modes-list" class="space-y-2">
+                    <button data-mode="classic" class="w-full game-control-btn mode-select-btn">
+                        <span class="font-bold">Modo Clásico</span>
+                        <span class="block text-sm opacity-80">La experiencia original. Dibuja una zona y adivina.</span>
+                    </button>
+                    <button data-mode="revancha" class="w-full game-control-btn mode-select-btn">
+                        <span class="font-bold">Modo Revancha</span>
+                        <span class="block text-sm opacity-80">Enfréntate a las calles que has fallado en tu ciudad.</span>
+                    </button>
+                    <button data-mode="instinto" class="w-full game-control-btn mode-select-btn" disabled>
+                        <span class="font-bold">Modo Instinto</span>
+                        <span class="block text-sm opacity-80">(Próximamente)</span>
+                    </button>
+                </div>
+            </div>
+            <!-- --- FIN: CÓDIGO AÑADIDO --- -->
         </div>
     </div>
   </div>

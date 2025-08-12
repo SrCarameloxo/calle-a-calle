@@ -411,3 +411,54 @@ button.game-control-btn:disabled { opacity: .4; cursor: default; }
     animation: panel-pulse-incorrect-anim 0.8s ease-in-out;
 }
 /* --- FIN: ESTILOS --- */
+
+
+/* --- INICIO: CÓDIGO AÑADIDO --- */
+/* Estilos para el nuevo Indicador de Modo y los botones de selección */
+
+#mode-indicator {
+    position: absolute;
+    top: 120px; /* Debajo del botón de reportar */
+    right: 20px;
+    z-index: 11;
+    background-color: rgba(31, 41, 55, 0.85); /* Un gris oscuro semi-transparente */
+    backdrop-filter: blur(8px);
+    color: #f3f4f6; /* Un gris claro para el icono */
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.2);
+    cursor: help;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    transition: transform 0.2s ease;
+}
+
+#mode-indicator:hover {
+    transform: scale(1.1);
+}
+
+#mode-indicator svg {
+    width: 24px;
+    height: 24px;
+}
+
+.mode-select-btn {
+    text-align: left;
+    padding: 0.75rem !important; /* Forzar padding para más espacio */
+    background-color: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    transition: background-color 0.2s;
+}
+
+.mode-select-btn:not(:disabled):hover {
+    background-color: rgba(59, 130, 246, 0.3) !important; /* Hover azul */
+}
+
+/* Para que la descripción de los botones no esté en negrita */
+.mode-select-btn .opacity-80 {
+    font-weight: 400; 
+}
+/* --- FIN: CÓDIGO AÑADIDO --- */

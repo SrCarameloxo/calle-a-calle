@@ -29,7 +29,6 @@ window.addEventListener('DOMContentLoaded', () => {
   const checkboxWrapper = document.querySelector('.checkbox-wrapper');
   const drawHelpContainer = document.getElementById('draw-help-container');
   const dismissDrawHelpBtn = document.getElementById('dismiss-draw-help');
-  const feedbackOverlay = document.getElementById('feedback-overlay');
 
   const gameInterface = document.getElementById('game-interface');
   const gameQuestion = document.getElementById('game-question');
@@ -356,27 +355,14 @@ window.addEventListener('DOMContentLoaded', () => {
       });
       const streetCheck = getDistanceToStreet(userMk.getLatLng(), streetGrp);
       
-      // --- INICIO DE LÓGICA DE FEEDBACK VISUAL (MÉTODO 'animationend') ---
-      const handleAnimationEnd = () => {
-          feedbackOverlay.className = ''; // Limpia todas las clases cuando la animación termina
-      };
-      // Limpiamos cualquier clase anterior ANTES de empezar.
-      feedbackOverlay.className = '';
-      
-      // Forzamos al navegador a "ver" el elemento sin clases. Este es el truco clave.
-      void feedbackOverlay.offsetWidth;
-      
-      // Preparamos el listener para que se ejecute una sola vez y se auto-destruya
-      feedbackOverlay.addEventListener('animationend', handleAnimationEnd, { once: true });
-      // --- FIN DE LÓGICA DE FEEDBACK VISUAL ---
+      let feedbackClass = '';
 
       if (streetCheck.distance <= 30) {
         streetsGuessedCorrectly++;
         currentStreak++;
         updateScoreDisplay('¡Correcto!', '#28a745');
         document.getElementById('correct-sound')?.play().catch(e => {});
-        // Aplicamos las clases para lanzar el efecto
-        feedbackOverlay.className = 'feedback-correct is-pulsing';
+        feedbackClass = 'feedback-pulse-correct';
         if (currentStreak >= 3) {
             streakDisplay.textContent = `¡Racha de ${currentStreak}!`;
             streakDisplay.classList.add('visible');
@@ -387,9 +373,13 @@ window.addEventListener('DOMContentLoaded', () => {
         streakDisplay.classList.remove('visible');
         updateScoreDisplay(`Casi... a ${Math.round(streetCheck.distance)} metros.`, '#c82333');
         document.getElementById('incorrect-sound')?.play().catch(e => {});
-        // Aplicamos las clases para lanzar el efecto
-        feedbackOverlay.className = 'feedback-incorrect is-pulsing';
+        feedbackClass = 'feedback-pulse-incorrect';
       }
+      
+      gameUiContainer.classList.add(feedbackClass);
+      setTimeout(() => {
+          gameUiContainer.classList.remove(feedbackClass);
+      }, 1000);
 
       const progress = totalQuestions > 0 ? ((qIdx) / totalQuestions) * 100 : 0;
       progressBar.style.width = `${progress}%`;

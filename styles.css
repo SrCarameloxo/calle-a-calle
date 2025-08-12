@@ -17,8 +17,9 @@ body { font-family: system-ui, sans-serif; background-color: #1a1a1a; }
     border-radius: 0.5rem;
     box-shadow: 0 10px 30px rgba(0,0,0,0.3);
     width: 320px;
-    transition: max-height 0.4s ease-in-out;
     max-height: 500px;
+    /* --- LÍNEA AÑADIDA --- */
+    transition: max-height 0.4s ease-in-out, box-shadow 0.4s ease-out;
 }
 
 /* --- Animación de pulso para el panel --- */
@@ -390,34 +391,12 @@ button.game-control-btn:disabled { opacity: .4; cursor: default; }
 .street-tooltip-color-11 { background-color: rgba(240, 113, 152, 0.8) !important; }
 /* --- FIN: Clases de color para Tooltips --- */
 
-/* --- INICIO: ESTILOS PARA EFECTO DE RESPLANDOR (VERSIÓN FINAL Y ROBUSTA) --- */
-#feedback-overlay {
-    position: fixed;
-    top: 0; left: 0; right: 0; bottom: 0;
-    z-index: 9999;
-    pointer-events: none;
-    opacity: 0;
-    box-sizing: border-box;
-    border: 8px solid transparent; /* El borde físico que se coloreará */
-    box-shadow: none;
+/* --- INICIO: ESTILOS PARA EL PULSO DE SOMBRA DEL PANEL --- */
+.feedback-pulse-correct {
+    box-shadow: 0 0 25px 8px rgba(57, 255, 20, 0.7); /* Sombra Verde Neón */
 }
 
-.feedback-correct {
-    border-color: #39ff14; /* Verde neón */
-    box-shadow: 0 0 20px 4px #39ff14; /* Resplandor exterior del mismo color */
-}
-
-.feedback-incorrect {
-    border-color: #ff1f4f; /* Rojo/Fucsia neón */
-    box-shadow: 0 0 20px 4px #ff1f4f; /* Resplandor exterior del mismo color */
-}
-
-@keyframes feedback-pulse-animation {
-    0%   { opacity: 1; }
-    100% { opacity: 0; }
-}
-
-.is-pulsing {
-    animation: feedback-pulse-animation 1.2s ease-out forwards;
+.feedback-pulse-incorrect {
+    box-shadow: 0 0 25px 8px rgba(255, 31, 79, 0.7); /* Sombra Roja Neón */
 }
 /* --- FIN: ESTILOS --- */

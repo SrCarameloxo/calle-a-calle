@@ -397,25 +397,27 @@ button.game-control-btn:disabled { opacity: .4; cursor: default; }
     z-index: 9999;
     pointer-events: none;
     opacity: 0;
-    box-shadow: none;
     box-sizing: border-box;
+    border: 8px solid transparent; /* El borde físico que se coloreará */
+    box-shadow: none;
 }
 
 .feedback-correct {
-    box-shadow: inset 0 0 10px 4px #39ff14; /* Verde neón */
+    border-color: #39ff14; /* Verde neón */
+    box-shadow: 0 0 20px 4px #39ff14; /* Resplandor exterior del mismo color */
 }
 
 .feedback-incorrect {
-    box-shadow: inset 0 0 10px 4px #ff1f4f; /* Rojo neón */
+    border-color: #ff1f4f; /* Rojo/Fucsia neón */
+    box-shadow: 0 0 20px 4px #ff1f4f; /* Resplandor exterior del mismo color */
 }
 
 @keyframes feedback-pulse-animation {
-    0% { opacity: 1; }
+    0%   { opacity: 1; }
     100% { opacity: 0; }
 }
 
 .is-pulsing {
-    /* La propiedad 'forwards' es clave: mantiene el estado final de la animación (opacidad 0) */
     animation: feedback-pulse-animation 1.2s ease-out forwards;
 }
 /* --- FIN: ESTILOS --- */

@@ -226,7 +226,7 @@ window.addEventListener('DOMContentLoaded', () => {
           setTimeout(() => { updateScoreDisplay(); }, 3000);
       } else {
           scoreDisplayToggle.style.color = '#555';
-          const answeredQuestions = qIdx; // Number of questions answered so far
+          const answeredQuestions = qIdx;
           if(showScoreAsPercentage){
               const percentage = answeredQuestions > 0 ? Math.round((streetsGuessedCorrectly / answeredQuestions) * 100) : 0;
               scoreDisplayToggle.textContent = `Aciertos: ${percentage}%`;
@@ -368,7 +368,7 @@ window.addEventListener('DOMContentLoaded', () => {
         currentStreak++;
         updateScoreDisplay('¡Correcto!', '#28a745');
         document.getElementById('correct-sound')?.play().catch(e => {});
-        feedbackOverlay.className = 'feedback-correct is-pulsing'; // Se añaden ambas clases
+        feedbackOverlay.className = 'feedback-correct is-pulsing';
         if (currentStreak >= 3) {
             streakDisplay.textContent = `¡Racha de ${currentStreak}!`;
             streakDisplay.classList.add('visible');
@@ -379,7 +379,7 @@ window.addEventListener('DOMContentLoaded', () => {
         streakDisplay.classList.remove('visible');
         updateScoreDisplay(`Casi... a ${Math.round(streetCheck.distance)} metros.`, '#c82333');
         document.getElementById('incorrect-sound')?.play().catch(e => {});
-        feedbackOverlay.className = 'feedback-incorrect is-pulsing'; // Se añaden ambas clases
+        feedbackOverlay.className = 'feedback-incorrect is-pulsing';
       }
 
       const progress = totalQuestions > 0 ? ((qIdx) / totalQuestions) * 100 : 0;

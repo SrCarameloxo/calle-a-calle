@@ -254,7 +254,7 @@ button.game-control-btn:disabled { opacity: .4; cursor: default; }
 }
 
 .menu-tabs { display: flex; border-bottom: 1px solid rgba(255, 255, 255, 0.1); }
-.menu-tab-btn { flex: 1; padding: 1rem; background: none; border: none; color: #a0aec0; font-weight: 600; transition: color 0.2s, background-color 0.2s; }
+.menu-tab-btn { flex: 1; padding: 1rem; background: none; border: none; color: #a0aec0; font-weight: 600; transition: color 0.2s, background-color 0.2s; white-space: nowrap; /* --- ESTA ES LA LÍNEA AÑADIDA --- */ }
 .menu-tab-btn:hover { background-color: rgba(255,255,255,0.05); color: white; }
 .menu-tab-btn.active { color: white; border-bottom: 2px solid #3b82f6; }
 .menu-content-area { padding: 1rem; max-height: 50vh; overflow-y: auto; }

@@ -389,3 +389,37 @@ button.game-control-btn:disabled { opacity: .4; cursor: default; }
 .street-tooltip-color-10 { background-color: rgba(64, 224, 208, 0.8) !important; color: #333 !important; }
 .street-tooltip-color-11 { background-color: rgba(240, 113, 152, 0.8) !important; }
 /* --- FIN: Clases de color para Tooltips --- */
+
+/* --- INICIO: NUEVOS ESTILOS PARA EFECTO DE RESPLANDOR --- */
+#feedback-overlay {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    z-index: 9999;
+    pointer-events: none;
+    opacity: 0;
+}
+
+.feedback-correct {
+    background-image:
+        radial-gradient(ellipse at top left, rgba(40, 167, 69, 0.4) 0%, transparent 70%),
+        radial-gradient(ellipse at bottom right, rgba(40, 167, 69, 0.3) 0%, transparent 60%),
+        radial-gradient(circle at top 20% right 10%, rgba(40, 167, 69, 0.2) 0%, transparent 50%);
+}
+
+.feedback-incorrect {
+    background-image:
+        radial-gradient(ellipse at top left, rgba(200, 35, 51, 0.4) 0%, transparent 70%),
+        radial-gradient(ellipse at bottom right, rgba(200, 35, 51, 0.3) 0%, transparent 60%),
+        radial-gradient(circle at top 20% right 10%, rgba(200, 35, 51, 0.2) 0%, transparent 50%);
+}
+
+@keyframes subtle-pulse {
+    0%   { opacity: 0; }
+    50%  { opacity: 1; }
+    100% { opacity: 0; }
+}
+
+.is-pulsing {
+    animation: subtle-pulse 1s ease-in-out;
+}
+/* --- FIN: NUEVOS ESTILOS --- */

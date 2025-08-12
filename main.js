@@ -29,6 +29,7 @@ window.addEventListener('DOMContentLoaded', () => {
   const checkboxWrapper = document.querySelector('.checkbox-wrapper');
   const drawHelpContainer = document.getElementById('draw-help-container');
   const dismissDrawHelpBtn = document.getElementById('dismiss-draw-help');
+  const feedbackOverlay = document.getElementById('feedback-overlay');
 
   const gameInterface = document.getElementById('game-interface');
   const gameQuestion = document.getElementById('game-question');
@@ -226,10 +227,10 @@ window.addEventListener('DOMContentLoaded', () => {
       } else {
           scoreDisplayToggle.style.color = '#555';
           if(showScoreAsPercentage){
-              const percentage = totalQuestions > 0 ? Math.round((streetsGuessedCorrectly / totalQuestions) * 100) : 0;
+              const percentage = qIdx > 0 ? Math.round((streetsGuessedCorrectly / qIdx) * 100) : 0;
               scoreDisplayToggle.textContent = `Aciertos: ${percentage}%`;
           } else {
-              scoreDisplayToggle.textContent = `Calles acertadas: ${streetsGuessedCorrectly} / ${totalQuestions}`;
+              scoreDisplayToggle.textContent = `Calles acertadas: ${streetsGuessedCorrectly} / ${qIdx}`;
           }
       }
   }
@@ -240,6 +241,7 @@ window.addEventListener('DOMContentLoaded', () => {
           gameInterface.classList.remove('hidden');
           progressBar.style.width = '0%';
       });
+      reportBtnFAB.classList.remove('hidden');
       recenterMapWithPadding();
       nextQ();
   }
@@ -357,23 +359,31 @@ window.addEventListener('DOMContentLoaded', () => {
         currentStreak++;
         updateScoreDisplay('¡Correcto!', '#28a745');
         document.getElementById('correct-sound')?.play().catch(e => {});
+        feedbackOverlay.className = 'feedback-correct is-pulsing';
         if (currentStreak >= 3) {
             streakDisplay.textContent = `¡Racha de ${currentStreak}!`;
             streakDisplay.classList.add('visible');
         }
-        const progress = totalQuestions > 0 ? (streetsGuessedCorrectly / totalQuestions) * 100 : 0;
-        progressBar.style.width = `${progress}%`;
-
       } else {
         currentStreak = 0;
         streakDisplay.classList.remove('visible');
         updateScoreDisplay(`Casi... a ${Math.round(streetCheck.distance)} metros.`, '#c82333');
         document.getElementById('incorrect-sound')?.play().catch(e => {});
+        feedbackOverlay.className = 'feedback-incorrect is-pulsing';
       }
+      
+      const progress = totalQuestions > 0 ? ((qIdx + 1) / totalQuestions) * 100 : 0;
+      progressBar.style.width = `${progress}%`;
+
       if (streetCheck.point) guide = L.polyline([userMk.getLatLng(), streetCheck.point], { dashArray:'6 4', color:COL_DASH }).addTo(gameMap);
     } else {
       updateScoreDisplay('Error: No se pudo dibujar el lugar.', '#c82333');
     }
+
+    setTimeout(() => {
+        feedbackOverlay.className = '';
+    }, 1000);
+    
     nextBtn.disabled=false;
   }
 
@@ -554,6 +564,7 @@ window.addEventListener('DOMContentLoaded', () => {
                 el.classList.add('hidden');
             }
         });
+        reportBtnFAB.classList.add('hidden');
         drawZoneBtn.classList.remove('hidden');
         if (zonePoly) gameMap.removeLayer(zonePoly);
         if (oldZonePoly) gameMap.removeLayer(oldZonePoly);
@@ -622,7 +633,9 @@ window.addEventListener('DOMContentLoaded', () => {
   }
 
   async function reportIncident() {
-    if (lastGameZonePoints.length === 0) {
+    const pointsToReport = playing ? zonePoints : lastGameZonePoints;
+
+    if (pointsToReport.length === 0) {
       alert("Debes jugar en una zona primero para poder reportar una incidencia sobre ella.");
       return;
     }
@@ -634,7 +647,7 @@ window.addEventListener('DOMContentLoaded', () => {
             alert("Necesitas estar conectado para reportar una incidencia.");
             return;
         }
-        const zoneString = lastGameZonePoints.map(p => `${p.lat},${p.lng}`).join(';');
+        const zoneString = pointsToReport.map(p => `${p.lat},${p.lng}`).join(';');
         const requestBody = {
             zone_points: zoneString,
             description: description,

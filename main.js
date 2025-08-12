@@ -355,12 +355,20 @@ window.addEventListener('DOMContentLoaded', () => {
           if (element) element.classList.add('street-reveal-animation');
       });
       const streetCheck = getDistanceToStreet(userMk.getLatLng(), streetGrp);
+
+      // --- INICIO DE LÓGICA DE FEEDBACK VISUAL MODIFICADA ---
+      // 1. Limpiamos cualquier animación anterior para poder re-lanzarla
+      feedbackOverlay.className = '';
+      // 2. Forzamos un "reflow" del navegador, un truco para asegurar que la animación se reinicie
+      void feedbackOverlay.offsetWidth;
+      // --- FIN DE LÓGICA DE FEEDBACK VISUAL MODIFICADA ---
+      
       if (streetCheck.distance <= 30) {
         streetsGuessedCorrectly++;
         currentStreak++;
         updateScoreDisplay('¡Correcto!', '#28a745');
         document.getElementById('correct-sound')?.play().catch(e => {});
-        feedbackOverlay.className = 'feedback-correct is-pulsing';
+        feedbackOverlay.classList.add('feedback-correct', 'is-pulsing');
         if (currentStreak >= 3) {
             streakDisplay.textContent = `¡Racha de ${currentStreak}!`;
             streakDisplay.classList.add('visible');
@@ -371,7 +379,7 @@ window.addEventListener('DOMContentLoaded', () => {
         streakDisplay.classList.remove('visible');
         updateScoreDisplay(`Casi... a ${Math.round(streetCheck.distance)} metros.`, '#c82333');
         document.getElementById('incorrect-sound')?.play().catch(e => {});
-        feedbackOverlay.className = 'feedback-incorrect is-pulsing';
+        feedbackOverlay.classList.add('feedback-incorrect', 'is-pulsing');
       }
 
       const progress = totalQuestions > 0 ? ((qIdx) / totalQuestions) * 100 : 0;
@@ -381,10 +389,6 @@ window.addEventListener('DOMContentLoaded', () => {
     } else {
       updateScoreDisplay('Error: No se pudo dibujar el lugar.', '#c82333');
     }
-
-    setTimeout(() => {
-        feedbackOverlay.className = '';
-    }, 1200);
 
     nextBtn.disabled=false;
   }

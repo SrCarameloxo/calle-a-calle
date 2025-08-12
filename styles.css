@@ -390,37 +390,32 @@ button.game-control-btn:disabled { opacity: .4; cursor: default; }
 .street-tooltip-color-11 { background-color: rgba(240, 113, 152, 0.8) !important; }
 /* --- FIN: Clases de color para Tooltips --- */
 
-/* --- INICIO: NUEVOS ESTILOS PARA EFECTO DE RESPLANDOR (CORREGIDO Y ROBUSTO) --- */
+/* --- INICIO: ESTILOS PARA EFECTO DE RESPLANDOR (VERSIÓN FINAL Y ROBUSTA) --- */
 #feedback-overlay {
     position: fixed;
     top: 0; left: 0; right: 0; bottom: 0;
     z-index: 9999;
     pointer-events: none;
     opacity: 0;
-    box-shadow: none; /* Estado por defecto: sin sombra */
+    box-shadow: none;
     box-sizing: border-box;
 }
 
 .feedback-correct {
-    /* Múltiples capas de sombra interior para crear un resplandor vibrante y controlado */
-    box-shadow:
-        inset 0 0 8px 4px rgba(57, 255, 20, 0.8),  /* Resplandor verde brillante interior */
-        inset 0 0 15px 8px rgba(57, 255, 20, 0.5); /* Aura verde más suave y amplia */
+    box-shadow: inset 0 0 10px 4px #39ff14; /* Verde neón */
 }
 
 .feedback-incorrect {
-    box-shadow:
-        inset 0 0 8px 4px rgba(255, 31, 79, 0.8),   /* Resplandor rojo brillante interior */
-        inset 0 0 15px 8px rgba(255, 31, 79, 0.5);  /* Aura roja más suave y amplia */
+    box-shadow: inset 0 0 10px 4px #ff1f4f; /* Rojo neón */
 }
 
-@keyframes subtle-pulse-anim {
-    0%   { opacity: 0; }
-    40%  { opacity: 1; }
+@keyframes feedback-pulse-animation {
+    0% { opacity: 1; }
     100% { opacity: 0; }
 }
 
 .is-pulsing {
-    animation: subtle-pulse-anim 1.2s ease-in-out;
+    /* La propiedad 'forwards' es clave: mantiene el estado final de la animación (opacidad 0) */
+    animation: feedback-pulse-animation 1.2s ease-out forwards;
 }
-/* --- FIN: NUEVOS ESTILOS --- */
+/* --- FIN: ESTILOS --- */

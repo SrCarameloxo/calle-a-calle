@@ -103,11 +103,9 @@
         <svg viewBox="0 0 24 24" height="28" width="28" xmlns="http://www.w3.org/2000/svg"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1v12zM4 22v-7" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
     </button>
     
-    <!-- --- INICIO: CÓDIGO AÑADIDO --- -->
     <div id="mode-indicator" class="hidden" title="Modo de Juego Actual">
         <!-- El SVG del icono se cambiará con JS -->
     </div>
-    <!-- --- FIN: CÓDIGO AÑADIDO --- -->
 
     <button id="open-menu-btn" title="Abrir menú">
         <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" fill="currentColor" viewBox="0 0 16 16">
@@ -120,9 +118,7 @@
             <button class="menu-tab-btn active" data-panel="profile-content">Perfil</button>
             <button class="menu-tab-btn" data-panel="stats-content">Estadísticas</button>
             <button class="menu-tab-btn" data-panel="saved-zones-content">Mis Zonas</button>
-            <!-- --- INICIO: CÓDIGO AÑADIDO --- -->
             <button class="menu-tab-btn" data-panel="modes-content">Modos</button>
-            <!-- --- FIN: CÓDIGO AÑADIDO --- -->
         </div>
         <div class="menu-content-area">
             <div id="profile-content" class="content-panel active">
@@ -139,7 +135,6 @@
                 <h3 class="mb-4 text-xl font-bold">Mis Zonas Guardadas</h3>
                 <div id="saved-zones-list" class="space-y-2"></div>
             </div>
-            <!-- --- INICIO: CÓDIGO AÑADIDO --- -->
             <div id="modes-content" class="content-panel">
                 <h3 class="mb-4 text-xl font-bold">Modos de Juego</h3>
                 <div id="game-modes-list" class="space-y-2">
@@ -157,7 +152,6 @@
                     </button>
                 </div>
             </div>
-            <!-- --- FIN: CÓDIGO AÑADIDO --- -->
         </div>
     </div>
   </div>
@@ -166,7 +160,9 @@
   <audio id="incorrect-sound" src="/sounds/incorrect.mp3" preload="auto"></audio>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script src="main.js"></script>
+  <!-- --- INICIO: CÓDIGO MODIFICADO --- -->
+  <script type="module" src="main.js"></script>
+  <!-- --- FIN: CÓDIGO MODIFICADO --- -->
 
 </body>
 </html>

@@ -282,8 +282,6 @@ window.addEventListener('DOMContentLoaded', () => {
     backToMenuBtn.addEventListener('click', resetToInitialView);
     backFromReviewBtn.addEventListener('click', exitReviewMode);
     
-    // El botón 'repeatZone' ya no tiene un listener aquí. Se gestiona en endGame.
-
     setupStartButton(startBtn);
     setupMenu();
 
@@ -333,12 +331,9 @@ window.addEventListener('DOMContentLoaded', () => {
       updatePanelUI(() => {
           gameInterface.classList.remove('hidden');
           progressBar.style.width = '0%';
-          // --- INICIO: CÓDIGO CORREGIDO ---
-          // El zoom automático ahora solo se aplica al modo clásico
           if (currentGameMode === 'classic') {
             recenterMapWithPadding();
           }
-          // --- FIN: CÓDIGO CORREGIDO ---
       });
       reportBtnFAB.classList.remove('hidden');
       nextQ();
@@ -597,10 +592,13 @@ window.addEventListener('DOMContentLoaded', () => {
         gameInterface.classList.add('hidden');
         finalScoreEl.textContent = `¡Partida terminada! Puntuación: ${streetsGuessedCorrectly} / ${totalQuestions}`;
         
+        // --- INICIO: CÓDIGO CORREGIDO (Regla #3) ---
+        // La lógica ahora está claramente separada por modo de juego
         if (currentGameMode === 'revancha') {
             drawZoneBtn.classList.add('hidden');
             saveZoneBtn.classList.add('hidden');
             repeatZoneBtn.textContent = 'Jugar Revancha de Nuevo';
+            // Asignamos la acción directamente, sin conflictos
             repeatZoneBtn.onclick = () => {
                 endGameOptions.classList.add('hidden'); 
                 startRevanchaGame({
@@ -612,13 +610,14 @@ window.addEventListener('DOMContentLoaded', () => {
                 });
             };
             repeatZoneBtn.disabled = false;
-        } else { 
+        } else { // Modo clásico
             drawZoneBtn.classList.remove('hidden');
             saveZoneBtn.classList.remove('hidden');
             repeatZoneBtn.textContent = 'Repetir Zona';
             repeatZoneBtn.onclick = repeatLastZone; 
             repeatZoneBtn.disabled = (lastGameZonePoints.length < 3 || lastGameStreetList.length === 0);
         }
+        // --- FIN: CÓDIGO CORREGIDO (Regla #3) ---
 
         endGameOptions.classList.remove('hidden');
         backToMenuBtn.classList.remove('hidden');
@@ -701,12 +700,9 @@ window.addEventListener('DOMContentLoaded', () => {
   }
 
   function nextQ(){
-    // --- INICIO: CÓDIGO CORREGIDO ---
-    // Eliminado el zoom automático para el modo revancha
     if (currentGameMode === 'classic') {
         recenterMapWithPadding();
     }
-    // --- FIN: CÓDIGO CORREGIDO ---
 
     clear();
     if(qIdx >= totalQuestions){
@@ -729,10 +725,7 @@ window.addEventListener('DOMContentLoaded', () => {
     nextBtn.disabled = true;
   }
   
-  // --- INICIO: CÓDIGO CORREGIDO (Regla #1) ---
-  // Esta es la nueva función de "Reseteo Maestro"
   function resetToInitialView() {
-    // Primero, si venimos del modo revancha, guardamos el progreso.
     if (currentGameMode === 'revancha' && acertadasEnSesionRevancha.size > 0) {
         console.log("Saliendo del modo revancha. Borrando calles acertadas de la BD...");
         acertadasEnSesionRevancha.forEach(streetName => {
@@ -741,7 +734,6 @@ window.addEventListener('DOMContentLoaded', () => {
     }
     acertadasEnSesionRevancha.clear();
 
-    // Luego, hacemos una limpieza profunda de la UI y el estado del juego.
     clear(true);
     updatePanelUI(() => {
         ['start-options', 'loaded-zone-options', 'checkbox-wrapper', 'game-interface', 'end-game-options', 'back-from-review-btn'].forEach(id => {
@@ -758,10 +750,8 @@ window.addEventListener('DOMContentLoaded', () => {
         progressBar.style.width = '0%';
     });
 
-    // Finalmente, forzamos el modo a clásico.
     setGameMode('classic');
   }
-  // --- FIN: CÓDIGO CORREGIDO (Regla #1) ---
 
   function playFromHistory(zoneString) {
     gameMap.off('click', addVertex);
@@ -806,10 +796,7 @@ window.addEventListener('DOMContentLoaded', () => {
   function repeatLastZone() {
       if (lastGameZonePoints.length < 3 || lastGameStreetList.length === 0) return;
       
-      // --- INICIO: CÓDIGO CORREGIDO ---
-      // Nos aseguramos de limpiar la pantalla final antes de empezar
       endGameOptions.classList.add('hidden');
-      // --- FIN: CÓDIGO CORREGIDO ---
 
       clear(true);
       if (zonePoly) gameMap.removeLayer(zonePoly);

@@ -202,6 +202,14 @@ window.addEventListener('DOMContentLoaded', () => {
 
     setupStartButton(startBtn);
     setupMenu();
+
+    // --- LÓGICA AÑADIDA PARA LA BARRA ESPACIADORA ---
+    document.addEventListener('keyup', (event) => {
+        if (event.code === 'Space' && !nextBtn.disabled) {
+            event.preventDefault(); // Evita que la página haga scroll
+            nextBtn.click();
+        }
+    });
   }
 
   async function dismissDrawHelp() {
@@ -362,7 +370,7 @@ window.addEventListener('DOMContentLoaded', () => {
         currentStreak++;
         updateScoreDisplay('¡Correcto!', '#28a745');
         document.getElementById('correct-sound')?.play().catch(e => {});
-        feedbackClass = 'feedback-pulse-correct';
+        feedbackClass = 'panel-pulse-correct';
         if (currentStreak >= 3) {
             streakDisplay.textContent = `¡Racha de ${currentStreak}!`;
             streakDisplay.classList.add('visible');
@@ -373,13 +381,13 @@ window.addEventListener('DOMContentLoaded', () => {
         streakDisplay.classList.remove('visible');
         updateScoreDisplay(`Casi... a ${Math.round(streetCheck.distance)} metros.`, '#c82333');
         document.getElementById('incorrect-sound')?.play().catch(e => {});
-        feedbackClass = 'feedback-pulse-incorrect';
+        feedbackClass = 'panel-pulse-incorrect';
       }
       
       gameUiContainer.classList.add(feedbackClass);
-      setTimeout(() => {
+      gameUiContainer.addEventListener('animationend', () => {
           gameUiContainer.classList.remove(feedbackClass);
-      }, 1000);
+      }, { once: true });
 
       const progress = totalQuestions > 0 ? ((qIdx) / totalQuestions) * 100 : 0;
       progressBar.style.width = `${progress}%`;

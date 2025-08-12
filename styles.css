@@ -18,8 +18,7 @@ body { font-family: system-ui, sans-serif; background-color: #1a1a1a; }
     box-shadow: 0 10px 30px rgba(0,0,0,0.3);
     width: 320px;
     max-height: 500px;
-    /* --- LÍNEA AÑADIDA --- */
-    transition: max-height 0.4s ease-in-out, box-shadow 0.4s ease-out;
+    transition: max-height 0.4s ease-in-out;
 }
 
 /* --- Animación de pulso para el panel --- */
@@ -392,11 +391,23 @@ button.game-control-btn:disabled { opacity: .4; cursor: default; }
 /* --- FIN: Clases de color para Tooltips --- */
 
 /* --- INICIO: ESTILOS PARA EL PULSO DE SOMBRA DEL PANEL --- */
-#game-ui-container.feedback-pulse-correct {
-    box-shadow: 0 0 25px 8px rgba(57, 255, 20, 0.7); /* Sombra Verde Neón */
+@keyframes panel-pulse-correct-anim {
+    0% { box-shadow: 0 10px 30px rgba(0,0,0,0.3); }
+    50% { box-shadow: 0 0 20px 5px rgba(57, 255, 20, 0.6); } /* Sombra Verde Neón Sutil */
+    100% { box-shadow: 0 10px 30px rgba(0,0,0,0.3); }
 }
 
-#game-ui-container.feedback-pulse-incorrect {
-    box-shadow: 0 0 25px 8px rgba(255, 31, 79, 0.7); /* Sombra Roja Neón */
+@keyframes panel-pulse-incorrect-anim {
+    0% { box-shadow: 0 10px 30px rgba(0,0,0,0.3); }
+    50% { box-shadow: 0 0 20px 5px rgba(255, 31, 79, 0.6); } /* Sombra Roja Neón Sutil */
+    100% { box-shadow: 0 10px 30px rgba(0,0,0,0.3); }
+}
+
+.panel-pulse-correct {
+    animation: panel-pulse-correct-anim 0.8s ease-in-out;
+}
+
+.panel-pulse-incorrect {
+    animation: panel-pulse-incorrect-anim 0.8s ease-in-out;
 }
 /* --- FIN: ESTILOS --- */

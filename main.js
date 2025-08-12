@@ -377,6 +377,19 @@ window.addEventListener('DOMContentLoaded', () => {
         }
 
       } else {
+        // --- INICIO: CÓDIGO AÑADIDO PARA GUARDAR FALLOS ---
+        // Si el usuario falla, llamamos a la función para guardar la calle.
+        // Nos aseguramos de que existan los datos de la calle antes de intentar guardarla.
+        if (target && streetList[qIdx - 1]) {
+            const failedStreetData = {
+                googleName: streetList[qIdx - 1].googleName,
+                geometries: streetList[qIdx - 1].geometries,
+                city: userProfile.subscribedCity
+            };
+            saveFailedStreet(failedStreetData);
+        }
+        // --- FIN: CÓDIGO AÑADIDO ---
+        
         currentStreak = 0;
         streakDisplay.classList.remove('visible');
         updateScoreDisplay(`Casi... a ${Math.round(streetCheck.distance)} metros.`, '#c82333');
@@ -681,6 +694,48 @@ window.addEventListener('DOMContentLoaded', () => {
       alert(`Hubo un error al enviar tu reporte: ${error.message}`);
     }
   }
+
+// --- INICIO: CÓDIGO AÑADIDO PARA GUARDAR FALLOS ---
+async function saveFailedStreet(streetData) {
+    // Esta función se encarga de enviar los datos de una calle fallada al backend
+    try {
+        const { data: { session } } = await supabaseClient.auth.getSession();
+        if (!session) {
+            // No hacemos nada si el usuario no está logueado
+            return;
+        }
+
+        const requestBody = {
+            osm_name: streetData.googleName, // Usamos el nombre limpio como identificador
+            city: streetData.city,
+            geometries: streetData.geometries
+        };
+
+        // Llamamos a la nueva API que hemos creado. Es una operación de "disparar y olvidar",
+        // no necesitamos esperar una respuesta detallada, solo que no falle.
+        const response = await fetch('/api/saveFailure', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${session.access_token}`
+            },
+            body: JSON.stringify(requestBody)
+        });
+        
+        // Opcional: puedes registrar si la operación fue exitosa o no
+        if (!response.ok) {
+           console.error('La API de guardado de fallos devolvió un error.', await response.json());
+        } else {
+           console.log(`Fallo en "${streetData.googleName}" registrado para el modo revancha.`);
+        }
+
+    } catch (error) {
+        // En caso de un error de red o similar, lo mostramos en la consola
+        // para no interrumpir el juego del usuario.
+        console.error('Error al intentar guardar la calle fallada:', error.message);
+    }
+}
+// --- FIN: CÓDIGO AÑADIDO ---
   
   async function saveCurrentZone() {
     if (lastGameZonePoints.length < 3) {

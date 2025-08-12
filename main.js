@@ -1,16 +1,12 @@
-// --- INICIO: CÓDIGO AÑADIDO ---
 // Importamos la función principal de nuestro nuevo módulo de revancha.
 import { startRevanchaGame } from './modules/revancha-mode.js';
-// --- FIN: CÓDIGO AÑADIDO ---
 
 window.addEventListener('DOMContentLoaded', () => {
 
   const SUPABASE_URL = 'https://hppzwfwtedghpsxfonoh.supabase.co';
   const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhwcHp3Znd0ZWRnaHBzeGZvbm9oIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQxMjQzNDMsImV4cCI6MjA2OTcwMDM0M30.BAh6i5iJ5YkDBoydfkC9azAD4eMdYBkEBdxws9kj5Hg';
-  // --- INICIO: CÓDIGO MODIFICADO ---
   // Hacemos que supabaseClient sea accesible globalmente para que los módulos puedan usarlo.
   window.supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-  // --- FIN: CÓDIGO MODIFICADO ---
 
   // --- Selectores de elementos DOM ---
   const loginScreen = document.getElementById('login-screen');
@@ -65,6 +61,10 @@ window.addEventListener('DOMContentLoaded', () => {
   let showScoreAsPercentage = false;
 
   let currentGameMode = 'classic'; 
+  // --- INICIO: CÓDIGO AÑADIDO ---
+  // Nueva variable para guardar las calles acertadas en una sesión de revancha
+  let acertadasEnSesionRevancha = new Set();
+  // --- FIN: CÓDIGO AÑADIDO ---
 
   const modeIcons = {
     classic: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z" /><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z" /></svg>`,
@@ -103,8 +103,6 @@ window.addEventListener('DOMContentLoaded', () => {
   }
   async function signOut() { await supabaseClient.auth.signOut(); }
   
-  // --- INICIO: CÓDIGO MODIFICADO ---
-  // He movido la comprobación de revancha a su propia función para mayor claridad.
   async function checkRevanchaAvailability() {
       const revanchaBtn = document.querySelector('button[data-mode="revancha"]');
       if (!revanchaBtn) return;
@@ -122,7 +120,7 @@ window.addEventListener('DOMContentLoaded', () => {
           revanchaBtn.disabled = data.streets.length === 0;
       } catch(e) {
           console.error("Error al comprobar disponibilidad de revancha:", e);
-          revanchaBtn.disabled = true; // Desactivar si hay un error
+          revanchaBtn.disabled = true;
       }
   }
 
@@ -142,14 +140,12 @@ window.addEventListener('DOMContentLoaded', () => {
             if (cityError) throw new Error(`No se encontraron datos para la ciudad: ${profile.subscribed_city}`);
             userProfile.cityData = city;
         }
-        // Una vez que tenemos el perfil, comprobamos si el modo revancha debe estar activo.
         await checkRevanchaAvailability();
     } catch (e) {
         console.error("Error al obtener el perfil del usuario:", e);
         alert("Hubo un problema al cargar los datos de tu perfil.");
     }
   }
-  // --- FIN: CÓDIGO MODIFICADO ---
 
   async function handleAuthStateChange(event, session) {
     const user = session ? session.user : null;
@@ -205,13 +201,9 @@ window.addEventListener('DOMContentLoaded', () => {
         event.stopPropagation();
         const isHidden = menuContentPanel.classList.toggle('hidden');
         if (!isHidden) {
-            // --- INICIO: CÓDIGO MODIFICADO ---
-            // Cada vez que se abre el menú, volvemos a comprobar la disponibilidad
-            // por si el usuario ha terminado una partida y ahora sí tiene fallos.
             if (document.querySelector('.content-panel.active')?.id === 'modes-content') {
                 checkRevanchaAvailability();
             }
-            // --- FIN: CÓDIGO MODIFICADO ---
             document.addEventListener('click', handleOutsideClick);
         } else {
             document.removeEventListener('click', handleOutsideClick);
@@ -227,9 +219,7 @@ window.addEventListener('DOMContentLoaded', () => {
         document.getElementById(panelId).classList.add('active');
         if (panelId === 'saved-zones-content') await displaySavedZones();
         if (panelId === 'stats-content') await displayStats();
-        // --- INICIO: CÓDIGO MODIFICADO ---
         if (panelId === 'modes-content') await checkRevanchaAvailability();
-        // --- FIN: CÓDIGO MODIFICADO ---
       });
     });
 
@@ -241,11 +231,11 @@ window.addEventListener('DOMContentLoaded', () => {
             setGameMode(selectedMode);
             menuContentPanel.classList.add('hidden');
 
-            // --- INICIO: CÓDIGO MODIFICADO ---
-            // Aquí conectamos el botón con la lógica del módulo
             if (selectedMode === 'revancha') {
+                resetToInitialView();
+                drawZoneBtn.classList.add('hidden');
+
                 startRevanchaGame({
-                    // Pasamos un "hook" o "gancho" que el módulo usará para iniciar nuestro flujo de juego
                     startGame: (revanchaStreets) => {
                         streetList = revanchaStreets;
                         totalQuestions = revanchaStreets.length;
@@ -255,7 +245,6 @@ window.addEventListener('DOMContentLoaded', () => {
             } else if (selectedMode === 'classic') {
                 resetToInitialView();
             }
-            // --- FIN: CÓDIGO MODIFICADO ---
         });
     });
   }
@@ -336,12 +325,15 @@ window.addEventListener('DOMContentLoaded', () => {
   }
 
   function startGameFlow() {
+      // --- INICIO: CÓDIGO MODIFICADO ---
+      // Limpiamos la lista de aciertos de la sesión anterior antes de empezar
+      acertadasEnSesionRevancha.clear();
+      // --- FIN: CÓDIGO MODIFICADO ---
+
       playing = true; qIdx = 0; streetsGuessedCorrectly = 0; currentStreak = 0;
       updatePanelUI(() => {
           gameInterface.classList.remove('hidden');
           progressBar.style.width = '0%';
-          // --- INICIO: CÓDIGO MODIFICADO ---
-          // En modo revancha no hay zona que centrar, así que buscamos los límites de todas las calles
           if (currentGameMode === 'revancha' && streetList.length > 0) {
               const allBounds = L.latLngBounds();
               streetList.forEach(street => {
@@ -353,7 +345,6 @@ window.addEventListener('DOMContentLoaded', () => {
           } else {
               recenterMapWithPadding();
           }
-          // --- FIN: CÓDIGO MODIFICADO ---
       });
       reportBtnFAB.classList.remove('hidden');
       nextQ();
@@ -455,6 +446,25 @@ window.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  async function deleteFailedStreet(streetName) {
+      try {
+          const { data: { session } } = await supabaseClient.auth.getSession();
+          if (!session) return;
+
+          await fetch('/api/deleteFailure', {
+              method: 'POST',
+              headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${session.access_token}`
+              },
+              body: JSON.stringify({ osm_name: streetName })
+          });
+          console.log(`Calle "${streetName}" eliminada de la lista de revancha.`);
+      } catch (error) {
+          console.error(`Error al eliminar la calle "${streetName}" de la revancha:`, error);
+      }
+  }
+
   function onMapClick(e){
     if(!playing) return; 
     gameMap.off('click', onMapClick);
@@ -471,6 +481,16 @@ window.addEventListener('DOMContentLoaded', () => {
       let feedbackClass = '';
 
       if (streetCheck.distance <= 30) {
+        // --- INICIO: CÓDIGO MODIFICADO ---
+        // Si acertamos en modo revancha, guardamos el nombre en nuestra lista temporal.
+        // YA NO la borramos inmediatamente de la base de datos.
+        if (currentGameMode === 'revancha') {
+            const acertada = streetList[qIdx - 1];
+            acertadasEnSesionRevancha.add(acertada.googleName);
+            console.log("Aciertos en esta sesión:", Array.from(acertadasEnSesionRevancha));
+        }
+        // --- FIN: CÓDIGO MODIFICADO ---
+
         streetsGuessedCorrectly++;
         currentStreak++;
         updateScoreDisplay('¡Correcto!', '#28a745');
@@ -578,6 +598,30 @@ window.addEventListener('DOMContentLoaded', () => {
         playing = false;
         gameInterface.classList.add('hidden');
         finalScoreEl.textContent = `¡Partida terminada! Puntuación: ${streetsGuessedCorrectly} / ${totalQuestions}`;
+        
+        if (currentGameMode === 'revancha') {
+            drawZoneBtn.classList.add('hidden');
+            saveZoneBtn.classList.add('hidden');
+            repeatZoneBtn.textContent = 'Jugar Revancha de Nuevo';
+            repeatZoneBtn.onclick = () => {
+                setGameMode('revancha');
+                startRevanchaGame({
+                     startGame: (revanchaStreets) => {
+                        streetList = revanchaStreets;
+                        totalQuestions = revanchaStreets.length;
+                        startGameFlow();
+                    }
+                });
+            };
+            repeatZoneBtn.disabled = false;
+        } else {
+            drawZoneBtn.classList.remove('hidden');
+            saveZoneBtn.classList.remove('hidden');
+            repeatZoneBtn.textContent = 'Repetir Zona';
+            repeatZoneBtn.onclick = repeatLastZone;
+            repeatZoneBtn.disabled = (lastGameZonePoints.length < 3 || lastGameStreetList.length === 0);
+        }
+
         endGameOptions.classList.remove('hidden');
         backToMenuBtn.classList.remove('hidden');
         
@@ -589,7 +633,6 @@ window.addEventListener('DOMContentLoaded', () => {
         lastGameStreetList = [...streetList];
         saveGameStats(streetsGuessedCorrectly, totalQuestions);
         
-        repeatZoneBtn.disabled = (lastGameZonePoints.length < 3 || lastGameStreetList.length === 0);
         zonePoly = null; zonePoints = [];
         gameMap.off('click', onMapClick);
     });
@@ -660,8 +703,6 @@ window.addEventListener('DOMContentLoaded', () => {
   }
 
   function nextQ(){
-    // --- INICIO: CÓDIGO MODIFICADO ---
-    // En modo revancha, el mapa debe centrarse en la calle actual
     if (currentGameMode === 'revancha' && streetList[qIdx]) {
         const bounds = L.latLngBounds();
         streetList[qIdx].geometries.forEach(g => bounds.extend(L.latLngBounds(g.points)));
@@ -669,7 +710,6 @@ window.addEventListener('DOMContentLoaded', () => {
     } else {
         recenterMapWithPadding();
     }
-    // --- FIN: CÓDIGO MODIFICADO ---
 
     clear();
     if(qIdx >= totalQuestions){
@@ -693,6 +733,18 @@ window.addEventListener('DOMContentLoaded', () => {
   }
   
   function resetToInitialView() {
+    // --- INICIO: CÓDIGO MODIFICADO ---
+    // Ahora, esta función también es responsable de limpiar los aciertos de la sesión de revancha
+    // y de llamar a la API para borrar las calles de la base de datos.
+    if (currentGameMode === 'revancha' && acertadasEnSesionRevancha.size > 0) {
+        console.log("Saliendo del modo revancha. Borrando calles acertadas de la BD...");
+        acertadasEnSesionRevancha.forEach(streetName => {
+            deleteFailedStreet(streetName);
+        });
+        acertadasEnSesionRevancha.clear();
+    }
+    // --- FIN: CÓDIGO MODIFICADO ---
+
     clear(true);
     updatePanelUI(() => {
         ['start-options', 'loaded-zone-options', 'checkbox-wrapper', 'game-interface', 'end-game-options', 'back-from-review-btn'].forEach(id => {

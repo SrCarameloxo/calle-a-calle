@@ -56,6 +56,46 @@ window.addEventListener('DOMContentLoaded', () => {
   let currentStreak = 0;
   let showScoreAsPercentage = false;
 
+  // --- INICIO: CÓDIGO AÑADIDO (BLOQUE 1 de 2) ---
+  // --- Gestión de Modos de Juego ---
+  
+  let currentGameMode = 'classic'; // Modo por defecto al iniciar
+
+  // Diccionario con los SVG de los iconos para cada modo
+  const modeIcons = {
+    classic: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z" /><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z" /></svg>`,
+    revancha: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0011.664 0l3.181-3.183m-4.991-2.695v-4.992m0 0h-4.992m4.992 0l-3.181-3.183a8.25 8.25 0 00-11.664 0l-3.181 3.183" /></svg>`,
+    instinto: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456zM16.898 20.553L16.5 21.75l-.398-1.197a3.375 3.375 0 00-2.986-2.986L12 17.25l1.197-.398a3.375 3.375 0 002.986-2.986L16.5 12.75l.398 1.197a3.375 3.375 0 002.986 2.986L21 17.25l-1.197.398a3.375 3.375 0 00-2.986 2.986z" /></svg>`
+  };
+
+  // Función central para cambiar el modo de juego
+  function setGameMode(mode) {
+    if (!mode || !modeIcons[mode]) {
+        console.error("Modo de juego no válido:", mode);
+        return;
+    }
+    currentGameMode = mode;
+    console.log(`Modo de juego cambiado a: ${currentGameMode}`);
+    
+    const indicator = document.getElementById('mode-indicator');
+    indicator.innerHTML = modeIcons[mode];
+    indicator.classList.remove('hidden');
+
+    // Prepara la UI para el modo seleccionado
+    if (mode === 'classic') {
+        // En modo clásico, el flujo normal es empezar con el botón de dibujar zona
+        resetToInitialView();
+    } else if (mode === 'revancha') {
+        // En modo revancha, no se dibuja zona, se empieza directamente
+        // Ocultamos todos los botones de inicio y mostramos el loader
+        resetToInitialView(); // Limpiamos la UI
+        drawZoneBtn.classList.add('hidden'); // Ocultamos el botón de dibujar zona
+        alert("Modo Revancha seleccionado. En el siguiente paso, esto iniciará el juego directamente.");
+        // Aquí, en el futuro, llamaremos a la función que inicie la partida de revancha.
+    }
+  }
+  // --- FIN: CÓDIGO AÑADIDO (BLOQUE 1 de 2) ---
+
   function updatePanelUI(updateFunction) {
       const heightBefore = gameUiContainer.offsetHeight;
       updateFunction();
@@ -167,6 +207,19 @@ window.addEventListener('DOMContentLoaded', () => {
         if (panelId === 'stats-content') await displayStats();
       });
     });
+
+    // --- INICIO: CÓDIGO AÑADIDO (BLOQUE 2 de 2) ---
+    // --- Lógica para los botones de selección de modo ---
+    document.querySelectorAll('.mode-select-btn').forEach(button => {
+        button.addEventListener('click', () => {
+            const selectedMode = button.dataset.mode;
+            if (button.disabled) return;
+
+            setGameMode(selectedMode);
+            menuContentPanel.classList.add('hidden'); // Cerramos el menú al seleccionar
+        });
+    });
+    // --- FIN: CÓDIGO AÑADIDO (BLOQUE 2 de 2) ---
   }
 
   function initGame() {
@@ -186,6 +239,9 @@ window.addEventListener('DOMContentLoaded', () => {
     }
     gameMap.invalidateSize();
     
+    // Mostramos el icono del modo por defecto (clásico) al iniciar
+    setGameMode('classic');
+
     drawZoneBtn.addEventListener('click', startDrawing);
     undoPointBtn.addEventListener('click', undoLastPoint);
     nextBtn.addEventListener('click', () => { nextBtn.disabled=true; nextQ(); });
@@ -377,10 +433,8 @@ window.addEventListener('DOMContentLoaded', () => {
         }
 
       } else {
-        // --- INICIO: CÓDIGO AÑADIDO PARA GUARDAR FALLOS ---
-        // Si el usuario falla, llamamos a la función para guardar la calle.
-        // Nos aseguramos de que existan los datos de la calle antes de intentar guardarla.
-        if (target && streetList[qIdx - 1]) {
+        // Si el modo es clásico, guardamos el fallo. En otros modos podríamos no querer hacerlo.
+        if (currentGameMode === 'classic' && target && streetList[qIdx - 1]) {
             const failedStreetData = {
                 googleName: streetList[qIdx - 1].googleName,
                 geometries: streetList[qIdx - 1].geometries,
@@ -388,7 +442,6 @@ window.addEventListener('DOMContentLoaded', () => {
             };
             saveFailedStreet(failedStreetData);
         }
-        // --- FIN: CÓDIGO AÑADIDO ---
         
         currentStreak = 0;
         streakDisplay.classList.remove('visible');

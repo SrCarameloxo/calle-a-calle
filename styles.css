@@ -392,11 +392,11 @@ button.game-control-btn:disabled { opacity: .4; cursor: default; }
 /* --- FIN: Clases de color para Tooltips --- */
 
 /* --- INICIO: ESTILOS PARA EL PULSO DE SOMBRA DEL PANEL --- */
-.feedback-pulse-correct {
+#game-ui-container.feedback-pulse-correct {
     box-shadow: 0 0 25px 8px rgba(57, 255, 20, 0.7); /* Sombra Verde Neón */
 }
 
-.feedback-pulse-incorrect {
+#game-ui-container.feedback-pulse-incorrect {
     box-shadow: 0 0 25px 8px rgba(255, 31, 79, 0.7); /* Sombra Roja Neón */
 }
 /* --- FIN: ESTILOS --- */

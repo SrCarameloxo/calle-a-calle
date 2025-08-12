@@ -69,16 +69,23 @@ window.addEventListener('DOMContentLoaded', () => {
     console.log(`Modo de juego cambiado a: ${currentGameMode}`);
     
     // --- INICIO: CÓDIGO MODIFICADO ---
-    // Lógica para cambiar el color del título
     const title = gameUiContainer.querySelector('.gradient-text');
     if (title) {
-        title.classList.remove('revancha-gradient', 'instinto-gradient'); // Limpiamos colores anteriores
+        title.classList.remove('revancha-gradient', 'instinto-gradient');
         if (mode === 'revancha') {
             title.classList.add('revancha-gradient');
         } else if (mode === 'instinto') {
             title.classList.add('instinto-gradient');
         }
     }
+
+    // Lógica para el tick de selección
+    document.querySelectorAll('.mode-select-btn').forEach(btn => {
+        btn.classList.remove('active-mode');
+        if (btn.dataset.mode === mode) {
+            btn.classList.add('active-mode');
+        }
+    });
     // --- FIN: CÓDIGO MODIFICADO ---
   }
 
@@ -597,13 +604,15 @@ window.addEventListener('DOMContentLoaded', () => {
         gameInterface.classList.add('hidden');
         finalScoreEl.textContent = `¡Partida terminada! Puntuación: ${streetsGuessedCorrectly} / ${totalQuestions}`;
         
+        // --- INICIO: CÓDIGO MODIFICADO ---
+        // Lógica de botones de fin de partida mejorada
         if (currentGameMode === 'revancha') {
             drawZoneBtn.classList.add('hidden');
             saveZoneBtn.classList.add('hidden');
             repeatZoneBtn.textContent = 'Jugar Revancha de Nuevo';
             repeatZoneBtn.onclick = () => {
                 endGameOptions.classList.add('hidden'); 
-                setGameMode('revancha');
+                // No necesitamos setGameMode aquí, ya estamos en revancha
                 startRevanchaGame({
                      startGame: (revanchaStreets) => {
                         streetList = revanchaStreets;
@@ -613,15 +622,14 @@ window.addEventListener('DOMContentLoaded', () => {
                 });
             };
             repeatZoneBtn.disabled = false;
-        } else { // --- INICIO: CÓDIGO MODIFICADO ---
-            // Aseguramos que los botones del modo clásico se muestran correctamente
+        } else {
             drawZoneBtn.classList.remove('hidden');
             saveZoneBtn.classList.remove('hidden');
-            // --- FIN: CÓDIGO MODIFICADO ---
             repeatZoneBtn.textContent = 'Repetir Zona';
-            repeatZoneBtn.onclick = repeatLastZone;
+            repeatZoneBtn.onclick = repeatLastZone; 
             repeatZoneBtn.disabled = (lastGameZonePoints.length < 3 || lastGameStreetList.length === 0);
         }
+        // --- FIN: CÓDIGO MODIFICADO ---
 
         endGameOptions.classList.remove('hidden');
         backToMenuBtn.classList.remove('hidden');

@@ -358,8 +358,15 @@ window.addEventListener('DOMContentLoaded', () => {
       
       // --- INICIO DE LÓGICA DE FEEDBACK VISUAL (MÉTODO 'animationend') ---
       const handleAnimationEnd = () => {
-          feedbackOverlay.className = '';
+          feedbackOverlay.className = ''; // Limpia todas las clases cuando la animación termina
       };
+      // Limpiamos cualquier clase anterior ANTES de empezar.
+      feedbackOverlay.className = '';
+      
+      // Forzamos al navegador a "ver" el elemento sin clases. Este es el truco clave.
+      void feedbackOverlay.offsetWidth;
+      
+      // Preparamos el listener para que se ejecute una sola vez y se auto-destruya
       feedbackOverlay.addEventListener('animationend', handleAnimationEnd, { once: true });
       // --- FIN DE LÓGICA DE FEEDBACK VISUAL ---
 
@@ -368,6 +375,7 @@ window.addEventListener('DOMContentLoaded', () => {
         currentStreak++;
         updateScoreDisplay('¡Correcto!', '#28a745');
         document.getElementById('correct-sound')?.play().catch(e => {});
+        // Aplicamos las clases para lanzar el efecto
         feedbackOverlay.className = 'feedback-correct is-pulsing';
         if (currentStreak >= 3) {
             streakDisplay.textContent = `¡Racha de ${currentStreak}!`;
@@ -379,6 +387,7 @@ window.addEventListener('DOMContentLoaded', () => {
         streakDisplay.classList.remove('visible');
         updateScoreDisplay(`Casi... a ${Math.round(streetCheck.distance)} metros.`, '#c82333');
         document.getElementById('incorrect-sound')?.play().catch(e => {});
+        // Aplicamos las clases para lanzar el efecto
         feedbackOverlay.className = 'feedback-incorrect is-pulsing';
       }
 

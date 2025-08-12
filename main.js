@@ -61,16 +61,15 @@ window.addEventListener('DOMContentLoaded', () => {
   let showScoreAsPercentage = false;
 
   let currentGameMode = 'classic'; 
-  // --- INICIO: CÓDIGO AÑADIDO ---
-  // Nueva variable para guardar las calles acertadas en una sesión de revancha
   let acertadasEnSesionRevancha = new Set();
-  // --- FIN: CÓDIGO AÑADIDO ---
 
+  // --- INICIO: CÓDIGO MODIFICADO (ICONOS) ---
   const modeIcons = {
     classic: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z" /><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z" /></svg>`,
     revancha: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0011.664 0l3.181-3.183m-4.991-2.695v-4.992m0 0h-4.992m4.992 0l-3.181-3.183a8.25 8.25 0 00-11.664 0l-3.181 3.183" /></svg>`,
-    instinto: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456zM16.898 20.553L16.5 21.75l-.398-1.197a3.375 3.375 0 00-2.986-2.986L12 17.25l1.197-.398a3.375 3.375 0 002.986-2.986L16.5 12.75l.398 1.197a3.375 3.375 0 002.986 2.986L21 17.25l-1.197.398a3.375 3.375 0 00-2.986 2.986z" /></svg>`
+    instinto: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" /></svg>`
   };
+  // --- FIN: CÓDIGO MODIFICADO (ICONOS) ---
 
   function setGameMode(mode) {
     if (!mode || !modeIcons[mode]) {
@@ -279,7 +278,11 @@ window.addEventListener('DOMContentLoaded', () => {
     reviewGameBtn.addEventListener('click', enterReviewMode);
     repeatZoneBtn.addEventListener('click', repeatLastZone);
     saveZoneBtn.addEventListener('click', saveCurrentZone);
+    // --- INICIO: CÓDIGO MODIFICADO ---
+    // El botón 'Volver' ahora siempre llama a resetToInitialView.
+    // La lógica de borrado ya está dentro de esa función.
     backToMenuBtn.addEventListener('click', resetToInitialView);
+    // --- FIN: CÓDIGO MODIFICADO ---
     backFromReviewBtn.addEventListener('click', exitReviewMode);
 
     setupStartButton(startBtn);
@@ -325,10 +328,7 @@ window.addEventListener('DOMContentLoaded', () => {
   }
 
   function startGameFlow() {
-      // --- INICIO: CÓDIGO MODIFICADO ---
-      // Limpiamos la lista de aciertos de la sesión anterior antes de empezar
       acertadasEnSesionRevancha.clear();
-      // --- FIN: CÓDIGO MODIFICADO ---
 
       playing = true; qIdx = 0; streetsGuessedCorrectly = 0; currentStreak = 0;
       updatePanelUI(() => {
@@ -481,15 +481,11 @@ window.addEventListener('DOMContentLoaded', () => {
       let feedbackClass = '';
 
       if (streetCheck.distance <= 30) {
-        // --- INICIO: CÓDIGO MODIFICADO ---
-        // Si acertamos en modo revancha, guardamos el nombre en nuestra lista temporal.
-        // YA NO la borramos inmediatamente de la base de datos.
         if (currentGameMode === 'revancha') {
             const acertada = streetList[qIdx - 1];
             acertadasEnSesionRevancha.add(acertada.googleName);
             console.log("Aciertos en esta sesión:", Array.from(acertadasEnSesionRevancha));
         }
-        // --- FIN: CÓDIGO MODIFICADO ---
 
         streetsGuessedCorrectly++;
         currentStreak++;
@@ -604,6 +600,11 @@ window.addEventListener('DOMContentLoaded', () => {
             saveZoneBtn.classList.add('hidden');
             repeatZoneBtn.textContent = 'Jugar Revancha de Nuevo';
             repeatZoneBtn.onclick = () => {
+                // --- INICIO: CÓDIGO MODIFICADO ---
+                // Se soluciona el bug de la interfaz superpuesta
+                endGameOptions.classList.add('hidden'); 
+                // --- FIN: CÓDIGO MODIFICADO ---
+
                 setGameMode('revancha');
                 startRevanchaGame({
                      startGame: (revanchaStreets) => {
@@ -733,9 +734,6 @@ window.addEventListener('DOMContentLoaded', () => {
   }
   
   function resetToInitialView() {
-    // --- INICIO: CÓDIGO MODIFICADO ---
-    // Ahora, esta función también es responsable de limpiar los aciertos de la sesión de revancha
-    // y de llamar a la API para borrar las calles de la base de datos.
     if (currentGameMode === 'revancha' && acertadasEnSesionRevancha.size > 0) {
         console.log("Saliendo del modo revancha. Borrando calles acertadas de la BD...");
         acertadasEnSesionRevancha.forEach(streetName => {
@@ -743,7 +741,6 @@ window.addEventListener('DOMContentLoaded', () => {
         });
         acertadasEnSesionRevancha.clear();
     }
-    // --- FIN: CÓDIGO MODIFICADO ---
 
     clear(true);
     updatePanelUI(() => {
@@ -762,6 +759,11 @@ window.addEventListener('DOMContentLoaded', () => {
         playing = false;
         progressBar.style.width = '0%';
     });
+
+    // --- INICIO: CÓDIGO AÑADIDO ---
+    // Al volver, siempre restauramos al modo clásico por defecto.
+    setGameMode('classic');
+    // --- FIN: CÓDIGO AÑADIDO ---
   }
 
   function playFromHistory(zoneString) {

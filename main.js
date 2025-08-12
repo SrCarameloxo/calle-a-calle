@@ -355,20 +355,20 @@ window.addEventListener('DOMContentLoaded', () => {
           if (element) element.classList.add('street-reveal-animation');
       });
       const streetCheck = getDistanceToStreet(userMk.getLatLng(), streetGrp);
-
-      // --- INICIO DE LÓGICA DE FEEDBACK VISUAL MODIFICADA ---
-      // 1. Limpiamos cualquier animación anterior para poder re-lanzarla
-      feedbackOverlay.className = '';
-      // 2. Forzamos un "reflow" del navegador, un truco para asegurar que la animación se reinicie
-      void feedbackOverlay.offsetWidth;
-      // --- FIN DE LÓGICA DE FEEDBACK VISUAL MODIFICADA ---
       
+      // --- INICIO DE LÓGICA DE FEEDBACK VISUAL (MÉTODO 'animationend') ---
+      const handleAnimationEnd = () => {
+          feedbackOverlay.className = '';
+      };
+      feedbackOverlay.addEventListener('animationend', handleAnimationEnd, { once: true });
+      // --- FIN DE LÓGICA DE FEEDBACK VISUAL ---
+
       if (streetCheck.distance <= 30) {
         streetsGuessedCorrectly++;
         currentStreak++;
         updateScoreDisplay('¡Correcto!', '#28a745');
         document.getElementById('correct-sound')?.play().catch(e => {});
-        feedbackOverlay.classList.add('feedback-correct', 'is-pulsing');
+        feedbackOverlay.className = 'feedback-correct is-pulsing'; // Se añaden ambas clases
         if (currentStreak >= 3) {
             streakDisplay.textContent = `¡Racha de ${currentStreak}!`;
             streakDisplay.classList.add('visible');
@@ -379,7 +379,7 @@ window.addEventListener('DOMContentLoaded', () => {
         streakDisplay.classList.remove('visible');
         updateScoreDisplay(`Casi... a ${Math.round(streetCheck.distance)} metros.`, '#c82333');
         document.getElementById('incorrect-sound')?.play().catch(e => {});
-        feedbackOverlay.classList.add('feedback-incorrect', 'is-pulsing');
+        feedbackOverlay.className = 'feedback-incorrect is-pulsing'; // Se añaden ambas clases
       }
 
       const progress = totalQuestions > 0 ? ((qIdx) / totalQuestions) * 100 : 0;

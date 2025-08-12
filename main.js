@@ -63,23 +63,23 @@ window.addEventListener('DOMContentLoaded', () => {
   let currentGameMode = 'classic'; 
   let acertadasEnSesionRevancha = new Set();
 
-  const modeIcons = {
-    classic: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z" /><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z" /></svg>`,
-    revancha: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0011.664 0l3.181-3.183m-4.991-2.695v-4.992m0 0h-4.992m4.992 0l-3.181-3.183a8.25 8.25 0 00-11.664 0l-3.181 3.183" /></svg>`,
-    instinto: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" /></svg>`
-  };
-
   function setGameMode(mode) {
-    if (!mode || !modeIcons[mode]) {
-        console.error("Modo de juego no válido:", mode);
-        return;
-    }
+    if (!mode) return;
     currentGameMode = mode;
     console.log(`Modo de juego cambiado a: ${currentGameMode}`);
     
-    const indicator = document.getElementById('mode-indicator');
-    indicator.innerHTML = modeIcons[mode];
-    indicator.classList.remove('hidden');
+    // --- INICIO: CÓDIGO MODIFICADO ---
+    // Lógica para cambiar el color del título
+    const title = gameUiContainer.querySelector('.gradient-text');
+    if (title) {
+        title.classList.remove('revancha-gradient', 'instinto-gradient'); // Limpiamos colores anteriores
+        if (mode === 'revancha') {
+            title.classList.add('revancha-gradient');
+        } else if (mode === 'instinto') {
+            title.classList.add('instinto-gradient');
+        }
+    }
+    // --- FIN: CÓDIGO MODIFICADO ---
   }
 
   function updatePanelUI(updateFunction) {
@@ -533,8 +533,6 @@ window.addEventListener('DOMContentLoaded', () => {
         if(reviewLayer) gameMap.removeLayer(reviewLayer);
         if(oldZonePoly) gameMap.removeLayer(oldZonePoly);
         reviewLayer = oldZonePoly = null;
-        // --- INICIO: CÓDIGO MODIFICADO ---
-        // Aseguramos que el evento de dibujo se desactiva siempre que se limpia el mapa.
         if (drawing) {
             gameMap.off('click', addVertex);
             drawing = false;
@@ -543,7 +541,6 @@ window.addEventListener('DOMContentLoaded', () => {
             tempMarkers.forEach(m => gameMap.removeLayer(m));
             tempMarkers = [];
         }
-        // --- FIN: CÓDIGO MODIFICADO ---
     }
   }
 
@@ -616,9 +613,11 @@ window.addEventListener('DOMContentLoaded', () => {
                 });
             };
             repeatZoneBtn.disabled = false;
-        } else {
+        } else { // --- INICIO: CÓDIGO MODIFICADO ---
+            // Aseguramos que los botones del modo clásico se muestran correctamente
             drawZoneBtn.classList.remove('hidden');
             saveZoneBtn.classList.remove('hidden');
+            // --- FIN: CÓDIGO MODIFICADO ---
             repeatZoneBtn.textContent = 'Repetir Zona';
             repeatZoneBtn.onclick = repeatLastZone;
             repeatZoneBtn.disabled = (lastGameZonePoints.length < 3 || lastGameStreetList.length === 0);

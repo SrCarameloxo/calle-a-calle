@@ -414,35 +414,7 @@ button.game-control-btn:disabled { opacity: .4; cursor: default; }
 
 
 /* --- INICIO: CÓDIGO MODIFICADO --- */
-/* Estilos para el nuevo Indicador de Modo y los botones de selección */
-
-#mode-indicator {
-    position: absolute;
-    top: 120px; /* Debajo del botón de reportar */
-    right: 20px;
-    z-index: 11;
-    /* Eliminamos el fondo y bordes para hacerlo flotante */
-    background-color: transparent; 
-    border: none;
-    color: #333; /* Color oscuro para el icono */
-    width: 32px; /* Tamaño consistente con otros iconos */
-    height: 32px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: help;
-    transition: transform 0.2s ease;
-    filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5)); /* Sombra para que destaque */
-}
-
-#mode-indicator:hover {
-    transform: scale(1.1);
-}
-
-#mode-indicator svg {
-    width: 32px; /* Aumentamos el tamaño del SVG para que coincida con el contenedor */
-    height: 32px;
-}
+/* Estilos para los botones de selección de modo y los degradados de título */
 
 .mode-select-btn {
     text-align: left;
@@ -459,5 +431,15 @@ button.game-control-btn:disabled { opacity: .4; cursor: default; }
 /* Para que la descripción de los botones no esté en negrita */
 .mode-select-btn .opacity-80 {
     font-weight: 400; 
+}
+
+/* Clases de color para el título. La de classic ya está en .gradient-text */
+.revancha-gradient {
+    background: linear-gradient(to right, #ef4444, #a855f7); /* Rojo a Lila */
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+.instinto-gradient {
+    background: linear-gradient(to right, #22c55e, #a855f7); /* Verde a Lila */
+    -webkit-background-clip: text; background-clip: text; color: transparent;
 }
 /* --- FIN: CÓDIGO MODIFICADO --- */

@@ -63,13 +63,11 @@ window.addEventListener('DOMContentLoaded', () => {
   let currentGameMode = 'classic'; 
   let acertadasEnSesionRevancha = new Set();
 
-  // --- INICIO: CÓDIGO MODIFICADO (ICONOS) ---
   const modeIcons = {
     classic: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z" /><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z" /></svg>`,
     revancha: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0011.664 0l3.181-3.183m-4.991-2.695v-4.992m0 0h-4.992m4.992 0l-3.181-3.183a8.25 8.25 0 00-11.664 0l-3.181 3.183" /></svg>`,
     instinto: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" /></svg>`
   };
-  // --- FIN: CÓDIGO MODIFICADO (ICONOS) ---
 
   function setGameMode(mode) {
     if (!mode || !modeIcons[mode]) {
@@ -278,11 +276,7 @@ window.addEventListener('DOMContentLoaded', () => {
     reviewGameBtn.addEventListener('click', enterReviewMode);
     repeatZoneBtn.addEventListener('click', repeatLastZone);
     saveZoneBtn.addEventListener('click', saveCurrentZone);
-    // --- INICIO: CÓDIGO MODIFICADO ---
-    // El botón 'Volver' ahora siempre llama a resetToInitialView.
-    // La lógica de borrado ya está dentro de esa función.
     backToMenuBtn.addEventListener('click', resetToInitialView);
-    // --- FIN: CÓDIGO MODIFICADO ---
     backFromReviewBtn.addEventListener('click', exitReviewMode);
 
     setupStartButton(startBtn);
@@ -539,6 +533,17 @@ window.addEventListener('DOMContentLoaded', () => {
         if(reviewLayer) gameMap.removeLayer(reviewLayer);
         if(oldZonePoly) gameMap.removeLayer(oldZonePoly);
         reviewLayer = oldZonePoly = null;
+        // --- INICIO: CÓDIGO MODIFICADO ---
+        // Aseguramos que el evento de dibujo se desactiva siempre que se limpia el mapa.
+        if (drawing) {
+            gameMap.off('click', addVertex);
+            drawing = false;
+        }
+        if(tempMarkers.length > 0) {
+            tempMarkers.forEach(m => gameMap.removeLayer(m));
+            tempMarkers = [];
+        }
+        // --- FIN: CÓDIGO MODIFICADO ---
     }
   }
 
@@ -600,11 +605,7 @@ window.addEventListener('DOMContentLoaded', () => {
             saveZoneBtn.classList.add('hidden');
             repeatZoneBtn.textContent = 'Jugar Revancha de Nuevo';
             repeatZoneBtn.onclick = () => {
-                // --- INICIO: CÓDIGO MODIFICADO ---
-                // Se soluciona el bug de la interfaz superpuesta
                 endGameOptions.classList.add('hidden'); 
-                // --- FIN: CÓDIGO MODIFICADO ---
-
                 setGameMode('revancha');
                 startRevanchaGame({
                      startGame: (revanchaStreets) => {
@@ -760,10 +761,7 @@ window.addEventListener('DOMContentLoaded', () => {
         progressBar.style.width = '0%';
     });
 
-    // --- INICIO: CÓDIGO AÑADIDO ---
-    // Al volver, siempre restauramos al modo clásico por defecto.
     setGameMode('classic');
-    // --- FIN: CÓDIGO AÑADIDO ---
   }
 
   function playFromHistory(zoneString) {

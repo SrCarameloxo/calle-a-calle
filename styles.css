@@ -254,7 +254,7 @@ button.game-control-btn:disabled { opacity: .4; cursor: default; }
 }
 
 .menu-tabs { display: flex; border-bottom: 1px solid rgba(255, 255, 255, 0.1); }
-.menu-tab-btn { flex: 1; padding: 1rem; background: none; border: none; color: #a0aec0; font-weight: 600; transition: color 0.2s, background-color 0.2s; white-space: nowrap; /* --- ESTA ES LA LÍNEA AÑADIDA --- */ }
+.menu-tab-btn { flex: 1; padding: 1rem; background: none; border: none; color: #a0aec0; font-weight: 600; transition: color 0.2s, background-color 0.2s; white-space: nowrap; }
 .menu-tab-btn:hover { background-color: rgba(255,255,255,0.05); color: white; }
 .menu-tab-btn.active { color: white; border-bottom: 2px solid #3b82f6; }
 .menu-content-area { padding: 1rem; max-height: 50vh; overflow-y: auto; }
@@ -413,7 +413,7 @@ button.game-control-btn:disabled { opacity: .4; cursor: default; }
 /* --- FIN: ESTILOS --- */
 
 
-/* --- INICIO: CÓDIGO AÑADIDO --- */
+/* --- INICIO: CÓDIGO MODIFICADO --- */
 /* Estilos para el nuevo Indicador de Modo y los botones de selección */
 
 #mode-indicator {
@@ -421,19 +421,18 @@ button.game-control-btn:disabled { opacity: .4; cursor: default; }
     top: 120px; /* Debajo del botón de reportar */
     right: 20px;
     z-index: 11;
-    background-color: rgba(31, 41, 55, 0.85); /* Un gris oscuro semi-transparente */
-    backdrop-filter: blur(8px);
-    color: #f3f4f6; /* Un gris claro para el icono */
-    width: 44px;
-    height: 44px;
-    border-radius: 50%;
+    /* Eliminamos el fondo y bordes para hacerlo flotante */
+    background-color: transparent; 
+    border: none;
+    color: #333; /* Color oscuro para el icono */
+    width: 32px; /* Tamaño consistente con otros iconos */
+    height: 32px;
     display: flex;
     align-items: center;
     justify-content: center;
-    box-shadow: 0 4px 6px rgba(0,0,0,0.2);
     cursor: help;
-    border: 1px solid rgba(255, 255, 255, 0.1);
     transition: transform 0.2s ease;
+    filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5)); /* Sombra para que destaque */
 }
 
 #mode-indicator:hover {
@@ -441,8 +440,8 @@ button.game-control-btn:disabled { opacity: .4; cursor: default; }
 }
 
 #mode-indicator svg {
-    width: 24px;
-    height: 24px;
+    width: 32px; /* Aumentamos el tamaño del SVG para que coincida con el contenedor */
+    height: 32px;
 }
 
 .mode-select-btn {
@@ -461,4 +460,4 @@ button.game-control-btn:disabled { opacity: .4; cursor: default; }
 .mode-select-btn .opacity-80 {
     font-weight: 400; 
 }
-/* --- FIN: CÓDIGO AÑADIDO --- */
+/* --- FIN: CÓDIGO MODIFICADO --- */

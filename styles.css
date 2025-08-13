@@ -494,22 +494,4 @@ button.game-control-btn:disabled { opacity: .4; cursor: default; }
     background: linear-gradient(to right, #22c55e, #a855f7); /* Verde a Lila */
     -webkit-background-clip: text; background-clip: text; color: transparent;
 }
-
-/* Estilos específicos para el Modo Instinto */
-.instinto-options-group {
-    background-color: rgba(0, 0, 0, 0.05);
-    border-radius: 8px;
-    padding: 0.75rem;
-    border: 1px solid rgba(0, 0, 0, 0.1);
-}
-
-.instinto-options-group button {
-    background-color: #f8f9fa;
-    color: #212529;
-    font-weight: 600;
-}
-.instinto-options-group button:not(:disabled):hover {
-    background-color: #e9ecef;
-}
-
 /* --- FIN: CÓDIGO MODIFICADO --- */

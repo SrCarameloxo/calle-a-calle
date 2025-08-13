@@ -7,7 +7,6 @@
  * @param {object} context.ui - Referencias a los elementos del DOM.
  * @param {object} context.gameMap - La instancia del mapa de Leaflet.
  * @param {function} context.updatePanelUI - La función para animar el panel de UI.
- * @returns {object} Un objeto con funciones para controlar el modo desde fuera.
  */
 export function startInstintoGame({ ui, gameMap, updatePanelUI }) {
   console.log("¡El Modo Instinto ha sido activado! La lógica está ahora en instinto-mode.js");
@@ -24,22 +23,17 @@ export function startInstintoGame({ ui, gameMap, updatePanelUI }) {
   let currentQuestionIndex = 0;
   let score = 0;
   let streetLayerGroup = null;
-  let listeners = []; // Para guardar y limpiar los listeners
+
+  // Hacemos que el nuevo contenedor de opciones sea accesible
+  ui.instintoOptionsContainer = document.getElementById('instinto-options-container');
 
   // --- Lógica Principal de Activación ---
-  
-  function addManagedListener(element, event, handler) {
-    element.addEventListener(event, handler);
-    listeners.push({ element, event, handler });
-  }
+  ui.drawZoneBtn.classList.remove('hidden');
+  const drawBtnListener = () => initializeDrawingProcess();
+  ui.drawZoneBtn.addEventListener('click', drawBtnListener);
 
-  function clearAllListeners() {
-    listeners.forEach(({ element, event, handler }) => {
-      element.removeEventListener(event, handler);
-    });
-    listeners = [];
-    gameMap.off('click', addVertex); // Limpiar listener del mapa explícitamente
-  }
+
+  // --- Funciones de Lógica de Juego ---
 
   function clearMapLayers(clearFull = false) {
     if (streetLayerGroup) gameMap.removeLayer(streetLayerGroup);
@@ -59,6 +53,7 @@ export function startInstintoGame({ ui, gameMap, updatePanelUI }) {
   }
 
   function initializeDrawingProcess() {
+    ui.drawZoneBtn.removeEventListener('click', drawBtnListener);
     updatePanelUI(() => {
         ui.drawZoneBtn.classList.add('hidden');
         ui.startOptions.classList.remove('hidden');
@@ -71,14 +66,12 @@ export function startInstintoGame({ ui, gameMap, updatePanelUI }) {
 
     clearMapLayers(true);
     drawing = true;
+    const startBtnListener = () => setupInstintoStartButton();
+    const undoBtnListener = () => undoLastPoint();
     
-    addManagedListener(ui.startBtn, 'click', handleStartClick);
-    addManagedListener(ui.undoPointBtn, 'click', undoLastPoint);
+    ui.startBtn.addEventListener('click', startBtnListener, { once: true });
+    ui.undoPointBtn.addEventListener('click', undoBtnListener);
     gameMap.on('click', addVertex);
-  }
-  
-  function handleStartClick() {
-      setupInstintoStartButton();
   }
 
   function addVertex(e) {
@@ -124,12 +117,12 @@ export function startInstintoGame({ ui, gameMap, updatePanelUI }) {
   }
 
   async function setupInstintoStartButton() {
-    clearAllListeners();
     updatePanelUI(() => ui.startOptions.classList.add('hidden'));
     if (!zonePoly) return;
     if (drawing) {
         drawing = false;
         gameMap.off('click', addVertex);
+        ui.undoPointBtn.removeEventListener('click', undoLastPoint);
         tempMarkers.forEach(m => gameMap.removeLayer(m));
         tempMarkers = [];
     }
@@ -140,7 +133,7 @@ export function startInstintoGame({ ui, gameMap, updatePanelUI }) {
     } else {
         alert('La zona seleccionada no contiene suficientes calles. El Modo Instinto requiere al menos 4 calles distintas. Por favor, dibuja una zona más grande.');
         ui.drawZoneBtn.classList.remove('hidden');
-        addManagedListener(ui.drawZoneBtn, 'click', initializeDrawingProcess);
+        ui.drawZoneBtn.addEventListener('click', drawBtnListener);
         clearMapLayers(true);
     }
   }
@@ -148,15 +141,21 @@ export function startInstintoGame({ ui, gameMap, updatePanelUI }) {
   function generateQuestions(allStreets) {
     const shuffledStreets = [...allStreets].sort(() => Math.random() - 0.5);
     const questions = [];
+
     for (let i = 0; i < shuffledStreets.length; i++) {
         const correctAnswer = shuffledStreets[i];
         const decoys = [];
+        
+        // Coger otras 3 calles aleatorias como señuelos
         const decoyPool = shuffledStreets.filter(s => s.googleName !== correctAnswer.googleName);
         while (decoys.length < 3 && decoyPool.length > 0) {
             const randomIndex = Math.floor(Math.random() * decoyPool.length);
             decoys.push(decoyPool.splice(randomIndex, 1)[0]);
         }
+
+        // Si no hay suficientes señuelos, esta pregunta no es válida
         if (decoys.length < 3) continue;
+
         const options = [correctAnswer, ...decoys].sort(() => Math.random() - 0.5);
         questions.push({ correctAnswer, options });
     }
@@ -166,6 +165,7 @@ export function startInstintoGame({ ui, gameMap, updatePanelUI }) {
   function startGameFlow(questions) {
     currentQuestionIndex = 0;
     score = 0;
+    
     updatePanelUI(() => {
       ui.gameInterface.classList.remove('hidden');
       ui.progressBar.style.width = '0%';
@@ -176,17 +176,23 @@ export function startInstintoGame({ ui, gameMap, updatePanelUI }) {
           });
       }
     });
+
+    ui.nextBtn.onclick = () => showNextQuestion();
     showNextQuestion();
   }
 
   function showNextQuestion() {
     clearMapLayers();
+
     if (currentQuestionIndex >= gameQuestions.length) {
         endGame();
         return;
     }
+
     const currentQuestion = gameQuestions[currentQuestionIndex];
     const { correctAnswer, options } = currentQuestion;
+    
+    // Dibujar la calle de la pregunta
     streetLayerGroup = L.layerGroup().addTo(gameMap);
     correctAnswer.geometries.forEach(geom => {
         const layer = geom.isClosed 
@@ -194,67 +200,79 @@ export function startInstintoGame({ ui, gameMap, updatePanelUI }) {
             : L.polyline(geom.points, { color: COL_TRACE, weight: 8 });
         layer.addTo(streetLayerGroup);
     });
-
+    streetLayerGroup.eachLayer(layer => layer.getElement()?.classList.add('street-reveal-animation'));
+    
     updatePanelUI(() => {
         ui.gameQuestion.textContent = `¿Cómo se llama esta calle?`;
-        ui.instintoOptionsContainer.innerHTML = '';
+        ui.instintoOptionsContainer.innerHTML = ''; // Limpiar opciones anteriores
+        
         options.forEach(opt => {
             const btn = document.createElement('button');
             btn.className = 'game-control-btn';
             btn.textContent = opt.googleName;
-            addManagedListener(btn, 'click', () => handleAnswer(opt, correctAnswer, btn));
+            btn.onclick = () => handleAnswer(opt, correctAnswer, btn);
             ui.instintoOptionsContainer.appendChild(btn);
         });
+
         ui.nextBtn.disabled = true;
         ui.scoreDisplayToggle.textContent = `Puntuación: ${score} / ${currentQuestionIndex}`;
         ui.progressCounter.textContent = `${currentQuestionIndex + 1} / ${gameQuestions.length}`;
         ui.progressBar.style.width = `${(currentQuestionIndex / gameQuestions.length) * 100}%`;
     });
+
     currentQuestionIndex++;
   }
 
   function handleAnswer(selectedOption, correctAnswer, clickedButton) {
-    clearAllListeners();
     const allOptionBtns = ui.instintoOptionsContainer.querySelectorAll('button');
+    allOptionBtns.forEach(btn => btn.onclick = null); // Desactivar todos los botones
+
     const isCorrect = selectedOption.googleName === correctAnswer.googleName;
     const soundToPlay = isCorrect ? 'correct-sound' : 'incorrect-sound';
     const pulseClass = isCorrect ? 'panel-pulse-correct' : 'panel-pulse-incorrect';
+
     if (isCorrect) {
         score++;
-        clickedButton.style.backgroundColor = '#28a745';
+        clickedButton.style.backgroundColor = '#28a745'; // Verde
     } else {
-        clickedButton.style.backgroundColor = '#c82333';
+        clickedButton.style.backgroundColor = '#c82333'; // Rojo
+        // Resaltar la respuesta correcta
         allOptionBtns.forEach(btn => {
             if (btn.textContent === correctAnswer.googleName) {
-                btn.style.backgroundColor = '#28a745';
+                btn.style.backgroundColor = '#28a745'; // Verde
                 btn.style.transform = 'scale(1.03)';
             }
         });
     }
+
     document.getElementById(soundToPlay)?.play().catch(e => {});
     ui.gameUiContainer.classList.add(pulseClass);
     ui.gameUiContainer.addEventListener('animationend', () => {
         ui.gameUiContainer.classList.remove(pulseClass);
     }, { once: true });
+
     ui.scoreDisplayToggle.textContent = `Puntuación: ${score} / ${currentQuestionIndex}`;
     ui.nextBtn.disabled = false;
   }
   
   function endGame() {
-    clearAllListeners();
     updatePanelUI(() => {
         ui.gameInterface.classList.add('hidden');
         ui.endGameOptions.classList.remove('hidden');
         ui.finalScoreEl.textContent = `¡Partida terminada! Puntuación: ${score} / ${gameQuestions.length}`;
+        
+        // Ocultar botones no relevantes
         ui.reviewGameBtn.classList.add('hidden');
         ui.saveZoneBtn.classList.add('hidden');
+
+        // Configurar botones de fin de partida
         ui.repeatZoneBtn.textContent = 'Repetir Zona (Instinto)';
         ui.repeatZoneBtn.disabled = false;
-        const repeatListener = () => {
+        ui.repeatZoneBtn.onclick = () => {
             ui.endGameOptions.classList.add('hidden');
             startGameFlow(gameQuestions.sort(() => Math.random() - 0.5));
         };
-        addManagedListener(ui.repeatZoneBtn, 'click', repeatListener, { once: true });
+        
         ui.backToMenuBtn.classList.remove('hidden');
     });
   }
@@ -278,16 +296,4 @@ export function startInstintoGame({ ui, gameMap, updatePanelUI }) {
           ui.loaderContainer.classList.add('hidden');
       }
   }
-
-  // --- Punto de Entrada Inicial del Módulo ---
-  addManagedListener(ui.drawZoneBtn, 'click', initializeDrawingProcess);
-  
-  // --- Devolver los Controles del Módulo ---
-  return {
-      next: showNextQuestion,
-      clear: () => {
-        clearAllListeners();
-        clearMapLayers(true);
-      }
-  };
 }

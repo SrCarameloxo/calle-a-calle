@@ -292,7 +292,7 @@ window.addEventListener('DOMContentLoaded', () => {
     
     // Listener inteligente para el botón "Siguiente"
     uiElements.nextBtn.addEventListener('click', () => {
-        if (currentGameMode === 'classic' || currentGameMode === 'revancha') {
+        if (currentGameMode === 'classic') {
             uiElements.nextBtn.disabled = true;
             nextQ();
         } else if (currentGameMode === 'instinto' && activeModeControls) {
@@ -651,7 +651,6 @@ window.addEventListener('DOMContentLoaded', () => {
             uiElements.saveZoneBtn.classList.add('hidden');
             uiElements.repeatZoneBtn.textContent = 'Jugar Revancha de Nuevo';
             uiElements.repeatZoneBtn.onclick = () => {
-                setGameMode('classic'); // Resetear el modo a clásico
                 uiElements.endGameOptions.classList.add('hidden'); 
                 startRevanchaGame({
                      startGame: (revanchaStreets) => {
@@ -749,7 +748,7 @@ window.addEventListener('DOMContentLoaded', () => {
   }
 
   function nextQ(){
-    if (currentGameMode === 'classic' || currentGameMode === 'revancha') {
+    if (currentGameMode === 'classic') {
         recenterMapWithPadding();
     }
 

@@ -60,11 +60,6 @@
         <div id="game-interface" class="hidden">
           <button id="next" class="game-control-btn" disabled>Siguiente</button>
           <p id="game-question" class="question-text"></p>
-          
-          <!-- INICIO: CONTENEDOR PARA OPCIONES DEL MODO INSTINTO -->
-          <div id="instinto-options-container" class="instinto-options-group space-y-2 my-4"></div>
-          <!-- FIN: CONTENEDOR -->
-
           <p id="score-display-toggle" class="score-display-toggle"></p>
           
           <div id="progress-component">
@@ -139,6 +134,7 @@
             <div id="modes-content" class="content-panel">
                 <h3 class="mb-4 text-xl font-bold">Modos de Juego</h3>
                 <div id="game-modes-list" class="space-y-2">
+                    <!-- --- INICIO: CÓDIGO MODIFICADO --- -->
                     <button data-mode="classic" class="w-full game-control-btn mode-select-btn">
                         <div class="mode-select-content">
                             <div>
@@ -166,6 +162,7 @@
                             <span class="mode-tick">✓</span>
                         </div>
                     </button>
+                    <!-- --- FIN: CÓDIGO MODIFICADO --- -->
                 </div>
             </div>
         </div>

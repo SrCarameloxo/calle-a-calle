@@ -5,24 +5,63 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Editor de Callejeros - Calle a Calle</title>
     
-    <!-- Cargamos las librerías que ya conoces -->
+    <!-- Librerías de Estilos -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://unpkg.com/@geoman-io/leaflet-geoman-free@latest/dist/leaflet-geoman.css" />
+    
+    <!-- Cliente de Supabase -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     
     <style>
         /* Estilos básicos para que el mapa ocupe toda la pantalla */
         html, body { height: 100%; margin: 0; padding: 0; font-family: sans-serif; }
         #editor-map { width: 100%; height: 100%; background: #f0f0f0; }
-        #loading-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); color: white; display: flex; align-items: center; justify-content: center; z-index: 10000; font-size: 2em; }
+        #loading-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); color: white; display: flex; align-items: center; justify-content: center; z-index: 10000; font-size: 2em; text-align: center; }
+        
+        /* Estilos para el panel de edición (lo añadiremos más adelante) */
+        #edit-panel {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            z-index: 1000;
+            background: white;
+            padding: 15px;
+            border-radius: 5px;
+            box-shadow: 0 1px 5px rgba(0,0,0,0.65);
+            width: 300px;
+            display: none; /* Empezará oculto */
+        }
+        #edit-panel h3 { margin-top: 0; }
+        #edit-panel label { font-weight: bold; }
+        #edit-panel input { width: 100%; padding: 8px; box-sizing: border-box; margin-top: 5px; margin-bottom: 15px; }
+        #edit-panel button { width: 100%; padding: 10px; border: none; border-radius: 4px; color: white; cursor: pointer; }
+        #save-changes-btn { background-color: #28a745; }
+        #cancel-btn { background-color: #dc3545; margin-top: 5px; }
     </style>
 </head>
 <body>
 
+    <!-- Contenedor del Mapa -->
     <div id="editor-map"></div>
+    
+    <!-- Mensaje de Carga -->
     <div id="loading-overlay"><p>Cargando datos del editor...</p></div>
+    
+    <!-- Panel de Edición (empezará oculto) -->
+    <div id="edit-panel">
+        <h3>Editar Calle</h3>
+        <label for="street-name-input">Nombre de la calle:</label>
+        <input type="text" id="street-name-input">
+        <p style="font-size: 12px; color: #555;">ID de OSM: <span id="street-id-display"></span></p>
+        <button id="save-changes-btn">Guardar Cambios</button>
+        <button id="cancel-btn">Cancelar</button>
+    </div>
 
+    <!-- Librerías de JavaScript -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <!-- Nuestro nuevo script para la lógica del editor -->
+    <script src="https://unpkg.com/@geoman-io/leaflet-geoman-free@latest/dist/leaflet-geoman.min.js"></script>
+    
+    <!-- Nuestro Script -->
     <script src="editor.js"></script>
 </body>
 </html>

@@ -646,9 +646,6 @@ window.addEventListener('DOMContentLoaded', () => {
             };
             repeatZoneBtn.disabled = false;
         } else { // Modo clásico
-            // --- INICIO: CAMBIO ---
-            // Se elimina la línea conflictiva `drawZoneBtn.classList.remove('hidden');`
-            // --- FIN: CAMBIO ---
             saveZoneBtn.classList.remove('hidden');
             repeatZoneBtn.textContent = 'Repetir Zona';
             repeatZoneBtn.onclick = repeatLastZone; 
@@ -1003,7 +1000,10 @@ async function saveFailedStreet(streetData) {
   async function saveGameStats(correct, total) {
     try {
         const { data: { session } } = await supabaseClient.auth.getSession();
-        if (!session || total === 0) return.
+        // --- INICIO: CAMBIO ---
+        // Se corrige el error de sintaxis: el punto final se reemplaza por un punto y coma.
+        if (!session || total === 0) return;
+        // --- FIN: CAMBIO ---
         await supabaseClient.from('game_stats').insert({ user_id: session.user.id, correct_guesses: correct, total_questions: total });
     } catch (error) {
         console.error('Error guardando estadísticas:', error.message);

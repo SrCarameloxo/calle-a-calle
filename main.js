@@ -625,6 +625,12 @@ window.addEventListener('DOMContentLoaded', () => {
 
   function endGame() {
     updatePanelUI(() => {
+        // --- INICIO: CAMBIO ÚNICO ---
+        // Guardamos el estado de la partida que acaba de terminar ANTES de tomar cualquier decisión.
+        lastGameZonePoints = [...zonePoints];
+        lastGameStreetList = [...streetList];
+        // --- FIN: CAMBIO ÚNICO ---
+
         playing = false;
         gameInterface.classList.add('hidden');
         finalScoreEl.textContent = `¡Partida terminada! Puntuación: ${streetsGuessedCorrectly} / ${totalQuestions}`;
@@ -649,6 +655,7 @@ window.addEventListener('DOMContentLoaded', () => {
             saveZoneBtn.classList.remove('hidden');
             repeatZoneBtn.textContent = 'Repetir Zona';
             repeatZoneBtn.onclick = repeatLastZone; 
+            // Esta decisión ahora usa los datos frescos guardados al principio de la función.
             repeatZoneBtn.disabled = (lastGameZonePoints.length < 3 || lastGameStreetList.length === 0);
         }
 
@@ -659,10 +666,10 @@ window.addEventListener('DOMContentLoaded', () => {
             zonePoly.setStyle({ color: '#696969', weight: 2, dashArray: '5, 5', fillOpacity: 0.05 });
             oldZonePoly = zonePoly;
         }
-        lastGameZonePoints = [...zonePoints];
-        lastGameStreetList = [...streetList];
+
         saveGameStats(streetsGuessedCorrectly, totalQuestions);
         
+        // La limpieza del estado actual de la partida se mantiene al final.
         zonePoly = null; zonePoints = [];
         gameMap.off('click', onMapClick);
     });
@@ -1000,10 +1007,7 @@ async function saveFailedStreet(streetData) {
   async function saveGameStats(correct, total) {
     try {
         const { data: { session } } = await supabaseClient.auth.getSession();
-        // --- INICIO: CAMBIO ---
-        // Se corrige el error de sintaxis: el punto final se reemplaza por un punto y coma.
         if (!session || total === 0) return;
-        // --- FIN: CAMBIO ---
         await supabaseClient.from('game_stats').insert({ user_id: session.user.id, correct_guesses: correct, total_questions: total });
     } catch (error) {
         console.error('Error guardando estadísticas:', error.message);

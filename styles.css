@@ -262,8 +262,15 @@ button.game-control-btn:disabled { opacity: .4; cursor: default; }
   overflow-x: auto; /* Permite el scroll horizontal si el contenido se desborda */
   scrollbar-width: none; /* Oculta la barra de scroll en Firefox */
   -ms-overflow-style: none;  /* Oculta la barra de scroll en IE y Edge */
-  padding-right: 1rem; /* --- INICIO: CAMBIO ÚNICO --- Añade espacio al final del contenedor */
 }
+
+/* --- INICIO: CAMBIO ÚNICO --- */
+/* Se crea un "espaciador fantasma" al final del contenedor de pestañas para garantizar un margen simétrico */
+.menu-tabs::after {
+    content: '';
+    min-width: 1rem;
+}
+/* --- FIN: CAMBIO ÚNICO --- */
 
 /* Oculta la barra de scroll en navegadores Webkit (Chrome, Safari) */
 .menu-tabs::-webkit-scrollbar {

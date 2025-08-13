@@ -288,18 +288,28 @@ window.addEventListener('DOMContentLoaded', () => {
 
     reviewGameBtn.addEventListener('click', enterReviewMode);
     saveZoneBtn.addEventListener('click', saveCurrentZone);
+
+    // --- INICIO: CÓDIGO MODIFICADO ---
+    // Este es el único bloque que se ha cambiado.
     backToMenuBtn.addEventListener('click', () => {
-        // --- INICIO: CÓDIGO CORREGIDO ---
-        // El botón "Volver" ahora tiene la responsabilidad de guardar el progreso de revancha
-        if (currentGameMode === 'revancha' && acertadasEnSesionRevancha.size > 0) {
-            console.log("Saliendo del modo revancha. Borrando calles acertadas de la BD...");
-            acertadasEnSesionRevancha.forEach(streetName => {
-                deleteFailedStreet(streetName);
-            });
+        // Si venimos del modo revancha, hacemos dos cosas importantes:
+        if (currentGameMode === 'revancha') {
+            // 1. Gestionamos la lógica de guardar el progreso (borrar las acertadas).
+            if (acertadasEnSesionRevancha.size > 0) {
+                console.log("Saliendo del modo revancha. Borrando calles acertadas de la BD...");
+                acertadasEnSesionRevancha.forEach(streetName => {
+                    deleteFailedStreet(streetName);
+                });
+            }
+            // 2. Le decimos al juego que vuelva explícitamente al modo clásico.
+            setGameMode('classic');
         }
-        resetToInitialView(true); // Llama al reseteo simple
-        // --- FIN: CÓDIGO CORREGIDO ---
+
+        // Finalmente, independientemente del modo, limpiamos la interfaz a su estado inicial.
+        resetToInitialView(true);
     });
+    // --- FIN: CÓDIGO MODIFICADO ---
+    
     backFromReviewBtn.addEventListener('click', exitReviewMode);
     
     // El event listener de repeatZoneBtn se elimina de aquí y se gestiona en endGame

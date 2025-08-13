@@ -10,46 +10,46 @@ window.addEventListener('DOMContentLoaded', () => {
   window.supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
   // --- Selectores de elementos DOM ---
-  const loginScreen = document.getElementById('login-screen');
-  const gameScreen = document.getElementById('game-screen');
-  const backgroundMapContainer = document.getElementById('background-map');
-  const googleLoginBtn = document.getElementById('google-login-btn');
-  const logoutBtn = document.getElementById('logout-btn');
-  const userInfoDetails = document.getElementById('user-info-details');
-  const adminPanelBtn = document.getElementById('admin-panel-btn');
-  const gameUiContainer = document.getElementById('game-ui-container');
-  const drawZoneBtn = document.getElementById('drawZone');
-  const undoPointBtn = document.getElementById('undoPoint');
-  const startBtn = document.getElementById('start');
-  const nextBtn = document.getElementById('next');
-  const loaderContainer = document.getElementById('loader-container');
-  const startOptions = document.getElementById('start-options');
-  const includePOICheckbox = document.getElementById('include-poi-checkbox');
-  const openMenuBtn = document.getElementById('open-menu-btn');
-  const menuContentPanel = document.getElementById('menu-content-panel');
-  const reportBtnFAB = document.getElementById('report-btn-fab');
-  const loadedZoneOptions = document.getElementById('loaded-zone-options');
-  const startLoadedZoneBtn = document.getElementById('startLoadedZone');
-  const drawNewZoneBtn = document.getElementById('drawNewZone');
-  const checkboxWrapper = document.querySelector('.checkbox-wrapper');
-  const drawHelpContainer = document.getElementById('draw-help-container');
-  const dismissDrawHelpBtn = document.getElementById('dismiss-draw-help');
-
-  const gameInterface = document.getElementById('game-interface');
-  const gameQuestion = document.getElementById('game-question');
-  const scoreDisplayToggle = document.getElementById('score-display-toggle');
-  const progressComponent = document.getElementById('progress-component');
-  const progressBar = document.getElementById('progress-bar');
-  const progressCounter = document.getElementById('progress-counter');
-  const streakDisplay = document.getElementById('streak-display');
-  
-  const endGameOptions = document.getElementById('end-game-options');
-  const finalScoreEl = document.getElementById('final-score');
-  const reviewGameBtn = document.getElementById('review-game-btn');
-  const repeatZoneBtn = document.getElementById('repeatZone');
-  const saveZoneBtn = document.getElementById('saveZoneBtn');
-  const backToMenuBtn = document.getElementById('back-to-menu-btn');
-  const backFromReviewBtn = document.getElementById('back-from-review-btn');
+  const uiElements = {
+    loginScreen: document.getElementById('login-screen'),
+    gameScreen: document.getElementById('game-screen'),
+    backgroundMapContainer: document.getElementById('background-map'),
+    googleLoginBtn: document.getElementById('google-login-btn'),
+    logoutBtn: document.getElementById('logout-btn'),
+    userInfoDetails: document.getElementById('user-info-details'),
+    adminPanelBtn: document.getElementById('admin-panel-btn'),
+    gameUiContainer: document.getElementById('game-ui-container'),
+    drawZoneBtn: document.getElementById('drawZone'),
+    undoPointBtn: document.getElementById('undoPoint'),
+    startBtn: document.getElementById('start'),
+    nextBtn: document.getElementById('next'),
+    loaderContainer: document.getElementById('loader-container'),
+    startOptions: document.getElementById('start-options'),
+    includePOICheckbox: document.getElementById('include-poi-checkbox'),
+    openMenuBtn: document.getElementById('open-menu-btn'),
+    menuContentPanel: document.getElementById('menu-content-panel'),
+    reportBtnFAB: document.getElementById('report-btn-fab'),
+    loadedZoneOptions: document.getElementById('loaded-zone-options'),
+    startLoadedZoneBtn: document.getElementById('startLoadedZone'),
+    drawNewZoneBtn: document.getElementById('drawNewZone'),
+    checkboxWrapper: document.querySelector('.checkbox-wrapper'),
+    drawHelpContainer: document.getElementById('draw-help-container'),
+    dismissDrawHelpBtn: document.getElementById('dismiss-draw-help'),
+    gameInterface: document.getElementById('game-interface'),
+    gameQuestion: document.getElementById('game-question'),
+    scoreDisplayToggle: document.getElementById('score-display-toggle'),
+    progressComponent: document.getElementById('progress-component'),
+    progressBar: document.getElementById('progress-bar'),
+    progressCounter: document.getElementById('progress-counter'),
+    streakDisplay: document.getElementById('streak-display'),
+    endGameOptions: document.getElementById('end-game-options'),
+    finalScoreEl: document.getElementById('final-score'),
+    reviewGameBtn: document.getElementById('review-game-btn'),
+    repeatZoneBtn: document.getElementById('repeatZone'),
+    saveZoneBtn: document.getElementById('saveZoneBtn'),
+    backToMenuBtn: document.getElementById('back-to-menu-btn'),
+    backFromReviewBtn: document.getElementById('back-from-review-btn')
+  };
 
   let backgroundMap, gameMap = null;
   const COL_ZONE = '#663399', COL_TRACE = '#007a2f', COL_DASH = '#1976d2';
@@ -72,7 +72,7 @@ window.addEventListener('DOMContentLoaded', () => {
     console.log(`Modo de juego cambiado a: ${currentGameMode}`);
     
     // 1. Lógica del color del título
-    const title = gameUiContainer.querySelector('.gradient-text');
+    const title = uiElements.gameUiContainer.querySelector('.gradient-text');
     if (title) {
         // Primero, limpiamos todas las clases de color
         title.classList.remove('revancha-gradient', 'instinto-gradient');
@@ -97,12 +97,12 @@ window.addEventListener('DOMContentLoaded', () => {
   // --- FIN: CÓDIGO CORREGIDO (Regla #2) ---
 
   function updatePanelUI(updateFunction) {
-      const heightBefore = gameUiContainer.offsetHeight;
+      const heightBefore = uiElements.gameUiContainer.offsetHeight;
       updateFunction();
-      const heightAfter = gameUiContainer.offsetHeight;
+      const heightAfter = uiElements.gameUiContainer.offsetHeight;
       if (heightBefore !== heightAfter) {
-          gameUiContainer.classList.add('panel-pulse');
-          setTimeout(() => gameUiContainer.classList.remove('panel-pulse'), 400);
+          uiElements.gameUiContainer.classList.add('panel-pulse');
+          setTimeout(() => uiElements.gameUiContainer.classList.remove('panel-pulse'), 400);
       }
   }
 
@@ -145,7 +145,7 @@ window.addEventListener('DOMContentLoaded', () => {
         userProfile.subscribedCity = profile.subscribed_city;
         userProfile.showDrawHelp = profile.mostrar_ayuda_dibujo;
         
-        if (profile.role === 'admin') adminPanelBtn.classList.remove('hidden');
+        if (profile.role === 'admin') uiElements.adminPanelBtn.classList.remove('hidden');
         if (profile.subscribed_city) {
             const { data: city, error: cityError } = await supabaseClient.from('cities').select('*').eq('name', profile.subscribed_city).single();
             if (cityError) throw new Error(`No se encontraron datos para la ciudad: ${profile.subscribed_city}`);
@@ -163,20 +163,20 @@ window.addEventListener('DOMContentLoaded', () => {
     if (user) {
       const userName = user.user_metadata?.full_name || user.email.split('@')[0];
       const profileImageUrl = user.user_metadata?.avatar_url || '';
-      userInfoDetails.innerHTML = `<img src="${profileImageUrl}" alt="Avatar" class="w-16 h-16 mx-auto mb-3 rounded-full"><p class="font-semibold text-lg truncate">${userName}</p><p class="text-sm text-gray-400">${user.email}</p>`;
-      loginScreen.style.opacity = '0';
-      gameScreen.classList.remove('hidden');
-      logoutBtn.addEventListener('click', signOut);
+      uiElements.userInfoDetails.innerHTML = `<img src="${profileImageUrl}" alt="Avatar" class="w-16 h-16 mx-auto mb-3 rounded-full"><p class="font-semibold text-lg truncate">${userName}</p><p class="text-sm text-gray-400">${user.email}</p>`;
+      uiElements.loginScreen.style.opacity = '0';
+      uiElements.gameScreen.classList.remove('hidden');
+      uiElements.logoutBtn.addEventListener('click', signOut);
       setTimeout(async () => {
-          loginScreen.classList.add('hidden');
+          uiElements.loginScreen.classList.add('hidden');
           await fetchUserProfile(user);
           if (!gameMap) initGame();
           setTimeout(() => gameMap.invalidateSize(), 100);
       }, 500);
     } else {
-      loginScreen.classList.remove('hidden');
-      loginScreen.style.opacity = '1';
-      gameScreen.classList.add('hidden');
+      uiElements.loginScreen.classList.remove('hidden');
+      uiElements.loginScreen.style.opacity = '1';
+      uiElements.gameScreen.classList.add('hidden');
       if (!backgroundMap) initBackgroundMap();
     }
   }
@@ -203,14 +203,14 @@ window.addEventListener('DOMContentLoaded', () => {
   
   function setupMenu() {
     const handleOutsideClick = (event) => {
-        if (!menuContentPanel.classList.contains('hidden') && !menuContentPanel.contains(event.target) && !openMenuBtn.contains(event.target)) {
-            menuContentPanel.classList.add('hidden');
+        if (!uiElements.menuContentPanel.classList.contains('hidden') && !uiElements.menuContentPanel.contains(event.target) && !uiElements.openMenuBtn.contains(event.target)) {
+            uiElements.menuContentPanel.classList.add('hidden');
             document.removeEventListener('click', handleOutsideClick);
         }
     };
-    openMenuBtn.addEventListener('click', (event) => {
+    uiElements.openMenuBtn.addEventListener('click', (event) => {
         event.stopPropagation();
-        const isHidden = menuContentPanel.classList.toggle('hidden');
+        const isHidden = uiElements.menuContentPanel.classList.toggle('hidden');
         if (!isHidden) {
             if (document.querySelector('.content-panel.active')?.id === 'modes-content') {
                 checkRevanchaAvailability();
@@ -240,11 +240,11 @@ window.addEventListener('DOMContentLoaded', () => {
             if (button.disabled) return;
 
             setGameMode(selectedMode);
-            menuContentPanel.classList.add('hidden');
+            uiElements.menuContentPanel.classList.add('hidden');
 
             if (selectedMode === 'revancha') {
                 resetToInitialView(true); // Usamos el reseteo simple
-                drawZoneBtn.classList.add('hidden');
+                uiElements.drawZoneBtn.classList.add('hidden');
 
                 startRevanchaGame({
                     startGame: (revanchaStreets) => {
@@ -257,7 +257,7 @@ window.addEventListener('DOMContentLoaded', () => {
                 resetToInitialView(true); // Usamos el reseteo simple
             } else if (selectedMode === 'instinto') {
                 resetToInitialView(true); // Limpiamos la UI al estado inicial
-                startInstintoGame(); // Le pasamos el control a nuestro nuevo módulo
+                startInstintoGame({ ui: uiElements, gameMap: gameMap }); // Le pasamos el control a nuestro nuevo módulo
             }
         });
     });
@@ -282,18 +282,18 @@ window.addEventListener('DOMContentLoaded', () => {
     
     setGameMode('classic');
 
-    drawZoneBtn.addEventListener('click', startDrawing);
-    undoPointBtn.addEventListener('click', undoLastPoint);
-    nextBtn.addEventListener('click', () => { nextBtn.disabled=true; nextQ(); });
-    reportBtnFAB.addEventListener('click', reportIncident);
-    adminPanelBtn.addEventListener('click', () => { window.location.href = '/admin.html'; });
-    dismissDrawHelpBtn.addEventListener('click', dismissDrawHelp);
-    scoreDisplayToggle.addEventListener('click', toggleScoreDisplay);
+    uiElements.drawZoneBtn.addEventListener('click', startDrawing);
+    uiElements.undoPointBtn.addEventListener('click', undoLastPoint);
+    uiElements.nextBtn.addEventListener('click', () => { uiElements.nextBtn.disabled=true; nextQ(); });
+    uiElements.reportBtnFAB.addEventListener('click', reportIncident);
+    uiElements.adminPanelBtn.addEventListener('click', () => { window.location.href = '/admin.html'; });
+    uiElements.dismissDrawHelpBtn.addEventListener('click', dismissDrawHelp);
+    uiElements.scoreDisplayToggle.addEventListener('click', toggleScoreDisplay);
 
-    reviewGameBtn.addEventListener('click', enterReviewMode);
-    saveZoneBtn.addEventListener('click', saveCurrentZone);
+    uiElements.reviewGameBtn.addEventListener('click', enterReviewMode);
+    uiElements.saveZoneBtn.addEventListener('click', saveCurrentZone);
 
-    backToMenuBtn.addEventListener('click', () => {
+    uiElements.backToMenuBtn.addEventListener('click', () => {
         // Si venimos del modo revancha, hacemos dos cosas importantes:
         if (currentGameMode === 'revancha') {
             // 1. Gestionamos la lógica de guardar el progreso (borrar las acertadas).
@@ -311,23 +311,23 @@ window.addEventListener('DOMContentLoaded', () => {
         resetToInitialView(true);
     });
     
-    backFromReviewBtn.addEventListener('click', exitReviewMode);
+    uiElements.backFromReviewBtn.addEventListener('click', exitReviewMode);
     
     // El event listener de repeatZoneBtn se elimina de aquí y se gestiona en endGame
 
-    setupStartButton(startBtn);
+    setupStartButton(uiElements.startBtn);
     setupMenu();
 
     document.addEventListener('keyup', (event) => {
-        if (event.code === 'Space' && !nextBtn.disabled) {
+        if (event.code === 'Space' && !uiElements.nextBtn.disabled) {
             event.preventDefault();
-            nextBtn.click();
+            uiElements.nextBtn.click();
         }
     });
   }
 
   async function dismissDrawHelp() {
-      drawHelpContainer.classList.add('hidden');
+      uiElements.drawHelpContainer.classList.add('hidden');
       if (userProfile.id) {
           userProfile.showDrawHelp = false;
           const { error } = await supabaseClient.from('profiles').update({ mostrar_ayuda_dibujo: false }).eq('id', userProfile.id);
@@ -342,17 +342,17 @@ window.addEventListener('DOMContentLoaded', () => {
 
   function updateScoreDisplay(feedbackText, feedbackColor) {
       if (feedbackText) {
-          scoreDisplayToggle.textContent = feedbackText;
-          if (feedbackColor) scoreDisplayToggle.style.color = feedbackColor;
+          uiElements.scoreDisplayToggle.textContent = feedbackText;
+          if (feedbackColor) uiElements.scoreDisplayToggle.style.color = feedbackColor;
           setTimeout(() => { updateScoreDisplay(); }, 3000);
       } else {
-          scoreDisplayToggle.style.color = '#555';
+          uiElements.scoreDisplayToggle.style.color = '#555';
           const answeredQuestions = qIdx;
           if(showScoreAsPercentage){
               const percentage = answeredQuestions > 0 ? Math.round((streetsGuessedCorrectly / answeredQuestions) * 100) : 0;
-              scoreDisplayToggle.textContent = `Aciertos: ${percentage}%`;
+              uiElements.scoreDisplayToggle.textContent = `Aciertos: ${percentage}%`;
           } else {
-              scoreDisplayToggle.textContent = `Calles acertadas: ${streetsGuessedCorrectly} / ${answeredQuestions}`;
+              uiElements.scoreDisplayToggle.textContent = `Calles acertadas: ${streetsGuessedCorrectly} / ${answeredQuestions}`;
           }
       }
   }
@@ -362,8 +362,8 @@ window.addEventListener('DOMContentLoaded', () => {
 
       playing = true; qIdx = 0; streetsGuessedCorrectly = 0; currentStreak = 0;
       updatePanelUI(() => {
-          gameInterface.classList.remove('hidden');
-          progressBar.style.width = '0%';
+          uiElements.gameInterface.classList.remove('hidden');
+          uiElements.progressBar.style.width = '0%';
           if (currentGameMode === 'revancha' && streetList.length > 0) {
               const allBounds = L.latLngBounds();
               streetList.forEach(street => {
@@ -376,13 +376,13 @@ window.addEventListener('DOMContentLoaded', () => {
               recenterMapWithPadding();
           }
       });
-      reportBtnFAB.classList.remove('hidden');
+      uiElements.reportBtnFAB.classList.remove('hidden');
       nextQ();
   }
 
   function setupStartButton(bStart) {
     const firstClickHandler = async () => {
-        updatePanelUI(() => startOptions.classList.add('hidden'));
+        updatePanelUI(() => uiElements.startOptions.classList.add('hidden'));
         if (oldZonePoly) gameMap.removeLayer(oldZonePoly);
         if (!zonePoly) return;
         if (drawing) {
@@ -390,19 +390,19 @@ window.addEventListener('DOMContentLoaded', () => {
             gameMap.off('click', addVertex);
             tempMarkers.forEach(m => gameMap.removeLayer(m));
             tempMarkers = [];
-            drawHelpContainer.classList.add('hidden');
+            uiElements.drawHelpContainer.classList.add('hidden');
         }
         bStart.disabled = true;
         await preloadStreets();
         bStart.textContent = 'Iniciar juego';
         bStart.onclick = secondClickHandler;
         updatePanelUI(() => {
-            checkboxWrapper.classList.add('hidden'); 
+            uiElements.checkboxWrapper.classList.add('hidden'); 
             if (totalQuestions > 0) {
               bStart.disabled = false;
-              startOptions.classList.remove('hidden');
-              undoPointBtn.classList.add('hidden');
-              startBtn.classList.remove('hidden');
+              uiElements.startOptions.classList.remove('hidden');
+              uiElements.undoPointBtn.classList.add('hidden');
+              uiElements.startBtn.classList.remove('hidden');
             } else {
               alert('No se encontraron calles válidas en esta zona. Por favor, dibuja otra.');
               resetToInitialView(true);
@@ -410,7 +410,7 @@ window.addEventListener('DOMContentLoaded', () => {
         });
     };
     const secondClickHandler = () => {
-        updatePanelUI(() => startOptions.classList.add('hidden'));
+        updatePanelUI(() => uiElements.startOptions.classList.add('hidden'));
         startGameFlow();
     };
     bStart.onclick = firstClickHandler;
@@ -422,19 +422,19 @@ window.addEventListener('DOMContentLoaded', () => {
             const el = document.getElementById(id);
             if (el) el.classList.add('hidden');
         });
-        if (userProfile.showDrawHelp) drawHelpContainer.classList.remove('hidden');
-        checkboxWrapper.classList.remove('hidden');
-        startOptions.classList.remove('hidden');
-        undoPointBtn.classList.remove('hidden');
-        startBtn.disabled = true;
-        startBtn.textContent = 'Start';
-        includePOICheckbox.disabled = false;
+        if (userProfile.showDrawHelp) uiElements.drawHelpContainer.classList.remove('hidden');
+        uiElements.checkboxWrapper.classList.remove('hidden');
+        uiElements.startOptions.classList.remove('hidden');
+        uiElements.undoPointBtn.classList.remove('hidden');
+        uiElements.startBtn.disabled = true;
+        uiElements.startBtn.textContent = 'Start';
+        uiElements.includePOICheckbox.disabled = false;
     });
     clear(true);
     if (zonePoly) gameMap.removeLayer(zonePoly);
     zonePoints = []; tempMarkers = []; zonePoly = null;
     playing = false; drawing = true;
-    setupStartButton(startBtn);
+    setupStartButton(uiElements.startBtn);
     gameMap.on('click', addVertex);
   }
 
@@ -446,8 +446,8 @@ window.addEventListener('DOMContentLoaded', () => {
     zonePoints.push(latlng);
     if(zonePoly) gameMap.removeLayer(zonePoly);
     zonePoly = L.polygon(zonePoints, { color:COL_ZONE, weight:2, fillOpacity:0.1 }).addTo(gameMap);
-    if(zonePoints.length >= 3 && startBtn.disabled) {
-        updatePanelUI(() => { startBtn.disabled = false; });
+    if(zonePoints.length >= 3 && uiElements.startBtn.disabled) {
+        updatePanelUI(() => { uiElements.startBtn.disabled = false; });
     }
   }
 
@@ -458,9 +458,9 @@ window.addEventListener('DOMContentLoaded', () => {
         tempMarkers.forEach(m=>gameMap.removeLayer(m));
         tempMarkers = [];
         zonePoly.addLatLng(zonePoints[0]);
-        undoPointBtn.classList.add('hidden');
-        startBtn.disabled = false;
-        drawHelpContainer.classList.add('hidden');
+        uiElements.undoPointBtn.classList.add('hidden');
+        uiElements.startBtn.disabled = false;
+        uiElements.drawHelpContainer.classList.add('hidden');
     });
   }
   
@@ -472,7 +472,7 @@ window.addEventListener('DOMContentLoaded', () => {
         if (lastMarker) gameMap.removeLayer(lastMarker);
         if (zonePoly) gameMap.removeLayer(zonePoly);
         zonePoly = (zonePoints.length >= 2) ? L.polygon(zonePoints, { color: COL_ZONE, weight: 2, fillOpacity: 0.1 }).addTo(gameMap) : null;
-        if (zonePoints.length < 3) startBtn.disabled = true;
+        if (zonePoints.length < 3) uiElements.startBtn.disabled = true;
     });
   }
 
@@ -523,8 +523,8 @@ window.addEventListener('DOMContentLoaded', () => {
         document.getElementById('correct-sound')?.play().catch(e => {});
         feedbackClass = 'panel-pulse-correct';
         if (currentStreak >= 3) {
-            streakDisplay.textContent = `¡Racha de ${currentStreak}!`;
-            streakDisplay.classList.add('visible');
+            uiElements.streakDisplay.textContent = `¡Racha de ${currentStreak}!`;
+            uiElements.streakDisplay.classList.add('visible');
         }
 
       } else {
@@ -538,26 +538,26 @@ window.addEventListener('DOMContentLoaded', () => {
         }
         
         currentStreak = 0;
-        streakDisplay.classList.remove('visible');
+        uiElements.streakDisplay.classList.remove('visible');
         updateScoreDisplay(`Casi... a ${Math.round(streetCheck.distance)} metros.`, '#c82333');
         document.getElementById('incorrect-sound')?.play().catch(e => {});
         feedbackClass = 'panel-pulse-incorrect';
       }
       
-      gameUiContainer.classList.add(feedbackClass);
-      gameUiContainer.addEventListener('animationend', () => {
-          gameUiContainer.classList.remove(feedbackClass);
+      uiElements.gameUiContainer.classList.add(feedbackClass);
+      uiElements.gameUiContainer.addEventListener('animationend', () => {
+          uiElements.gameUiContainer.classList.remove(feedbackClass);
       }, { once: true });
 
       const progress = totalQuestions > 0 ? ((qIdx) / totalQuestions) * 100 : 0;
-      progressBar.style.width = `${progress}%`;
+      uiElements.progressBar.style.width = `${progress}%`;
       
       if (streetCheck.point) guide = L.polyline([userMk.getLatLng(), streetCheck.point], { dashArray:'6 4', color:COL_DASH }).addTo(gameMap);
     } else {
       updateScoreDisplay('Error: No se pudo dibujar el lugar.', '#c82333');
     }
 
-    nextBtn.disabled=false;
+    uiElements.nextBtn.disabled=false;
   }
 
   function clear(clearFull=false){ 
@@ -581,10 +581,10 @@ window.addEventListener('DOMContentLoaded', () => {
   }
 
   async function preloadStreets() {
-      loaderContainer.classList.remove('hidden');
+      uiElements.loaderContainer.classList.remove('hidden');
       try {
           const zoneParam = zonePoints.map(p => `${p.lat},${p.lng}`).join(';');
-          const includePOI = includePOICheckbox.checked;
+          const includePOI = uiElements.includePOICheckbox.checked;
           const response = await fetch(`/api/getStreets?zone=${encodeURIComponent(zoneParam)}&includePOI=${includePOI}`);
           if (!response.ok) {
               const errorData = await response.json();
@@ -597,7 +597,7 @@ window.addEventListener('DOMContentLoaded', () => {
           console.error(error);
           alert(`Error al cargar las calles: ${error.message}`);
       } finally {
-          loaderContainer.classList.add('hidden');
+          uiElements.loaderContainer.classList.add('hidden');
       }
   }
   
@@ -636,16 +636,16 @@ window.addEventListener('DOMContentLoaded', () => {
         // --- FIN: CAMBIO ÚNICO ---
 
         playing = false;
-        gameInterface.classList.add('hidden');
-        finalScoreEl.textContent = `¡Partida terminada! Puntuación: ${streetsGuessedCorrectly} / ${totalQuestions}`;
+        uiElements.gameInterface.classList.add('hidden');
+        uiElements.finalScoreEl.textContent = `¡Partida terminada! Puntuación: ${streetsGuessedCorrectly} / ${totalQuestions}`;
         
-        drawZoneBtn.classList.add('hidden');
+        uiElements.drawZoneBtn.classList.add('hidden');
 
         if (currentGameMode === 'revancha') {
-            saveZoneBtn.classList.add('hidden');
-            repeatZoneBtn.textContent = 'Jugar Revancha de Nuevo';
-            repeatZoneBtn.onclick = () => {
-                endGameOptions.classList.add('hidden'); 
+            uiElements.saveZoneBtn.classList.add('hidden');
+            uiElements.repeatZoneBtn.textContent = 'Jugar Revancha de Nuevo';
+            uiElements.repeatZoneBtn.onclick = () => {
+                uiElements.endGameOptions.classList.add('hidden'); 
                 startRevanchaGame({
                      startGame: (revanchaStreets) => {
                         streetList = revanchaStreets;
@@ -654,17 +654,17 @@ window.addEventListener('DOMContentLoaded', () => {
                     }
                 });
             };
-            repeatZoneBtn.disabled = false;
+            uiElements.repeatZoneBtn.disabled = false;
         } else { // Modo clásico
-            saveZoneBtn.classList.remove('hidden');
-            repeatZoneBtn.textContent = 'Repetir Zona';
-            repeatZoneBtn.onclick = repeatLastZone; 
+            uiElements.saveZoneBtn.classList.remove('hidden');
+            uiElements.repeatZoneBtn.textContent = 'Repetir Zona';
+            uiElements.repeatZoneBtn.onclick = repeatLastZone; 
             // Esta decisión ahora usa los datos frescos guardados al principio de la función.
-            repeatZoneBtn.disabled = (lastGameZonePoints.length < 3 || lastGameStreetList.length === 0);
+            uiElements.repeatZoneBtn.disabled = (lastGameZonePoints.length < 3 || lastGameStreetList.length === 0);
         }
 
-        endGameOptions.classList.remove('hidden');
-        backToMenuBtn.classList.remove('hidden');
+        uiElements.endGameOptions.classList.remove('hidden');
+        uiElements.backToMenuBtn.classList.remove('hidden');
         
         if (zonePoly) {
             zonePoly.setStyle({ color: '#696969', weight: 2, dashArray: '5, 5', fillOpacity: 0.05 });
@@ -712,8 +712,8 @@ window.addEventListener('DOMContentLoaded', () => {
       }
       
       updatePanelUI(() => {
-          endGameOptions.classList.add('hidden');
-          backFromReviewBtn.classList.remove('hidden');
+          uiElements.endGameOptions.classList.add('hidden');
+          uiElements.backFromReviewBtn.classList.remove('hidden');
       });
   }
 
@@ -726,8 +726,8 @@ window.addEventListener('DOMContentLoaded', () => {
       if (oldZonePoly) recenterMapWithPadding(oldZonePoly.getBounds());
 
       updatePanelUI(() => {
-          backFromReviewBtn.classList.add('hidden');
-          endGameOptions.classList.remove('hidden');
+          uiElements.backFromReviewBtn.classList.add('hidden');
+          uiElements.endGameOptions.classList.remove('hidden');
       });
   }
   
@@ -736,7 +736,7 @@ window.addEventListener('DOMContentLoaded', () => {
       const targetBounds = bounds || (zonePoly ? zonePoly.getBounds() : null);
       if (!targetBounds || !targetBounds.isValid()) return;
 
-      const panelWidth = gameUiContainer.offsetWidth;
+      const panelWidth = uiElements.gameUiContainer.offsetWidth;
       gameMap.fitBounds(targetBounds, {
           paddingTopLeft: [panelWidth + 20, 20],
           paddingBottomRight: [20, 20]
@@ -760,14 +760,14 @@ window.addEventListener('DOMContentLoaded', () => {
     target = s.geometries;
     
     updatePanelUI(() => {
-        gameQuestion.textContent = `¿Dónde está «${s.googleName}»?`;
+        uiElements.gameQuestion.textContent = `¿Dónde está «${s.googleName}»?`;
         updateScoreDisplay();
-        if (currentStreak < 3) streakDisplay.classList.remove('visible');
-        progressCounter.textContent = `${qIdx + 1} / ${totalQuestions}`;
+        if (currentStreak < 3) uiElements.streakDisplay.classList.remove('visible');
+        uiElements.progressCounter.textContent = `${qIdx + 1} / ${totalQuestions}`;
     });
 
     qIdx++;
-    nextBtn.disabled = true;
+    uiElements.nextBtn.disabled = true;
   }
   
   function resetToInitialView(isSimpleReset = false) {
@@ -787,14 +787,14 @@ window.addEventListener('DOMContentLoaded', () => {
               const el = document.getElementById(id);
               if (el) el.classList.add('hidden');
           });
-          reportBtnFAB.classList.add('hidden');
-          drawZoneBtn.classList.remove('hidden');
+          uiElements.reportBtnFAB.classList.add('hidden');
+          uiElements.drawZoneBtn.classList.remove('hidden');
           if (zonePoly) gameMap.removeLayer(zonePoly);
           if (oldZonePoly) gameMap.removeLayer(oldZonePoly);
           zonePoly = oldZonePoly = null;
           zonePoints = [];
           playing = false;
-          progressBar.style.width = '0%';
+          uiElements.progressBar.style.width = '0%';
       });
 
       // La función ya no fuerza el modo a 'classic'. Esto lo decide el que la llama.
@@ -820,10 +820,10 @@ window.addEventListener('DOMContentLoaded', () => {
         zonePoints = points.map(p => L.latLng(p.lat, p.lng));
         zonePoly = L.polygon(zonePoints, { color: COL_ZONE, weight: 2, fillOpacity: 0.1 }).addTo(gameMap);
         
-        startLoadedZoneBtn.onclick = async () => {
+        uiElements.startLoadedZoneBtn.onclick = async () => {
             updatePanelUI(() => {
-                loadedZoneOptions.classList.add('hidden');
-                checkboxWrapper.classList.add('hidden');
+                uiElements.loadedZoneOptions.classList.add('hidden');
+                uiElements.checkboxWrapper.classList.add('hidden');
             });
             await preloadStreets(); 
             if (totalQuestions > 0) {
@@ -833,13 +833,13 @@ window.addEventListener('DOMContentLoaded', () => {
                 resetToInitialView(true);
             }
         };
-        drawNewZoneBtn.onclick = () => resetToInitialView(true);
-        loadedZoneOptions.classList.remove('hidden');
-        checkboxWrapper.classList.remove('hidden');
-        includePOICheckbox.disabled = false;
+        uiElements.drawNewZoneBtn.onclick = () => resetToInitialView(true);
+        uiElements.loadedZoneOptions.classList.remove('hidden');
+        uiElements.checkboxWrapper.classList.remove('hidden');
+        uiElements.includePOICheckbox.disabled = false;
     });
     
-    menuContentPanel.classList.add('hidden'); 
+    uiElements.menuContentPanel.classList.add('hidden'); 
     recenterMapWithPadding(zonePoly.getBounds());
   }
 
@@ -940,7 +940,7 @@ async function saveFailedStreet(streetData) {
         const { error } = await supabaseClient.from('saved_zones').insert({ user_id: session.user.id, name: zoneName, zone_points: zoneString });
         if (error) throw error;
         alert(`¡Zona "${zoneName}" guardada con éxito!`);
-        saveZoneBtn.classList.add('hidden');
+        uiElements.saveZoneBtn.classList.add('hidden');
     } catch (error) {
         console.error('Error al guardar la zona:', error.message);
         alert('Hubo un error al guardar la zona.');
@@ -1040,6 +1040,6 @@ async function saveFailedStreet(streetData) {
     }
   }
 
-  googleLoginBtn.addEventListener('click', signInWithGoogle);
+  uiElements.googleLoginBtn.addEventListener('click', signInWithGoogle);
   supabaseClient.auth.onAuthStateChange(handleAuthStateChange);
 });

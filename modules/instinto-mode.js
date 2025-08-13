@@ -194,7 +194,7 @@ export function startInstintoGame({ ui, gameMap, updatePanelUI }) {
             : L.polyline(geom.points, { color: COL_TRACE, weight: 8 });
         layer.addTo(streetLayerGroup);
     });
-    streetLayerGroup.eachLayer(layer => layer.getElement()?.classList.add('street-reveal-animation'));
+
     updatePanelUI(() => {
         ui.gameQuestion.textContent = `¿Cómo se llama esta calle?`;
         ui.instintoOptionsContainer.innerHTML = '';

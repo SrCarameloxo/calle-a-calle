@@ -1,11 +1,8 @@
-// --- editor.js (VERSIÓN FINAL Y ROBUSTA) ---
+// --- editor.js (VERSIÓN FINAL DEFINITIVA - Autenticación Primero) ---
 
-document.addEventListener('DOMContentLoaded', () => {
-
-    // --- CONFIGURACIÓN ---
-    const SUPABASE_URL = 'https://hppzwfwtedghpsxfonoh.supabase.co';
-    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhwcHp3Znd0ZWRnaHBzeGZvbm9oIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQxMjQzNDMsImV4cCI6MjA2OTcwMDQ0M30.BAh6i5iJ5YkDBoydfkC9azAD4eMdYBkEBdxws9kj5Hg';
-    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+// La lógica principal del editor se encapsula en una función `iniciarEditor`
+function iniciarEditor(supabase) {
+    console.log('¡Administrador verificado! Iniciando editor...');
 
     // --- ELEMENTOS DEL DOM ---
     const loadingOverlay = document.getElementById('loading-overlay');
@@ -127,25 +124,8 @@ document.addEventListener('DOMContentLoaded', () => {
         setTimeout(() => loadingOverlay.style.display = 'none', 2000);
     }
     
-    // --- LÓGICA DE AUTENTICACIÓN Y ARRANQUE (VERSIÓN ROBUSTA) ---
-    async function checkAuthAndLoad() {
-        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-        if (sessionError || !session) {
-            console.log('No hay sesión activa. Redirigiendo al inicio.');
-            window.location.href = '/';
-            return;
-        }
-        console.log('Sesión encontrada. Verificando rol de administrador...');
-        const { data: profile, error: profileError } = await supabase.from('profiles').select('role').eq('id', session.user.id).single();
-        if (profileError || !profile || profile.role !== 'admin') {
-            console.log('Acceso denegado. Se requiere rol de administrador. Redirigiendo...');
-            window.location.href = '/';
-            return;
-        }
-        console.log('¡Administrador verificado! Iniciando editor...');
-        cargarCallesPaginado();
-    }
-    checkAuthAndLoad();
+    // Al final, llamamos a la función de carga
+    cargarCallesPaginado();
 
     // --- LÓGICA PARA LA HERRAMIENTA DE CORTE DE GEOMAN ---
     map.on('pm:cut', async (e) => {
@@ -183,5 +163,33 @@ document.addEventListener('DOMContentLoaded', () => {
              console.log("Corte cancelado por el usuario.");
         }
     });
+}
 
+
+// --- PUNTO DE ENTRADA PRINCIPAL ---
+// Esto se ejecuta en cuanto el DOM está listo
+document.addEventListener('DOMContentLoaded', async () => {
+    // Definimos las constantes de Supabase aquí
+    const SUPABASE_URL = 'https://hppzwfwtedghpsxfonoh.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhwcHp3Znd0ZWRnaHBzeGZvbm9oIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQxMjQzNDMsImV4cCI6MjA2OTcwMDQ0M30.BAh6i5iJ5YkDBoydfkC9azAD4eMdYBkEBdxws9kj5Hg';
+    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    // Hacemos la comprobación de seguridad ANTES de hacer cualquier otra cosa
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+    if (sessionError || !session) {
+        console.log('No hay sesión activa. Redirigiendo al inicio.');
+        window.location.href = '/';
+        return; // Detenemos la ejecución aquí si no hay sesión
+    }
+
+    const { data: profile, error: profileError } = await supabase.from('profiles').select('role').eq('id', session.user.id).single();
+    if (profileError || !profile || profile.role !== 'admin') {
+        console.log('Acceso denegado. Se requiere rol de administrador. Redirigiendo...');
+        window.location.href = '/';
+        return; // Detenemos la ejecución aquí si no es admin
+    }
+
+    // Si hemos llegado hasta aquí, es un admin verificado.
+    // Ahora, y solo ahora, llamamos a la función principal que construye el editor.
+    iniciarEditor(supabase);
 });

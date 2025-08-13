@@ -1,34 +1,35 @@
-// Ruta: /api/getCityStreets.js
+// Ruta: /api/getCityStreets.js (Versión 2 - Paginada)
 
 const { createClient } = require('@supabase/supabase-js');
 
 module.exports = async (request, response) => {
     try {
-        // Se conecta a Supabase usando las claves de entorno (más seguro)
         const supabase = createClient(
             process.env.SUPABASE_URL, 
             process.env.SUPABASE_SERVICE_ROLE_KEY
         );
 
-        // Llama a la función 'get_all_ways' que creamos en la base de datos
-        const { data, error } = await supabase.rpc('get_all_ways');
+        // Cogemos el número de página de la URL, por defecto será la página 1.
+        const page = parseInt(request.query.page) || 1;
+        const pageSize = 1000; // Pedimos las calles en lotes de 1000.
+
+        // Llamamos a la función de BD con los parámetros de paginación
+        const { data, error } = await supabase.rpc('get_all_ways', {
+            page_size: pageSize,
+            page_number: page
+        });
 
         if (error) throw error;
 
-        // Devuelve los datos como un FeatureCollection de GeoJSON, que es lo que Leaflet espera
         const geojsonData = {
             type: "FeatureCollection",
             features: data.map(row => ({
                 type: "Feature",
                 geometry: row.geometry,
-                properties: {
-                    id: row.id,
-                    tags: row.tags
-                }
+                properties: { id: row.id, tags: row.tags }
             }))
         };
-
-        // Envía el GeoJSON de vuelta a la página del editor
+        
         response.status(200).json(geojsonData);
 
     } catch (error) {

@@ -1,5 +1,6 @@
 // Importamos la función principal de nuestro nuevo módulo de revancha.
 import { startRevanchaGame } from './modules/revancha-mode.js';
+import { startInstintoGame } from './modules/instinto-mode.js';
 
 window.addEventListener('DOMContentLoaded', () => {
 
@@ -254,6 +255,9 @@ window.addEventListener('DOMContentLoaded', () => {
                 });
             } else if (selectedMode === 'classic') {
                 resetToInitialView(true); // Usamos el reseteo simple
+            } else if (selectedMode === 'instinto') {
+                resetToInitialView(true); // Limpiamos la UI al estado inicial
+                startInstintoGame(); // Le pasamos el control a nuestro nuevo módulo
             }
         });
     });

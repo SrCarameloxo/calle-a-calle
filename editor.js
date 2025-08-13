@@ -1,10 +1,10 @@
-// --- editor.js (Versión 6 - Con Guardado Real en API) ---
+// --- editor.js (Versión 6 - Con Guardado y Lógica de Corte) ---
 
 document.addEventListener('DOMContentLoaded', () => {
 
     // --- CONFIGURACIÓN ---
     const SUPABASE_URL = 'https://hppzwfwtedghpsxfonoh.supabase.co';
-    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhwcHp3Znd0ZWRnaHBzeGZvbm9oIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQxMjQzNDMsImV4cCI6MjA2OTcwMDM0M30.BAh6i5iJ5YkDBoydfkC9azAD4eMdYBkEBdxws9kj5Hg';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhwcHp3Znd0ZWRnaHBzeGZvbm9oIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQxMjQzNDMsImV4cCI6MjA2OTcwMDQ0M30.BAh6i5iJ5YkDBoydfkC9azAD4eMdYBkEBdxws9kj5Hg';
     const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
     // --- ELEMENTOS DEL DOM ---
@@ -32,7 +32,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     map.pm.setPathOptions({ color: 'orange', fillColor: 'orange', fillOpacity: 0.4 });
 
-    // --- LÓGICA DE EDICIÓN ---
+    // --- LÓGICA DE EDICIÓN (RENOMBRAR) ---
     let selectedLayer = null;
 
     function openEditPanel(layer) {
@@ -49,7 +49,6 @@ document.addEventListener('DOMContentLoaded', () => {
         selectedLayer = null;
     }
 
-    // **** ¡ESTA ES LA FUNCIÓN ACTUALIZADA! ****
     saveChangesBtn.addEventListener('click', async () => {
         if (!selectedLayer) return;
 
@@ -106,9 +105,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     cancelBtn.addEventListener('click', closeEditPanel);
 
-    // --- FUNCIÓN DE CARGA PAGINADA (sin cambios) ---
+    // --- FUNCIÓN DE CARGA PAGINADA ---
     async function cargarCallesPaginado() {
-        // ... (el resto de la función es igual, la dejo para que el archivo esté completo)
         let currentPage = 1;
         let totalFeaturesCargadas = 0;
         let seguirCargando = true;
@@ -155,23 +153,80 @@ document.addEventListener('DOMContentLoaded', () => {
         setTimeout(() => loadingOverlay.style.display = 'none', 2000);
     }
     
-    // --- LÓGICA DE AUTENTICACIÓN (sin cambios) ---
+    // --- LÓGICA DE AUTENTICACIÓN ---
     async function checkAuthAndLoad() {
-        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-        if (sessionError || !session) {
-            console.log('No hay sesión activa. Redirigiendo al inicio.');
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) {
             window.location.href = '/';
             return;
         }
-        console.log('Sesión encontrada. Verificando rol de administrador...');
-        const { data: profile, error: profileError } = await supabase.from('profiles').select('role').eq('id', session.user.id).single();
-        if (profileError || !profile || profile.role !== 'admin') {
-            console.log('Acceso denigado. Se requiere rol de administrador. Redirigiendo...');
+        const { data: profile } = await supabase.from('profiles').select('role').eq('id', session.user.id).single();
+        if (!profile || profile.role !== 'admin') {
             window.location.href = '/';
             return;
         }
-        console.log('¡Administrador verificado! Iniciando editor...');
         cargarCallesPaginado();
     }
     checkAuthAndLoad();
-});
+
+
+    // --- ¡NUEVO! LÓGICA PARA LA HERRAMIENTA DE CORTE DE GEOMAN ---
+    map.on('pm:cut', async (e) => {
+        const originalLayer = e.originalLayer;
+        const newLayer = e.layer;
+        const osm_id = originalLayer.feature.properties.id;
+
+        console.log(`Calle con ID ${osm_id} ha sido cortada.`);
+        
+        // El punto de corte es el último vértice de la primera parte de la línea cortada
+        // Geoman nos da una capa con un array de polilíneas. Nos quedamos con la primera.
+        const latlngs = newLayer.getLatLngs()[0];
+        const cut_point = latlngs[latlngs.length - 1];
+
+        if (confirm(`¿Quieres dividir permanentemente la calle con ID ${osm_id} en este punto? Esta acción no se puede deshacer.`)) {
+            try {
+                const { data: { session } } = await supabase.auth.getSession();
+                if (!session) throw new Error('No hay sesión activa.');
+
+                // Mostramos feedback al usuario
+                loadingOverlay.style.display = 'flex';
+                loadingText.textContent = 'Dividiendo calle...';
+
+                // Llamamos a nuestra nueva API de corte
+                const response = await fetch('/api/splitStreet', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${session.access_token}`,
+                    },
+                    body: JSON.stringify({
+                        osm_id: osm_id,
+                        cut_point: cut_point,
+                        city: 'Badajoz'
+                    }),
+                });
+
+                if (!response.ok) {
+                    const err = await response.json();
+                    throw new Error(err.details || 'Error en la API de corte');
+                }
+                
+                const result = await response.json();
+                console.log('Calle dividida con éxito:', result);
+                alert('¡Calle dividida! La página se recargará para mostrar los nuevos segmentos.');
+                
+                // Recargamos la página para ver los cambios
+                window.location.reload();
+
+            } catch (error) {
+                console.error('Error al dividir la calle:', error);
+                alert(`No se pudo dividir la calle: ${error.message}`);
+                loadingOverlay.style.display = 'none';
+            }
+        } else {
+             console.log("Corte cancelado por el usuario.");
+             // Geoman revierte el corte visual automáticamente si no hacemos nada.
+        }
+    });
+
+}); 

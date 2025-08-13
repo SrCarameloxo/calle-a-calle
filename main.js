@@ -629,10 +629,7 @@ window.addEventListener('DOMContentLoaded', () => {
         gameInterface.classList.add('hidden');
         finalScoreEl.textContent = `¡Partida terminada! Puntuación: ${streetsGuessedCorrectly} / ${totalQuestions}`;
         
-        // --- INICIO: CAMBIO #1 ---
-        // Se oculta el botón de "Establecer zona" para que "Volver" sea la única opción de reinicio.
         drawZoneBtn.classList.add('hidden');
-        // --- FIN: CAMBIO #1 ---
 
         if (currentGameMode === 'revancha') {
             saveZoneBtn.classList.add('hidden');
@@ -649,6 +646,9 @@ window.addEventListener('DOMContentLoaded', () => {
             };
             repeatZoneBtn.disabled = false;
         } else { // Modo clásico
+            // --- INICIO: CAMBIO ---
+            // Se elimina la línea conflictiva `drawZoneBtn.classList.remove('hidden');`
+            // --- FIN: CAMBIO ---
             saveZoneBtn.classList.remove('hidden');
             repeatZoneBtn.textContent = 'Repetir Zona';
             repeatZoneBtn.onclick = repeatLastZone; 
@@ -736,12 +736,10 @@ window.addEventListener('DOMContentLoaded', () => {
   }
 
   function nextQ(){
-    // --- INICIO: CAMBIO #2 ---
     // Solo se hace zoom a la zona si el modo es 'classic'. En revancha, no se hace zoom.
     if (currentGameMode === 'classic') {
         recenterMapWithPadding();
     }
-    // --- FIN: CAMBIO #2 ---
 
     clear();
     if(qIdx >= totalQuestions){
@@ -1005,7 +1003,7 @@ async function saveFailedStreet(streetData) {
   async function saveGameStats(correct, total) {
     try {
         const { data: { session } } = await supabaseClient.auth.getSession();
-        if (!session || total === 0) return;
+        if (!session || total === 0) return.
         await supabaseClient.from('game_stats').insert({ user_id: session.user.id, correct_guesses: correct, total_questions: total });
     } catch (error) {
         console.error('Error guardando estadísticas:', error.message);

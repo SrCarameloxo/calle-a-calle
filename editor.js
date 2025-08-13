@@ -1,4 +1,4 @@
-// --- editor.js (Versión 5 - Con Autenticación Robusta) ---
+// --- editor.js (Versión 6 - Con Guardado Real en API) ---
 
 document.addEventListener('DOMContentLoaded', () => {
 
@@ -26,20 +26,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- INICIALIZACIÓN DE GEOMAN ---
     map.pm.addControls({
-      position: 'topleft',
-      drawCircle: false,
-      drawMarker: false,
-      drawCircleMarker: false,
-      drawRectangle: false,
-      drawPolygon: true,
-      editMode: true,
-      dragMode: true,
-      cutPolygon: true,
-      removalMode: true,
+      position: 'topleft', drawCircle: false, drawMarker: false, drawCircleMarker: false,
+      drawRectangle: false, drawPolygon: true, editMode: true, dragMode: true,
+      cutPolygon: true, removalMode: true,
     });
-    map.pm.setPathOptions({
-        color: 'orange', fillColor: 'orange', fillOpacity: 0.4,
-    });
+    map.pm.setPathOptions({ color: 'orange', fillColor: 'orange', fillOpacity: 0.4 });
 
     // --- LÓGICA DE EDICIÓN ---
     let selectedLayer = null;
@@ -48,7 +39,6 @@ document.addEventListener('DOMContentLoaded', () => {
         selectedLayer = layer;
         const properties = layer.feature.properties;
         const currentName = properties.tags.name || '';
-        
         streetNameInput.value = currentName;
         streetIdDisplay.textContent = properties.id;
         editPanel.style.display = 'block';
@@ -59,37 +49,74 @@ document.addEventListener('DOMContentLoaded', () => {
         selectedLayer = null;
     }
 
+    // **** ¡ESTA ES LA FUNCIÓN ACTUALIZADA! ****
     saveChangesBtn.addEventListener('click', async () => {
         if (!selectedLayer) return;
 
+        const osm_id = selectedLayer.feature.properties.id;
         const newName = streetNameInput.value.trim();
-        alert(`Guardar cambios para la calle ${selectedLayer.feature.properties.id} con el nuevo nombre: "${newName}"\n\n(Lógica de guardado en Supabase pendiente)`);
+        const city = 'Badajoz';
+
+        if (!newName) {
+            alert('El nombre de la calle no puede estar vacío.');
+            return;
+        }
         
-        selectedLayer.bindPopup(`<b>${newName}</b><br>ID: ${selectedLayer.feature.properties.id}`);
-        selectedLayer.feature.properties.tags.name = newName;
-        
-        closeEditPanel();
+        try {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (!session) throw new Error('No hay sesión activa.');
+
+            saveChangesBtn.textContent = 'Guardando...';
+            saveChangesBtn.disabled = true;
+
+            const response = await fetch('/api/updateStreetName', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${session.access_token}`,
+                },
+                body: JSON.stringify({
+                    osm_id: osm_id,
+                    display_name: newName,
+                    city: city,
+                }),
+            });
+            
+            const result = await response.json();
+            
+            if (!response.ok) {
+                throw new Error(result.error || 'Error desconocido del servidor.');
+            }
+
+            console.log('Respuesta de la API:', result.message);
+
+            selectedLayer.bindPopup(`<b>${newName}</b><br>ID: ${osm_id}`);
+            selectedLayer.feature.properties.tags.name = newName;
+            
+            closeEditPanel();
+
+        } catch (error) {
+            console.error('Error al guardar los cambios:', error);
+            alert(`No se pudo guardar el cambio: ${error.message}`);
+        } finally {
+            saveChangesBtn.textContent = 'Guardar Cambios';
+            saveChangesBtn.disabled = false;
+        }
     });
 
     cancelBtn.addEventListener('click', closeEditPanel);
 
-
-    // --- FUNCIÓN DE CARGA PAGINADA ---
+    // --- FUNCIÓN DE CARGA PAGINADA (sin cambios) ---
     async function cargarCallesPaginado() {
+        // ... (el resto de la función es igual, la dejo para que el archivo esté completo)
         let currentPage = 1;
         let totalFeaturesCargadas = 0;
         let seguirCargando = true;
-
         console.log('Iniciando carga paginada de calles...');
-
         geojsonLayer = L.geoJSON(null, {
             style: function(feature) {
                 const hasName = feature.properties.tags && feature.properties.tags.name;
-                return {
-                    color: hasName ? "#3388ff" : "#999999",
-                    weight: hasName ? 3 : 2,
-                    opacity: hasName ? 1.0 : 0.6
-                };
+                return { color: hasName ? "#3388ff" : "#999999", weight: hasName ? 3 : 2, opacity: hasName ? 1.0 : 0.6 };
             },
             onEachFeature: function(feature, layer) {
                 const tags = feature.properties.tags;
@@ -104,16 +131,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
         }).addTo(map);
-
         while (seguirCargando) {
             try {
                 loadingText.textContent = `Cargando lote ${currentPage}...`;
                 const response = await fetch(`/api/getCityStreets?page=${currentPage}`);
                 if (!response.ok) throw new Error('Respuesta de API no válida.');
-                
                 const geojsonData = await response.json();
                 const numFeatures = geojsonData.features.length;
-                
                 if (numFeatures > 0) {
                     totalFeaturesCargadas += numFeatures;
                     geojsonLayer.addData(geojsonData);
@@ -127,38 +151,27 @@ document.addEventListener('DOMContentLoaded', () => {
                 seguirCargando = false;
             }
         }
-        
         loadingText.textContent = `¡Carga completada! ${totalFeaturesCargadas} calles en el mapa.`;
         setTimeout(() => loadingOverlay.style.display = 'none', 2000);
     }
     
-    // --- LÓGICA DE AUTENTICACIÓN Y ARRANQUE (VERSIÓN CORREGIDA) ---
+    // --- LÓGICA DE AUTENTICACIÓN (sin cambios) ---
     async function checkAuthAndLoad() {
         const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-
         if (sessionError || !session) {
             console.log('No hay sesión activa. Redirigiendo al inicio.');
             window.location.href = '/';
             return;
         }
-
         console.log('Sesión encontrada. Verificando rol de administrador...');
-        const { data: profile, error: profileError } = await supabase
-            .from('profiles')
-            .select('role')
-            .eq('id', session.user.id)
-            .single();
-
+        const { data: profile, error: profileError } = await supabase.from('profiles').select('role').eq('id', session.user.id).single();
         if (profileError || !profile || profile.role !== 'admin') {
-            console.log('Acceso denegado. Se requiere rol de administrador. Redirigiendo...');
+            console.log('Acceso denigado. Se requiere rol de administrador. Redirigiendo...');
             window.location.href = '/';
             return;
         }
-
         console.log('¡Administrador verificado! Iniciando editor...');
         cargarCallesPaginado();
     }
-
-    // Llamamos a nuestra nueva función de verificación al cargar la página.
     checkAuthAndLoad();
 });

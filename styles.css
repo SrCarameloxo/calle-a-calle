@@ -246,6 +246,11 @@ button.game-control-btn:disabled { opacity: .4; cursor: default; }
   color: white;
   transition: opacity 0.3s ease, transform 0.3s ease;
   transform-origin: top right;
+  /* --- INICIO: CAMBIOS --- */
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100vh - 90px); /* Límite de altura para que nunca se salga de la pantalla */
+  /* --- FIN: CAMBIOS --- */
 }
 #menu-content-panel.hidden {
   opacity: 0;
@@ -257,7 +262,14 @@ button.game-control-btn:disabled { opacity: .4; cursor: default; }
 .menu-tab-btn { flex: 1; padding: 1rem; background: none; border: none; color: #a0aec0; font-weight: 600; transition: color 0.2s, background-color 0.2s; white-space: nowrap; }
 .menu-tab-btn:hover { background-color: rgba(255,255,255,0.05); color: white; }
 .menu-tab-btn.active { color: white; border-bottom: 2px solid #3b82f6; }
-.menu-content-area { padding: 1rem; max-height: 50vh; overflow-y: auto; }
+.menu-content-area {
+  padding: 1rem;
+  overflow-y: auto;
+  /* --- INICIO: CAMBIOS --- */
+  flex-grow: 1; /* Hace que esta área ocupe todo el espacio vertical sobrante */
+  min-height: 0; /* Soluciona un bug de cálculo de altura de flexbox en algunos navegadores */
+  /* --- FIN: CAMBIOS --- */
+}
 .content-panel { display: none; }
 .content-panel.active { display: block; }
 

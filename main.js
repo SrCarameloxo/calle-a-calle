@@ -257,7 +257,7 @@ window.addEventListener('DOMContentLoaded', () => {
                 resetToInitialView(true); // Usamos el reseteo simple
             } else if (selectedMode === 'instinto') {
                 resetToInitialView(true); // Limpiamos la UI al estado inicial
-                startInstintoGame({ ui: uiElements, gameMap: gameMap }); // Le pasamos el control a nuestro nuevo módulo
+                startInstintoGame({ ui: uiElements, gameMap: gameMap, updatePanelUI: updatePanelUI }); // Le pasamos el control y las herramientas
             }
         });
     });
@@ -417,6 +417,8 @@ window.addEventListener('DOMContentLoaded', () => {
   }
 
   function startDrawing(){
+    if (currentGameMode !== 'classic') return; // <-- AÑADIDO: Guardia para no ejecutar en otros modos
+
     updatePanelUI(() => {
         ['end-game-options', 'drawZone', 'loaded-zone-options', 'game-interface', 'back-from-review-btn'].forEach(id => {
             const el = document.getElementById(id);

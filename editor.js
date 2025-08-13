@@ -1,9 +1,21 @@
-// --- editor.js (Versión Final v3 - Forzando Scope) ---
+// --- editor.js (VERSIÓN FINAL CON IMPORTACIÓN DE MÓDULO) ---
 
-// La lógica principal del editor se encapsula en una función `iniciarEditor`
-function iniciarEditor(supabase) {
-    // ... (El contenido de esta función es EXACTAMENTE el mismo que en la versión anterior)
-    console.log('Iniciando la construcción del editor...');
+// ¡CAMBIO CLAVE! Importamos la función 'createClient' directamente desde el CDN.
+// Esto es mucho más robusto que depender de 'window.supabase'.
+import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+
+// --- CONFIGURACIÓN ---
+const SUPABASE_URL = 'https://hppzwfwtedghpsxfonoh.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhwcHp3Znd0ZWRnaHBzeGZvbm9oIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQxMjQzNDMsImV4cCI6MjA2OTcwMDQ0M30.BAh6i5iJ5YkDBoydfkC9azAD4eMdYBkEBdxws9kj5Hg';
+
+// ¡CAMBIO CLAVE! Usamos la función importada, no la global.
+const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+
+// --- LÓGICA PRINCIPAL DEL EDITOR (encapsulada) ---
+function iniciarEditor() {
+    console.log('¡Administrador verificado! Iniciando la construcción del editor...');
+
     const loadingOverlay = document.getElementById('loading-overlay');
     const loadingText = loadingOverlay.querySelector('p');
     const editPanel = document.getElementById('edit-panel');
@@ -11,18 +23,23 @@ function iniciarEditor(supabase) {
     const streetIdDisplay = document.getElementById('street-id-display');
     const saveChangesBtn = document.getElementById('save-changes-btn');
     const cancelBtn = document.getElementById('cancel-btn');
+
     const map = L.map('editor-map').setView([38.88, -6.97], 13);
     L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
         attribution: '© CARTO', maxZoom: 20
     }).addTo(map);
+    
     let geojsonLayer;
+
     map.pm.addControls({
       position: 'topleft', drawCircle: false, drawMarker: false, drawCircleMarker: false,
       drawRectangle: false, drawPolygon: true, editMode: true, dragMode: true,
       cutPolygon: true, removalMode: true,
     });
     map.pm.setPathOptions({ color: 'orange', fillColor: 'orange', fillOpacity: 0.4 });
+
     let selectedLayer = null;
+
     function openEditPanel(layer) {
         selectedLayer = layer;
         const properties = layer.feature.properties;
@@ -31,10 +48,12 @@ function iniciarEditor(supabase) {
         streetIdDisplay.textContent = properties.id;
         editPanel.style.display = 'block';
     }
+
     function closeEditPanel() {
         editPanel.style.display = 'none';
         selectedLayer = null;
     }
+
     saveChangesBtn.addEventListener('click', async () => {
         if (!selectedLayer) return;
         const osm_id = selectedLayer.feature.properties.id;
@@ -65,7 +84,9 @@ function iniciarEditor(supabase) {
             saveChangesBtn.disabled = false;
         }
     });
+
     cancelBtn.addEventListener('click', closeEditPanel);
+
     async function cargarCallesPaginado() {
         let currentPage = 1;
         let totalFeaturesCargadas = 0;
@@ -109,7 +130,9 @@ function iniciarEditor(supabase) {
         loadingText.textContent = `¡Carga completada! ${totalFeaturesCargadas} calles en el mapa.`;
         setTimeout(() => loadingOverlay.style.display = 'none', 2000);
     }
+    
     cargarCallesPaginado();
+
     map.on('pm:cut', async (e) => {
         const originalLayer = e.originalLayer;
         const newLayer = e.layer;
@@ -142,45 +165,29 @@ function iniciarEditor(supabase) {
     });
 }
 
-// --- PUNTO DE ENTRADA PRINCIPAL ---
-document.addEventListener('DOMContentLoaded', () => {
-    const SUPABASE_URL = 'https://hppzwfwtedghpsxfonoh.supabase.co';
-    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhwcHp3Znd0ZWRnaHBzeGZvbm9oIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQxMjQzNDMsImV4cCI6MjA2OTcwMDQ0M30.BAh6i5iJ5YkDBoydfkC9azAD4eMdYBkEBdxws9kj5Hg';
-    
-    // Volvemos a definir supabaseClient aquí para asegurarnos de que es la instancia correcta.
-    const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-    console.log("Editor.js cargado. Esperando estado de autenticación de Supabase...");
-    
-    supabaseClient.auth.onAuthStateChange(async (event, session) => {
-        console.log(`Evento de Auth recibido: ${event}`);
+// --- PUNTO DE ENTRADA Y AUTENTICACIÓN ---
+// Esta estructura se ejecuta una sola vez.
+async function checkAuthAndLoad() {
+    console.log("Editor.js cargado. Verificando sesión...");
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+    if (sessionError || !session) {
+        console.log('No hay sesión activa. Redirigiendo al inicio.');
+        window.location.href = '/';
+        return;
+    }
 
-        if (event === 'INITIAL_SESSION' || event === 'SIGNED_IN') {
-            if (session) {
-                console.log("Sesión encontrada. Verificando rol para el usuario:", session.user.id);
-                // Usamos supabaseClient para asegurarnos del scope
-                const { data: profile, error } = await supabaseClient.from('profiles').select('role').eq('id', session.user.id).single();
+    console.log('Sesión encontrada. Verificando rol de administrador...');
+    const { data: profile, error: profileError } = await supabase.from('profiles').select('role').eq('id', session.user.id).single();
+    if (profileError || !profile || profile.role !== 'admin') {
+        console.log('Acceso denegado. Se requiere rol de administrador. Redirigiendo...');
+        window.location.href = '/';
+        return;
+    }
 
-                if (error) {
-                    console.error("Error al obtener el perfil:", error);
-                    window.location.href = '/';
-                    return;
-                }
+    // Si hemos llegado hasta aquí, es un admin verificado.
+    // Ahora, llamamos a la función principal que construye el editor.
+    iniciarEditor();
+}
 
-                if (profile && profile.role === 'admin') {
-                    iniciarEditor(supabaseClient); // Le pasamos el cliente correcto
-                } else {
-                    console.log(`El perfil del usuario no es admin. Rol encontrado: ${profile ? profile.role : 'ninguno'}. Redirigiendo...`);
-                    window.location.href = '/';
-                }
-            } else if (event === 'INITIAL_SESSION') {
-                // Solo redirigimos si es la carga inicial y no hay sesión.
-                console.log("No hay sesión inicial. Redirigiendo...");
-                window.location.href = '/';
-            }
-        } else if (event === 'SIGNED_OUT') {
-            console.log("Sesión cerrada. Redirigiendo...");
-            window.location.href = '/';
-        }
-    });
-});
+checkAuthAndLoad();

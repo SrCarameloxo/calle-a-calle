@@ -289,8 +289,6 @@ window.addEventListener('DOMContentLoaded', () => {
     reviewGameBtn.addEventListener('click', enterReviewMode);
     saveZoneBtn.addEventListener('click', saveCurrentZone);
 
-    // --- INICIO: CÓDIGO MODIFICADO ---
-    // Este es el único bloque que se ha cambiado.
     backToMenuBtn.addEventListener('click', () => {
         // Si venimos del modo revancha, hacemos dos cosas importantes:
         if (currentGameMode === 'revancha') {
@@ -308,7 +306,6 @@ window.addEventListener('DOMContentLoaded', () => {
         // Finalmente, independientemente del modo, limpiamos la interfaz a su estado inicial.
         resetToInitialView(true);
     });
-    // --- FIN: CÓDIGO MODIFICADO ---
     
     backFromReviewBtn.addEventListener('click', exitReviewMode);
     
@@ -626,16 +623,18 @@ window.addEventListener('DOMContentLoaded', () => {
       return { distance: Math.sqrt(minDistance), point: closestPointOnStreet };
   }
 
-  // --- INICIO: CÓDIGO CORREGIDO (Regla #3) ---
-  // Esta función ahora es la única responsable de la pantalla final
   function endGame() {
     updatePanelUI(() => {
         playing = false;
         gameInterface.classList.add('hidden');
         finalScoreEl.textContent = `¡Partida terminada! Puntuación: ${streetsGuessedCorrectly} / ${totalQuestions}`;
         
+        // --- INICIO: CAMBIO #1 ---
+        // Se oculta el botón de "Establecer zona" para que "Volver" sea la única opción de reinicio.
+        drawZoneBtn.classList.add('hidden');
+        // --- FIN: CAMBIO #1 ---
+
         if (currentGameMode === 'revancha') {
-            drawZoneBtn.classList.add('hidden');
             saveZoneBtn.classList.add('hidden');
             repeatZoneBtn.textContent = 'Jugar Revancha de Nuevo';
             repeatZoneBtn.onclick = () => {
@@ -650,7 +649,6 @@ window.addEventListener('DOMContentLoaded', () => {
             };
             repeatZoneBtn.disabled = false;
         } else { // Modo clásico
-            drawZoneBtn.classList.remove('hidden');
             saveZoneBtn.classList.remove('hidden');
             repeatZoneBtn.textContent = 'Repetir Zona';
             repeatZoneBtn.onclick = repeatLastZone; 
@@ -672,7 +670,6 @@ window.addEventListener('DOMContentLoaded', () => {
         gameMap.off('click', onMapClick);
     });
   }
-  // --- FIN: CÓDIGO CORREGIDO (Regla #3) ---
 
   function enterReviewMode() {
       if(reviewLayer) gameMap.removeLayer(reviewLayer);
@@ -739,13 +736,12 @@ window.addEventListener('DOMContentLoaded', () => {
   }
 
   function nextQ(){
-    if (currentGameMode === 'revancha' && streetList[qIdx]) {
-        const bounds = L.latLngBounds();
-        streetList[qIdx].geometries.forEach(g => bounds.extend(L.latLngBounds(g.points)));
-        if(bounds.isValid()) recenterMapWithPadding(bounds);
-    } else {
+    // --- INICIO: CAMBIO #2 ---
+    // Solo se hace zoom a la zona si el modo es 'classic'. En revancha, no se hace zoom.
+    if (currentGameMode === 'classic') {
         recenterMapWithPadding();
     }
+    // --- FIN: CAMBIO #2 ---
 
     clear();
     if(qIdx >= totalQuestions){
@@ -768,8 +764,6 @@ window.addEventListener('DOMContentLoaded', () => {
     nextBtn.disabled = true;
   }
   
-  // --- INICIO: CÓDIGO CORREGIDO (Regla #1) ---
-  // resetToInitialView ahora es una función de limpieza pura, sin tomar decisiones de modo.
   function resetToInitialView(isSimpleReset = false) {
       // Si NO es un reseteo simple (es decir, el usuario ha pulsado "Volver" para salir del modo),
       // entonces guardamos el progreso de la revancha.
@@ -802,7 +796,6 @@ window.addEventListener('DOMContentLoaded', () => {
           setGameMode('classic');
       }
   }
-  // --- FIN: CÓDIGO CORREGIDO (Regla #1) ---
 
   function playFromHistory(zoneString) {
     gameMap.off('click', addVertex);

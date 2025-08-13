@@ -1,10 +1,10 @@
-// --- editor.js (Versión 4 - Con Filtrado Visual) ---
+// --- editor.js (Versión 5 - Con Autenticación Robusta) ---
 
 document.addEventListener('DOMContentLoaded', () => {
 
     // --- CONFIGURACIÓN ---
     const SUPABASE_URL = 'https://hppzwfwtedghpsxfonoh.supabase.co';
-    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhwcHp3Znd0ZWRnaHBzeGZvbm9oIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQxMjQzNDMsImV4cCI6MjA2OTcwMDM0M30.BAh6i5iJ5YkDBoydfkC9azAD4eMdYBkEBdxws9kj5Hg';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhwcHp3Znd0ZWRnaHBzeGZvbm9oIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQxMjQzNDMsImV4cCI6MjA2OTcwMDM0M30.BAh6i5iJ5YkDBoydfkC9azAD4eMdYBkEBdxws9kj5Hg';
     const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
     // --- ELEMENTOS DEL DOM ---
@@ -82,11 +82,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
         console.log('Iniciando carga paginada de calles...');
 
-        // Creamos la capa GeoJSON vacía con las reglas de estilo y eventos.
-        // La iremos llenando lote a lote.
-        geojsonLayer = L.geoJSON(null, { // Empezamos con datos nulos
+        geojsonLayer = L.geoJSON(null, {
             style: function(feature) {
-                // Estilo condicional:
                 const hasName = feature.properties.tags && feature.properties.tags.name;
                 return {
                     color: hasName ? "#3388ff" : "#999999",
@@ -96,20 +93,17 @@ document.addEventListener('DOMContentLoaded', () => {
             },
             onEachFeature: function(feature, layer) {
                 const tags = feature.properties.tags;
-                // SOLO añadimos la interactividad si la calle TIENE nombre.
                 if (tags && tags.name) {
                     layer.bindPopup(`<b>${tags.name}</b><br>ID: ${feature.properties.id}`);
                     layer.on('click', (e) => {
-                        L.DomEvent.stopPropagation(e); // Evita que el clic se propague al mapa
+                        L.DomEvent.stopPropagation(e);
                         openEditPanel(layer);
                     });
                 } else {
-                    // A las capas sin nombre, no les hacemos nada. No serán clicables.
                     layer.options.interactive = false;
                 }
             }
         }).addTo(map);
-
 
         while (seguirCargando) {
             try {
@@ -122,11 +116,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 
                 if (numFeatures > 0) {
                     totalFeaturesCargadas += numFeatures;
-                    
-                    // En lugar de crear una capa nueva, añadimos los datos a la que ya existe.
-                    // La capa aplicará automáticamente el estilo y los eventos que definimos al crearla.
                     geojsonLayer.addData(geojsonData);
-                    
                     currentPage++;
                 } else {
                     seguirCargando = false;
@@ -142,21 +132,33 @@ document.addEventListener('DOMContentLoaded', () => {
         setTimeout(() => loadingOverlay.style.display = 'none', 2000);
     }
     
-    // --- LÓGICA DE AUTENTICACIÓN Y ARRANQUE ---
-    supabase.auth.onAuthStateChange((event, session) => {
-        if (event === 'INITIAL_SESSION' || event === 'SIGNED_IN') {
-            if (session) {
-                supabase.from('profiles').select('role').eq('id', session.user.id).single()
-                    .then(({ data, error }) => {
-                        if (error || !data || data.role !== 'admin') {
-                            window.location.href = '/';
-                        } else {
-                            cargarCallesPaginado();
-                        }
-                    });
-            } else {
-                window.location.href = '/';
-            }
+    // --- LÓGICA DE AUTENTICACIÓN Y ARRANQUE (VERSIÓN CORREGIDA) ---
+    async function checkAuthAndLoad() {
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+
+        if (sessionError || !session) {
+            console.log('No hay sesión activa. Redirigiendo al inicio.');
+            window.location.href = '/';
+            return;
         }
-    });
+
+        console.log('Sesión encontrada. Verificando rol de administrador...');
+        const { data: profile, error: profileError } = await supabase
+            .from('profiles')
+            .select('role')
+            .eq('id', session.user.id)
+            .single();
+
+        if (profileError || !profile || profile.role !== 'admin') {
+            console.log('Acceso denegado. Se requiere rol de administrador. Redirigiendo...');
+            window.location.href = '/';
+            return;
+        }
+
+        console.log('¡Administrador verificado! Iniciando editor...');
+        cargarCallesPaginado();
+    }
+
+    // Llamamos a nuestra nueva función de verificación al cargar la página.
+    checkAuthAndLoad();
 });

@@ -259,24 +259,19 @@ button.game-control-btn:disabled { opacity: .4; cursor: default; }
 .menu-tabs {
   display: flex;
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-  /* --- INICIO: CAMBIOS --- */
   overflow-x: auto; /* Permite el scroll horizontal si el contenido se desborda */
   scrollbar-width: none; /* Oculta la barra de scroll en Firefox */
   -ms-overflow-style: none;  /* Oculta la barra de scroll en IE y Edge */
-  /* --- FIN: CAMBIOS --- */
+  padding-right: 1rem; /* --- INICIO: CAMBIO ÚNICO --- Añade espacio al final del contenedor */
 }
 
-/* --- INICIO: CAMBIO --- */
 /* Oculta la barra de scroll en navegadores Webkit (Chrome, Safari) */
 .menu-tabs::-webkit-scrollbar {
     display: none;
 }
-/* --- FIN: CAMBIO --- */
 
 .menu-tab-btn {
-  /* --- INICIO: CAMBIO --- */
   /* Se elimina flex: 1 para que los botones se ajusten a su contenido */
-  /* --- FIN: CAMBIO --- */
   padding: 1rem;
   background: none;
   border: none;

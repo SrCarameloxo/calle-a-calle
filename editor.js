@@ -1,10 +1,10 @@
-// --- editor.js (Versión 3 - Con Geoman y Panel de Edición Básico) ---
+// --- editor.js (Versión 4 - Con Filtrado Visual) ---
 
 document.addEventListener('DOMContentLoaded', () => {
 
     // --- CONFIGURACIÓN ---
     const SUPABASE_URL = 'https://hppzwfwtedghpsxfonoh.supabase.co';
-    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhwcHp3Znd0ZWRnaHBzeGZvbm9oIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQxMjQzNDMsImV4cCI6MjA2OTcwMDM0M30.BAh6i5iJ5YkDBoydfkC9azAD4eMdYBkEBdxws9kj5Hg';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhwcHp3Znd0ZWRnaHBzeGZvbm9oIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQxMjQzNDMsImV4cCI6MjA2OTcwMDM0M30.BAh6i5iJ5YkDBoydfkC9azAD4eMdYBkEBdxws9kj5Hg';
     const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
     // --- ELEMENTOS DEL DOM ---
@@ -22,7 +22,7 @@ document.addEventListener('DOMContentLoaded', () => {
         attribution: '© CARTO', maxZoom: 20
     }).addTo(map);
     
-    let geojsonLayer; // Variable global para guardar la capa de calles
+    let geojsonLayer;
 
     // --- INICIALIZACIÓN DE GEOMAN ---
     map.pm.addControls({
@@ -42,7 +42,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // --- LÓGICA DE EDICIÓN ---
-    let selectedLayer = null; // Para saber qué calle estamos editando
+    let selectedLayer = null;
 
     function openEditPanel(layer) {
         selectedLayer = layer;
@@ -59,15 +59,12 @@ document.addEventListener('DOMContentLoaded', () => {
         selectedLayer = null;
     }
 
-    // Eventos de los botones del panel
     saveChangesBtn.addEventListener('click', async () => {
         if (!selectedLayer) return;
 
         const newName = streetNameInput.value.trim();
         alert(`Guardar cambios para la calle ${selectedLayer.feature.properties.id} con el nuevo nombre: "${newName}"\n\n(Lógica de guardado en Supabase pendiente)`);
-        // Aquí irá la llamada a la API de Supabase para guardar el cambio
         
-        // Actualizamos el popup en el mapa al instante
         selectedLayer.bindPopup(`<b>${newName}</b><br>ID: ${selectedLayer.feature.properties.id}`);
         selectedLayer.feature.properties.tags.name = newName;
         
@@ -85,6 +82,35 @@ document.addEventListener('DOMContentLoaded', () => {
 
         console.log('Iniciando carga paginada de calles...');
 
+        // Creamos la capa GeoJSON vacía con las reglas de estilo y eventos.
+        // La iremos llenando lote a lote.
+        geojsonLayer = L.geoJSON(null, { // Empezamos con datos nulos
+            style: function(feature) {
+                // Estilo condicional:
+                const hasName = feature.properties.tags && feature.properties.tags.name;
+                return {
+                    color: hasName ? "#3388ff" : "#999999",
+                    weight: hasName ? 3 : 2,
+                    opacity: hasName ? 1.0 : 0.6
+                };
+            },
+            onEachFeature: function(feature, layer) {
+                const tags = feature.properties.tags;
+                // SOLO añadimos la interactividad si la calle TIENE nombre.
+                if (tags && tags.name) {
+                    layer.bindPopup(`<b>${tags.name}</b><br>ID: ${feature.properties.id}`);
+                    layer.on('click', (e) => {
+                        L.DomEvent.stopPropagation(e); // Evita que el clic se propague al mapa
+                        openEditPanel(layer);
+                    });
+                } else {
+                    // A las capas sin nombre, no les hacemos nada. No serán clicables.
+                    layer.options.interactive = false;
+                }
+            }
+        }).addTo(map);
+
+
         while (seguirCargando) {
             try {
                 loadingText.textContent = `Cargando lote ${currentPage}...`;
@@ -97,26 +123,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (numFeatures > 0) {
                     totalFeaturesCargadas += numFeatures;
                     
-                    if (!geojsonLayer) {
-                        // Creamos la capa la primera vez
-                        geojsonLayer = L.geoJSON(geojsonData, {
-                            style: { color: "#3388ff", weight: 3 },
-                            onEachFeature: function(feature, layer) {
-                                // Evento de clic en cada calle
-                                layer.on('click', () => {
-                                    openEditPanel(layer);
-                                });
-
-                                const tags = feature.properties.tags;
-                                if (tags && tags.name) {
-                                    layer.bindPopup(`<b>${tags.name}</b><br>ID: ${feature.properties.id}`);
-                                }
-                            }
-                        }).addTo(map);
-                    } else {
-                        // Añadimos los nuevos datos a la capa existente
-                        geojsonLayer.addData(geojsonData);
-                    }
+                    // En lugar de crear una capa nueva, añadimos los datos a la que ya existe.
+                    // La capa aplicará automáticamente el estilo y los eventos que definimos al crearla.
+                    geojsonLayer.addData(geojsonData);
+                    
                     currentPage++;
                 } else {
                     seguirCargando = false;

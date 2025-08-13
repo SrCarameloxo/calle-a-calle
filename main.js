@@ -48,7 +48,9 @@ window.addEventListener('DOMContentLoaded', () => {
     repeatZoneBtn: document.getElementById('repeatZone'),
     saveZoneBtn: document.getElementById('saveZoneBtn'),
     backToMenuBtn: document.getElementById('back-to-menu-btn'),
-    backFromReviewBtn: document.getElementById('back-from-review-btn')
+    backFromReviewBtn: document.getElementById('back-from-review-btn'),
+    // Añadimos el nuevo contenedor de opciones para que sea accesible
+    instintoOptionsContainer: document.getElementById('instinto-options-container'),
   };
 
   let backgroundMap, gameMap = null;
@@ -63,6 +65,7 @@ window.addEventListener('DOMContentLoaded', () => {
 
   let currentGameMode = 'classic'; 
   let acertadasEnSesionRevancha = new Set();
+  let activeModeControls = null; // Variable para guardar los controles del modo activo
 
   // --- INICIO: CÓDIGO CORREGIDO (Regla #2) ---
   // Esta función ahora es la única responsable de la apariencia del modo
@@ -239,13 +242,18 @@ window.addEventListener('DOMContentLoaded', () => {
             const selectedMode = button.dataset.mode;
             if (button.disabled) return;
 
+            // Limpiar el estado del modo anterior antes de cambiar
+            if (activeModeControls && typeof activeModeControls.clear === 'function') {
+                activeModeControls.clear();
+            }
+            activeModeControls = null;
+
             setGameMode(selectedMode);
             uiElements.menuContentPanel.classList.add('hidden');
+            resetToInitialView(true);
 
             if (selectedMode === 'revancha') {
-                resetToInitialView(true); // Usamos el reseteo simple
                 uiElements.drawZoneBtn.classList.add('hidden');
-
                 startRevanchaGame({
                     startGame: (revanchaStreets) => {
                         streetList = revanchaStreets;
@@ -253,11 +261,8 @@ window.addEventListener('DOMContentLoaded', () => {
                         startGameFlow();
                     }
                 });
-            } else if (selectedMode === 'classic') {
-                resetToInitialView(true); // Usamos el reseteo simple
             } else if (selectedMode === 'instinto') {
-                resetToInitialView(true); // Limpiamos la UI al estado inicial
-                startInstintoGame({ ui: uiElements, gameMap: gameMap, updatePanelUI: updatePanelUI }); // Le pasamos el control y las herramientas
+                activeModeControls = startInstintoGame({ ui: uiElements, gameMap: gameMap, updatePanelUI: updatePanelUI });
             }
         });
     });
@@ -284,7 +289,17 @@ window.addEventListener('DOMContentLoaded', () => {
 
     uiElements.drawZoneBtn.addEventListener('click', startDrawing);
     uiElements.undoPointBtn.addEventListener('click', undoLastPoint);
-    uiElements.nextBtn.addEventListener('click', () => { uiElements.nextBtn.disabled=true; nextQ(); });
+    
+    // Listener inteligente para el botón "Siguiente"
+    uiElements.nextBtn.addEventListener('click', () => {
+        if (currentGameMode === 'classic') {
+            uiElements.nextBtn.disabled = true;
+            nextQ();
+        } else if (currentGameMode === 'instinto' && activeModeControls) {
+            activeModeControls.next();
+        }
+    });
+
     uiElements.reportBtnFAB.addEventListener('click', reportIncident);
     uiElements.adminPanelBtn.addEventListener('click', () => { window.location.href = '/admin.html'; });
     uiElements.dismissDrawHelpBtn.addEventListener('click', dismissDrawHelp);
@@ -294,27 +309,20 @@ window.addEventListener('DOMContentLoaded', () => {
     uiElements.saveZoneBtn.addEventListener('click', saveCurrentZone);
 
     uiElements.backToMenuBtn.addEventListener('click', () => {
-        // Si venimos del modo revancha, hacemos dos cosas importantes:
         if (currentGameMode === 'revancha') {
-            // 1. Gestionamos la lógica de guardar el progreso (borrar las acertadas).
             if (acertadasEnSesionRevancha.size > 0) {
                 console.log("Saliendo del modo revancha. Borrando calles acertadas de la BD...");
                 acertadasEnSesionRevancha.forEach(streetName => {
                     deleteFailedStreet(streetName);
                 });
             }
-            // 2. Le decimos al juego que vuelva explícitamente al modo clásico.
-            setGameMode('classic');
         }
-
-        // Finalmente, independientemente del modo, limpiamos la interfaz a su estado inicial.
+        setGameMode('classic');
         resetToInitialView(true);
     });
     
     uiElements.backFromReviewBtn.addEventListener('click', exitReviewMode);
     
-    // El event listener de repeatZoneBtn se elimina de aquí y se gestiona en endGame
-
     setupStartButton(uiElements.startBtn);
     setupMenu();
 
@@ -417,7 +425,7 @@ window.addEventListener('DOMContentLoaded', () => {
   }
 
   function startDrawing(){
-    if (currentGameMode !== 'classic') return; // <-- AÑADIDO: Guardia para no ejecutar en otros modos
+    if (currentGameMode !== 'classic') return; // <-- Guardia para no ejecutar en otros modos
 
     updatePanelUI(() => {
         ['end-game-options', 'drawZone', 'loaded-zone-options', 'game-interface', 'back-from-review-btn'].forEach(id => {
@@ -631,12 +639,8 @@ window.addEventListener('DOMContentLoaded', () => {
 
   function endGame() {
     updatePanelUI(() => {
-        // --- INICIO: CAMBIO ÚNICO ---
-        // Guardamos el estado de la partida que acaba de terminar ANTES de tomar cualquier decisión.
         lastGameZonePoints = [...zonePoints];
         lastGameStreetList = [...streetList];
-        // --- FIN: CAMBIO ÚNICO ---
-
         playing = false;
         uiElements.gameInterface.classList.add('hidden');
         uiElements.finalScoreEl.textContent = `¡Partida terminada! Puntuación: ${streetsGuessedCorrectly} / ${totalQuestions}`;
@@ -661,7 +665,6 @@ window.addEventListener('DOMContentLoaded', () => {
             uiElements.saveZoneBtn.classList.remove('hidden');
             uiElements.repeatZoneBtn.textContent = 'Repetir Zona';
             uiElements.repeatZoneBtn.onclick = repeatLastZone; 
-            // Esta decisión ahora usa los datos frescos guardados al principio de la función.
             uiElements.repeatZoneBtn.disabled = (lastGameZonePoints.length < 3 || lastGameStreetList.length === 0);
         }
 
@@ -675,7 +678,6 @@ window.addEventListener('DOMContentLoaded', () => {
 
         saveGameStats(streetsGuessedCorrectly, totalQuestions);
         
-        // La limpieza del estado actual de la partida se mantiene al final.
         zonePoly = null; zonePoints = [];
         gameMap.off('click', onMapClick);
     });
@@ -746,7 +748,6 @@ window.addEventListener('DOMContentLoaded', () => {
   }
 
   function nextQ(){
-    // Solo se hace zoom a la zona si el modo es 'classic'. En revancha, no se hace zoom.
     if (currentGameMode === 'classic') {
         recenterMapWithPadding();
     }
@@ -773,15 +774,11 @@ window.addEventListener('DOMContentLoaded', () => {
   }
   
   function resetToInitialView(isSimpleReset = false) {
-      // Si NO es un reseteo simple (es decir, el usuario ha pulsado "Volver" para salir del modo),
-      // entonces guardamos el progreso de la revancha.
-      if (!isSimpleReset && currentGameMode === 'revancha' && acertadasEnSesionRevancha.size > 0) {
-          console.log("Saliendo del modo revancha. Borrando calles acertadas de la BD...");
-          acertadasEnSesionRevancha.forEach(streetName => {
-              deleteFailedStreet(streetName);
-          });
+      // Limpiar el modo activo anterior si existe
+      if (!isSimpleReset && activeModeControls && typeof activeModeControls.clear === 'function') {
+        activeModeControls.clear();
       }
-      acertadasEnSesionRevancha.clear();
+      activeModeControls = null;
 
       clear(true);
       updatePanelUI(() => {
@@ -799,7 +796,6 @@ window.addEventListener('DOMContentLoaded', () => {
           uiElements.progressBar.style.width = '0%';
       });
 
-      // La función ya no fuerza el modo a 'classic'. Esto lo decide el que la llama.
       if (!isSimpleReset) {
           setGameMode('classic');
       }

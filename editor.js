@@ -1,4 +1,4 @@
-// --- editor.js (Versión 6 - Con Guardado y Lógica de Corte) ---
+// --- editor.js (VERSIÓN FINAL Y ROBUSTA) ---
 
 document.addEventListener('DOMContentLoaded', () => {
 
@@ -51,49 +51,26 @@ document.addEventListener('DOMContentLoaded', () => {
 
     saveChangesBtn.addEventListener('click', async () => {
         if (!selectedLayer) return;
-
         const osm_id = selectedLayer.feature.properties.id;
         const newName = streetNameInput.value.trim();
         const city = 'Badajoz';
-
-        if (!newName) {
-            alert('El nombre de la calle no puede estar vacío.');
-            return;
-        }
-        
+        if (!newName) { alert('El nombre de la calle no puede estar vacío.'); return; }
         try {
             const { data: { session } } = await supabase.auth.getSession();
             if (!session) throw new Error('No hay sesión activa.');
-
             saveChangesBtn.textContent = 'Guardando...';
             saveChangesBtn.disabled = true;
-
             const response = await fetch('/api/updateStreetName', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${session.access_token}`,
-                },
-                body: JSON.stringify({
-                    osm_id: osm_id,
-                    display_name: newName,
-                    city: city,
-                }),
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
+                body: JSON.stringify({ osm_id: osm_id, display_name: newName, city: city }),
             });
-            
             const result = await response.json();
-            
-            if (!response.ok) {
-                throw new Error(result.error || 'Error desconocido del servidor.');
-            }
-
+            if (!response.ok) { throw new Error(result.error || 'Error desconocido del servidor.'); }
             console.log('Respuesta de la API:', result.message);
-
             selectedLayer.bindPopup(`<b>${newName}</b><br>ID: ${osm_id}`);
             selectedLayer.feature.properties.tags.name = newName;
-            
             closeEditPanel();
-
         } catch (error) {
             console.error('Error al guardar los cambios:', error);
             alert(`No se pudo guardar el cambio: ${error.message}`);
@@ -120,10 +97,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const tags = feature.properties.tags;
                 if (tags && tags.name) {
                     layer.bindPopup(`<b>${tags.name}</b><br>ID: ${feature.properties.id}`);
-                    layer.on('click', (e) => {
-                        L.DomEvent.stopPropagation(e);
-                        openEditPanel(layer);
-                    });
+                    layer.on('click', (e) => { L.DomEvent.stopPropagation(e); openEditPanel(layer); });
                 } else {
                     layer.options.interactive = false;
                 }
@@ -153,71 +127,53 @@ document.addEventListener('DOMContentLoaded', () => {
         setTimeout(() => loadingOverlay.style.display = 'none', 2000);
     }
     
-    // --- LÓGICA DE AUTENTICACIÓN ---
+    // --- LÓGICA DE AUTENTICACIÓN Y ARRANQUE (VERSIÓN ROBUSTA) ---
     async function checkAuthAndLoad() {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!session) {
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        if (sessionError || !session) {
+            console.log('No hay sesión activa. Redirigiendo al inicio.');
             window.location.href = '/';
             return;
         }
-        const { data: profile } = await supabase.from('profiles').select('role').eq('id', session.user.id).single();
-        if (!profile || profile.role !== 'admin') {
+        console.log('Sesión encontrada. Verificando rol de administrador...');
+        const { data: profile, error: profileError } = await supabase.from('profiles').select('role').eq('id', session.user.id).single();
+        if (profileError || !profile || profile.role !== 'admin') {
+            console.log('Acceso denegado. Se requiere rol de administrador. Redirigiendo...');
             window.location.href = '/';
             return;
         }
+        console.log('¡Administrador verificado! Iniciando editor...');
         cargarCallesPaginado();
     }
     checkAuthAndLoad();
 
-
-    // --- ¡NUEVO! LÓGICA PARA LA HERRAMIENTA DE CORTE DE GEOMAN ---
+    // --- LÓGICA PARA LA HERRAMIENTA DE CORTE DE GEOMAN ---
     map.on('pm:cut', async (e) => {
         const originalLayer = e.originalLayer;
         const newLayer = e.layer;
         const osm_id = originalLayer.feature.properties.id;
-
         console.log(`Calle con ID ${osm_id} ha sido cortada.`);
-        
-        // El punto de corte es el último vértice de la primera parte de la línea cortada
-        // Geoman nos da una capa con un array de polilíneas. Nos quedamos con la primera.
         const latlngs = newLayer.getLatLngs()[0];
         const cut_point = latlngs[latlngs.length - 1];
-
         if (confirm(`¿Quieres dividir permanentemente la calle con ID ${osm_id} en este punto? Esta acción no se puede deshacer.`)) {
             try {
                 const { data: { session } } = await supabase.auth.getSession();
                 if (!session) throw new Error('No hay sesión activa.');
-
-                // Mostramos feedback al usuario
                 loadingOverlay.style.display = 'flex';
                 loadingText.textContent = 'Dividiendo calle...';
-
-                // Llamamos a nuestra nueva API de corte
                 const response = await fetch('/api/splitStreet', {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${session.access_token}`,
-                    },
-                    body: JSON.stringify({
-                        osm_id: osm_id,
-                        cut_point: cut_point,
-                        city: 'Badajoz'
-                    }),
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
+                    body: JSON.stringify({ osm_id: osm_id, cut_point: cut_point, city: 'Badajoz' }),
                 });
-
                 if (!response.ok) {
                     const err = await response.json();
                     throw new Error(err.details || 'Error en la API de corte');
                 }
-                
                 const result = await response.json();
                 console.log('Calle dividida con éxito:', result);
                 alert('¡Calle dividida! La página se recargará para mostrar los nuevos segmentos.');
-                
-                // Recargamos la página para ver los cambios
                 window.location.reload();
-
             } catch (error) {
                 console.error('Error al dividir la calle:', error);
                 alert(`No se pudo dividir la calle: ${error.message}`);
@@ -225,8 +181,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         } else {
              console.log("Corte cancelado por el usuario.");
-             // Geoman revierte el corte visual automáticamente si no hacemos nada.
         }
     });
 
-}); 
+});

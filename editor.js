@@ -1,4 +1,4 @@
-// --- editor.js (Versión 6 - Con Guardado Real en API) ---
+// --- editor.js (Versión 7 - Con Corte de Calles) ---
 
 document.addEventListener('DOMContentLoaded', () => {
 
@@ -32,8 +32,26 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     map.pm.setPathOptions({ color: 'orange', fillColor: 'orange', fillOpacity: 0.4 });
 
+    // <-- AÑADIDO: Botón personalizado para CORTAR en la barra de Geoman -->
+    map.pm.Toolbar.createCustomControl({
+        name: 'CutLayer',
+        block: 'custom',
+        title: 'Cortar Calle (Activar Modo Corte)',
+        className: 'leaflet-pm-icon-cut', // Geoman ya tiene un ícono de tijeras!
+        onClick: () => {
+            // No se necesita lógica aquí, el toggle se encarga
+        },
+        toggle: true, // Importante: hace que el botón se quede "pulsado"
+        afterClick: (e) => {
+            // Actualizamos el estado y el cursor cuando el botón cambia
+            isCuttingMode = e.target.classList.contains('active');
+            map.getContainer().style.cursor = isCuttingMode ? 'crosshair' : '';
+        },
+    });
+
     // --- LÓGICA DE EDICIÓN ---
     let selectedLayer = null;
+    let isCuttingMode = false; // <-- AÑADIDO: Variable de estado para el modo corte
 
     function openEditPanel(layer) {
         selectedLayer = layer;
@@ -48,8 +66,84 @@ document.addEventListener('DOMContentLoaded', () => {
         editPanel.style.display = 'none';
         selectedLayer = null;
     }
+    
+    // <-- AÑADIDO: Nueva función para manejar la lógica de corte -->
+    async function handleCutStreet(layer, cutLatLng) {
+        if (!confirm('¿Estás seguro de que quieres dividir esta calle en este punto?')) {
+            return;
+        }
 
-    // **** ¡ESTA ES LA FUNCIÓN ACTUALIZADA! ****
+        const osm_id = layer.feature.properties.id;
+        const city = 'Badajoz'; // O la ciudad activa que tengas
+
+        // Mostrar feedback visual al usuario
+        loadingOverlay.style.display = 'flex';
+        loadingText.textContent = 'Dividiendo calle...';
+
+        try {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (!session) throw new Error('No hay sesión activa para realizar esta acción.');
+
+            const response = await fetch('/api/splitStreet', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${session.access_token}`,
+                },
+                body: JSON.stringify({
+                    osm_id: osm_id,
+                    cut_point: cutLatLng,
+                    city: city,
+                }),
+            });
+
+            const result = await response.json();
+            if (!response.ok) {
+                // Si la API devuelve un error con detalles, lo mostramos
+                throw new Error(result.details || result.error || 'Error desconocido del servidor.');
+            }
+
+            // --- Éxito: Actualizar el mapa dinámicamente ---
+            // 1. Eliminar la capa original del mapa
+            geojsonLayer.removeLayer(layer);
+
+            // 2. Añadir las nuevas capas que nos ha devuelto la API
+            const newWaysGeoJSON = {
+                type: "FeatureCollection",
+                features: result.map(way => ({
+                    type: "Feature",
+                    geometry: way.geom, // La API ya devuelve el formato GeoJSON correcto
+                    properties: { id: way.id, tags: way.tags }
+                }))
+            };
+            geojsonLayer.addData(newWaysGeoJSON);
+
+            loadingText.textContent = '¡Calle dividida con éxito!';
+            setTimeout(() => {
+                loadingOverlay.style.display = 'none';
+            }, 1500);
+
+        } catch (error) {
+            console.error('Error al dividir la calle:', error);
+            alert(`No se pudo dividir la calle: ${error.message}`);
+            loadingOverlay.style.display = 'none';
+        } finally {
+            // Desactivamos y reactivamos el modo edición para resetear el estado de Geoman
+            map.pm.disableGlobalEditMode();
+            map.pm.enableGlobalEditMode();
+            
+            isCuttingMode = false;
+            map.getContainer().style.cursor = '';
+            
+            // Asegurarse de que el botón de la UI no se quede "activo" visualmente
+            const cutButton = document.querySelector('.leaflet-pm-icon-cut').parentElement;
+            if(cutButton && cutButton.classList.contains('active')) {
+                cutButton.classList.remove('active');
+            }
+        }
+    }
+
+
     saveChangesBtn.addEventListener('click', async () => {
         if (!selectedLayer) return;
 
@@ -106,31 +200,48 @@ document.addEventListener('DOMContentLoaded', () => {
 
     cancelBtn.addEventListener('click', closeEditPanel);
 
-    // --- FUNCIÓN DE CARGA PAGINADA (sin cambios) ---
+    // --- FUNCIÓN DE CARGA PAGINADA ---
     async function cargarCallesPaginado() {
-        // ... (el resto de la función es igual, la dejo para que el archivo esté completo)
         let currentPage = 1;
         let totalFeaturesCargadas = 0;
         let seguirCargando = true;
         console.log('Iniciando carga paginada de calles...');
+
         geojsonLayer = L.geoJSON(null, {
             style: function(feature) {
                 const hasName = feature.properties.tags && feature.properties.tags.name;
                 return { color: hasName ? "#3388ff" : "#999999", weight: hasName ? 3 : 2, opacity: hasName ? 1.0 : 0.6 };
             },
+            // <-- MODIFICADO: onEachFeature ahora gestiona ambos modos (edición y corte) -->
             onEachFeature: function(feature, layer) {
                 const tags = feature.properties.tags;
+
+                // Función central para manejar el clic en cualquier capa de calle
+                const onLayerClick = (e) => {
+                    L.DomEvent.stopPropagation(e); // Evita que el clic se propague al mapa
+
+                    if (isCuttingMode) {
+                        // Si estamos en modo corte, llamamos a la función de corte
+                        handleCutStreet(e.target, e.latlng);
+                    } else {
+                        // Si estamos en modo normal, abrimos el panel de edición
+                        if (tags && tags.name) {
+                           openEditPanel(layer);
+                        }
+                    }
+                };
+
+                // Asignamos el manejador de clics a las capas que son interactivas
                 if (tags && tags.name) {
                     layer.bindPopup(`<b>${tags.name}</b><br>ID: ${feature.properties.id}`);
-                    layer.on('click', (e) => {
-                        L.DomEvent.stopPropagation(e);
-                        openEditPanel(layer);
-                    });
+                    layer.on('click', onLayerClick);
                 } else {
+                    // Las calles sin nombre o sin tags no son interactivas
                     layer.options.interactive = false;
                 }
             }
         }).addTo(map);
+
         while (seguirCargando) {
             try {
                 loadingText.textContent = `Cargando lote ${currentPage}...`;

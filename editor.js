@@ -1,4 +1,4 @@
-// --- editor.js (Versión 8.1 - CORRECCIÓN FINAL sobre TU CÓDIGO) ---
+// --- editor.js (Versión 9 - Con Corte y Unión de Calles) ---
 
 document.addEventListener('DOMContentLoaded', () => {
 
@@ -32,134 +32,91 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     map.pm.setPathOptions({ color: 'orange', fillColor: 'orange', fillOpacity: 0.4 });
 
-    // <-- ÚNICO BLOQUE MODIFICADO: Ahora gestionamos el toggle manualmente -->
     map.pm.Toolbar.createCustomControl({
         name: 'CutLayer',
         block: 'custom',
         title: 'Cortar Calle (Activar/Desactivar Modo Corte)',
         className: 'leaflet-pm-icon-cut',
-        toggle: false, // Lo ponemos a false para tomar el control nosotros.
+        toggle: false,
         onClick: (e) => {
-            // Invertimos nuestro estado manualmente cada vez que se hace clic
-            isCuttingMode = !isCuttingMode;
+            toggleMode('cut', e.target);
+        },
+    });
 
-            // Sincronizamos el estilo del botón y el cursor con nuestro estado
-            if (isCuttingMode) {
-                // Activando modo corte
-                e.target.classList.add('active'); // Añadimos la clase para que se vea "pulsado"
-                map.getContainer().style.cursor = 'crosshair';
-            } else {
-                // Desactivando modo corte
-                e.target.classList.remove('active'); // Quitamos la clase
-                map.getContainer().style.cursor = '';
-            }
+    // <-- AÑADIDO: Botón para UNIR calles -->
+    map.pm.Toolbar.createCustomControl({
+        name: 'MergeLayers',
+        block: 'custom',
+        title: 'Unir Calles (Activar/Desactivar Modo Unión)',
+        className: 'leaflet-pm-icon-polygon', // Reutilizamos un icono existente
+        toggle: false,
+        onClick: (e) => {
+            toggleMode('merge', e.target);
         },
     });
 
     // --- LÓGICA DE EDICIÓN ---
     let selectedLayer = null;
-    let isCuttingMode = false; // <-- AÑADIDO: Variable de estado para el modo corte
+    let isCuttingMode = false;
+    let isMergingMode = false; // <-- AÑADIDO: Estado para el modo unión
+    let streetsToMerge = [];   // <-- AÑADIDO: Array para guardar las calles a unir
+
+    // <-- AÑADIDO: Función central para gestionar los modos de edición -->
+    function toggleMode(mode, buttonElement) {
+        // Desactiva cualquier otro modo antes de activar el nuevo
+        isCuttingMode = false;
+        isMergingMode = false;
+        document.querySelector('.leaflet-pm-icon-cut').classList.remove('active');
+        document.querySelector('.leaflet-pm-icon-polygon').classList.remove('active');
+
+        if (mode === 'cut') {
+            isCuttingMode = !buttonElement.classList.contains('active'); // Invertimos el estado actual
+            if (isCuttingMode) buttonElement.classList.add('active');
+        } else if (mode === 'merge') {
+            isMergingMode = !buttonElement.classList.contains('active');
+            if (isMergingMode) buttonElement.classList.add('active');
+            else resetMergeSelection(); // Si desactivamos el modo, limpiamos la selección
+        }
+
+        map.getContainer().style.cursor = isCuttingMode || isMergingMode ? 'pointer' : '';
+    }
 
     function openEditPanel(layer) {
-        // Al abrir el panel de edición, nos aseguramos de que el modo corte esté desactivado
-        if (isCuttingMode) {
-            isCuttingMode = false;
-            map.getContainer().style.cursor = '';
-            const cutButton = document.querySelector('.leaflet-pm-icon-cut');
-            if(cutButton) cutButton.classList.remove('active');
-        }
+        // Al abrir el panel, nos aseguramos de que ningún modo especial esté activo
+        if (isCuttingMode || isMergingMode) toggleMode('none');
+
         selectedLayer = layer;
         const properties = layer.feature.properties;
         const currentName = properties.tags.name || '';
         streetNameInput.value = currentName;
         streetIdDisplay.textContent = properties.id;
+
+        // Mostramos el panel de edición normal
+        editPanel.innerHTML = `
+            <h3>Editar Calle</h3>
+            <label for="street-name-input">Nombre de la calle:</label>
+            <input type="text" id="street-name-input" value="${currentName}">
+            <p style="font-size: 12px; color: #555;">ID de OSM: <span id="street-id-display">${properties.id}</span></p>
+            <button id="save-changes-btn">Guardar Cambios</button>
+            <button id="cancel-btn">Cancelar</button>
+        `;
         editPanel.style.display = 'block';
+
+        // Re-asignamos los listeners a los nuevos botones
+        document.getElementById('save-changes-btn').onclick = saveChanges;
+        document.getElementById('cancel-btn').onclick = closeEditPanel;
     }
 
     function closeEditPanel() {
         editPanel.style.display = 'none';
         selectedLayer = null;
     }
-    
-    // <-- AÑADIDO: Nueva función para manejar la lógica de corte -->
-    async function handleCutStreet(layer, cutLatLng) {
-        if (!confirm('¿Estás seguro de que quieres dividir esta calle en este punto?')) {
-            return;
-        }
 
-        const osm_id = layer.feature.properties.id;
-        const city = 'Badajoz'; // O la ciudad activa que tengas
-
-        // Mostrar feedback visual al usuario
-        loadingOverlay.style.display = 'flex';
-        loadingText.textContent = 'Dividiendo calle...';
-
-        try {
-            const { data: { session } } = await supabase.auth.getSession();
-            if (!session) throw new Error('No hay sesión activa para realizar esta acción.');
-
-            const response = await fetch('/api/splitStreet', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${session.access_token}`,
-                },
-                body: JSON.stringify({
-                    osm_id: osm_id,
-                    cut_point: cutLatLng,
-                    city: city,
-                }),
-            });
-
-            const result = await response.json();
-            if (!response.ok) {
-                // Si la API devuelve un error con detalles, lo mostramos
-                throw new Error(result.details || result.error || 'Error desconocido del servidor.');
-            }
-
-            // --- Éxito: Actualizar el mapa dinámicamente ---
-            // 1. Eliminar la capa original del mapa
-            geojsonLayer.removeLayer(layer);
-
-            // 2. Añadir las nuevas capas que nos ha devuelto la API
-            const newWaysGeoJSON = {
-                type: "FeatureCollection",
-                features: result.map(way => ({
-                    type: "Feature",
-                    geometry: way.geom, // La API ya devuelve el formato GeoJSON correcto
-                    properties: { id: way.id, tags: way.tags }
-                }))
-            };
-            geojsonLayer.addData(newWaysGeoJSON);
-
-            loadingText.textContent = '¡Calle dividida con éxito!';
-            setTimeout(() => {
-                loadingOverlay.style.display = 'none';
-            }, 1500);
-
-        } catch (error) {
-            console.error('Error al dividir la calle:', error);
-            alert(`No se pudo dividir la calle: ${error.message}`);
-            loadingOverlay.style.display = 'none';
-        } finally {
-            // Desactivamos y reactivamos el modo edición para resetear el estado de Geoman
-            isCuttingMode = false;
-            map.getContainer().style.cursor = '';
-            
-            // Asegurarse de que el botón de la UI no se quede "activo" visualmente
-            const cutButton = document.querySelector('.leaflet-pm-icon-cut');
-            if(cutButton && cutButton.classList.contains('active')) {
-                cutButton.classList.remove('active');
-            }
-        }
-    }
-
-
-    saveChangesBtn.addEventListener('click', async () => {
+    async function saveChanges() {
+        // Re-implementamos la lógica aquí porque el botón se regenera
         if (!selectedLayer) return;
-
         const osm_id = selectedLayer.feature.properties.id;
-        const newName = streetNameInput.value.trim();
+        const newName = document.getElementById('street-name-input').value.trim();
         const city = 'Badajoz';
 
         if (!newName) {
@@ -171,45 +128,151 @@ document.addEventListener('DOMContentLoaded', () => {
             const { data: { session } } = await supabase.auth.getSession();
             if (!session) throw new Error('No hay sesión activa.');
 
-            saveChangesBtn.textContent = 'Guardando...';
-            saveChangesBtn.disabled = true;
+            const saveBtn = document.getElementById('save-changes-btn');
+            saveBtn.textContent = 'Guardando...';
+            saveBtn.disabled = true;
 
+            // La lógica de fetch es la misma
             const response = await fetch('/api/updateStreetName', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${session.access_token}`,
-                },
-                body: JSON.stringify({
-                    osm_id: osm_id,
-                    display_name: newName,
-                    city: city,
-                }),
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
+                body: JSON.stringify({ osm_id, display_name: newName, city }),
             });
-            
             const result = await response.json();
-            
-            if (!response.ok) {
-                throw new Error(result.error || 'Error desconocido del servidor.');
-            }
-
-            console.log('Respuesta de la API:', result.message);
+            if (!response.ok) throw new Error(result.error || 'Error del servidor.');
 
             selectedLayer.bindPopup(`<b>${newName}</b><br>ID: ${osm_id}`);
             selectedLayer.feature.properties.tags.name = newName;
-            
             closeEditPanel();
 
         } catch (error) {
-            console.error('Error al guardar los cambios:', error);
-            alert(`No se pudo guardar el cambio: ${error.message}`);
-        } finally {
-            saveChangesBtn.textContent = 'Guardar Cambios';
-            saveChangesBtn.disabled = false;
+            alert(`No se pudo guardar: ${error.message}`);
         }
-    });
+    }
+    
+    async function handleCutStreet(layer, cutLatLng) {
+        if (!confirm('¿Estás seguro de que quieres dividir esta calle en este punto?')) return;
 
-    cancelBtn.addEventListener('click', closeEditPanel);
+        const osm_id = layer.feature.properties.id;
+        const city = 'Badajoz';
+
+        loadingOverlay.style.display = 'flex';
+        loadingText.textContent = 'Dividiendo calle...';
+
+        try {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (!session) throw new Error('No hay sesión activa.');
+            const response = await fetch('/api/splitStreet', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
+                body: JSON.stringify({ osm_id, cut_point: cutLatLng, city }),
+            });
+            const result = await response.json();
+            if (!response.ok) throw new Error(result.details || result.error || 'Error del servidor.');
+
+            geojsonLayer.removeLayer(layer);
+            const newWaysGeoJSON = {
+                type: "FeatureCollection",
+                features: result.map(way => ({
+                    type: "Feature",
+                    geometry: way.geom,
+                    properties: { id: way.id, tags: way.tags }
+                }))
+            };
+            geojsonLayer.addData(newWaysGeoJSON);
+            loadingText.textContent = '¡Calle dividida con éxito!';
+            
+        } catch (error) {
+            alert(`No se pudo dividir: ${error.message}`);
+        } finally {
+            loadingOverlay.style.display = 'none';
+            toggleMode('none'); // Resetea todos los modos
+        }
+    }
+    
+    // <-- AÑADIDO: Funciones para gestionar la unión de calles -->
+    function handleMergeSelection(layer) {
+        const layerId = layer._leaflet_id;
+        const index = streetsToMerge.findIndex(item => item._leaflet_id === layerId);
+
+        if (index > -1) {
+            // Deseleccionar: quitar del array y resetear estilo
+            streetsToMerge.splice(index, 1);
+            layer.setStyle({ color: '#3388ff', weight: 3 }); // Estilo original
+        } else {
+            // Seleccionar: añadir al array y resaltar
+            streetsToMerge.push(layer);
+            layer.setStyle({ color: '#28a745', weight: 5 }); // Estilo de selección (verde)
+        }
+        updateMergeUI();
+    }
+
+    function updateMergeUI() {
+        if (streetsToMerge.length < 2) {
+            editPanel.style.display = 'none';
+            return;
+        }
+        
+        const streetNames = streetsToMerge.map(l => `<li>${l.feature.properties.tags.name || `ID: ${l.feature.properties.id}`}</li>`).join('');
+
+        editPanel.innerHTML = `
+            <h3>Unir Calles</h3>
+            <p>Calles seleccionadas (${streetsToMerge.length}):</p>
+            <ul style="font-size: 14px; margin-left: 20px;">${streetNames}</ul>
+            <p style="font-size: 12px; color: #555;">La calle más larga determinará el nombre final.</p>
+            <button id="confirm-merge-btn">Confirmar Unión</button>
+            <button id="cancel-merge-btn">Cancelar</button>
+        `;
+        editPanel.style.display = 'block';
+
+        document.getElementById('confirm-merge-btn').onclick = handleMergeStreet;
+        document.getElementById('cancel-merge-btn').onclick = resetMergeSelection;
+    }
+
+    function resetMergeSelection() {
+        streetsToMerge.forEach(layer => layer.setStyle({ color: '#3388ff', weight: 3 }));
+        streetsToMerge = [];
+        editPanel.style.display = 'none';
+        toggleMode('none');
+    }
+
+    async function handleMergeStreet() {
+        if (streetsToMerge.length < 2) return;
+        
+        const idsToMerge = streetsToMerge.map(l => l.feature.properties.id);
+
+        loadingOverlay.style.display = 'flex';
+        loadingText.textContent = 'Uniendo calles...';
+        
+        try {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (!session) throw new Error('No hay sesión activa.');
+
+            const response = await fetch('/api/mergeStreets', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
+                body: JSON.stringify({ ids: idsToMerge }),
+            });
+            const newWay = await response.json();
+            if (!response.ok) throw new Error(newWay.details || newWay.error || 'Error del servidor.');
+            
+            // Éxito: actualizar el mapa
+            streetsToMerge.forEach(layer => geojsonLayer.removeLayer(layer));
+            geojsonLayer.addData({
+                type: "Feature",
+                geometry: newWay.geom,
+                properties: { id: newWay.id, tags: newWay.tags }
+            });
+            
+            loadingText.textContent = '¡Calles unidas con éxito!';
+
+        } catch (error) {
+            alert(`No se pudieron unir las calles: ${error.message}`);
+        } finally {
+            loadingOverlay.style.display = 'none';
+            resetMergeSelection();
+        }
+    }
 
     // --- FUNCIÓN DE CARGA PAGINADA ---
     async function cargarCallesPaginado() {
@@ -223,31 +286,27 @@ document.addEventListener('DOMContentLoaded', () => {
                 const hasName = feature.properties.tags && feature.properties.tags.name;
                 return { color: hasName ? "#3388ff" : "#999999", weight: hasName ? 3 : 2, opacity: hasName ? 1.0 : 0.6 };
             },
-            // <-- MODIFICADO: onEachFeature ahora gestiona ambos modos (edición y corte) -->
             onEachFeature: function(feature, layer) {
                 const tags = feature.properties.tags;
-
-                // Función central para manejar el clic en cualquier capa de calle
+                
                 const onLayerClick = (e) => {
-                    L.DomEvent.stopPropagation(e); // Evita que el clic se propague al mapa
-
+                    L.DomEvent.stopPropagation(e);
+                    
                     if (isCuttingMode) {
-                        // Si estamos en modo corte, llamamos a la función de corte
                         handleCutStreet(e.target, e.latlng);
+                    } else if (isMergingMode) { // <-- AÑADIDO: Lógica para modo unión
+                        handleMergeSelection(e.target);
                     } else {
-                        // Si estamos en modo normal, abrimos el panel de edición
                         if (tags && tags.name) {
                            openEditPanel(layer);
                         }
                     }
                 };
 
-                // Asignamos el manejador de clics a las capas que son interactivas
                 if (tags && tags.name) {
                     layer.bindPopup(`<b>${tags.name}</b><br>ID: ${feature.properties.id}`);
                     layer.on('click', onLayerClick);
                 } else {
-                    // Las calles sin nombre o sin tags no son interactivas
                     layer.options.interactive = false;
                 }
             }
@@ -279,6 +338,7 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // --- LÓGICA DE AUTENTICACIÓN (sin cambios) ---
     async function checkAuthAndLoad() {
+        // ... (el resto del fichero es idéntico)
         const { data: { session }, error: sessionError } = await supabase.auth.getSession();
         if (sessionError || !session) {
             console.log('No hay sesión activa. Redirigiendo al inicio.');
@@ -286,7 +346,7 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
         console.log('Sesión encontrada. Verificando rol de administrador...');
-        const { data: profile, error: profileError } = await supabase.from('profiles').select('role').eq('id', session.user.id).single();
+        const { data: profile, error: profileError } = await supabase.from('profiles').select('role').eq('id', user.id).single();
         if (profileError || !profile || profile.role !== 'admin') {
             console.log('Acceso denigado. Se requiere rol de administrador. Redirigiendo...');
             window.location.href = '/';

@@ -154,7 +154,7 @@ module.exports = async (request, response) => {
     const blockedNames = new Set();
 
     if (currentCity) {
-        const { data: overrides, error } = await supabaseAdmin.from('street_overrides').select('osm_name, display_name').eq('city', currentCity);
+        const { data: overrides, error } = await supabaseAdmin.from('street_overrides_old').select('osm_name, display_name').eq('city', currentCity);
         if (!error) overrides.forEach(rule => overrideRules.set(rule.osm_name, rule));
         
         const { data: blocked, error: blockedError } = await supabaseAdmin.from('street_blocklist').select('osm_name').eq('city', currentCity);

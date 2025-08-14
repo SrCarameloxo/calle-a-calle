@@ -25,7 +25,7 @@ module.exports = async (request, response) => {
 
         // --- 2. Lógica de la API (El usuario ya está verificado como admin) ---
         if (request.method === 'GET') {
-            const { data: overrides, error: overridesError } = await supabaseAdmin.from('street_overrides').select('*').order('created_at', { ascending: false });
+            const { data: overrides, error: overridesError } = await supabaseAdmin.from('street_overrides_old').select('*').order('created_at', { ascending: false });
             if (overridesError) throw overridesError;
 
             const { data: blocklist, error: blocklistError } = await supabaseAdmin.from('street_blocklist').select('*').order('created_at', { ascending: false });

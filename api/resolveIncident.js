@@ -55,7 +55,7 @@ module.exports = async (request, response) => {
                     return response.status(400).json({ error: 'Para la acción "override", se requiere displayName.' });
                 }
                 // Insertamos la nueva regla en la tabla de excepciones
-                const { error: overrideError } = await supabaseAdmin.from('street_overrides').insert({
+                const { error: overrideError } = await supabaseAdmin.from('street_overrides_old').insert({
                     osm_name: osmName,
                     display_name: displayName,
                     city: city,

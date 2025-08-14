@@ -46,6 +46,7 @@ document.addEventListener('DOMContentLoaded', () => {
             // Actualizamos el estado y el cursor cuando el botón cambia
             isCuttingMode = e.target.classList.contains('active');
             map.getContainer().style.cursor = isCuttingMode ? 'crosshair' : '';
+            console.log(`// <-- DEBUG: Modo corte cambiado a: ${isCuttingMode}`); // <-- DEBUG 1
         },
     });
 
@@ -218,7 +219,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 // Función central para manejar el clic en cualquier capa de calle
                 const onLayerClick = (e) => {
+                    console.log("// <-- DEBUG: ¡Clic en la capa detectado!"); // <-- DEBUG 2
                     L.DomEvent.stopPropagation(e); // Evita que el clic se propague al mapa
+
+                    console.log(`// <-- DEBUG: El valor de isCuttingMode es: ${isCuttingMode}`); // <-- DEBUG 3
 
                     if (isCuttingMode) {
                         // Si estamos en modo corte, llamamos a la función de corte

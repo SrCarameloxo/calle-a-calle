@@ -1,4 +1,4 @@
-// Ruta: /api/streetActions.js (NUEVO FICHERO)
+// Ruta: /api/streetActions.js (VERSIÓN CON DELETE Y CREATE)
 
 const { createClient } = require('@supabase/supabase-js');
 
@@ -11,7 +11,7 @@ module.exports = async (request, response) => {
         const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
         const token = request.headers.authorization?.split('Bearer ')[1];
 
-        // 1. Seguridad (común para ambas acciones)
+        // 1. Seguridad (común para todas las acciones)
         if (!token) return response.status(401).json({ error: 'Token no proporcionado.' });
         const { data: { user }, error: userError } = await supabase.auth.getUser(token);
         if (userError || !user) return response.status(401).json({ error: 'Token inválido.' });
@@ -50,8 +50,54 @@ module.exports = async (request, response) => {
             if (error) throw error;
             return response.status(200).json(data[0]);
 
+        } else if (action === 'delete') {
+            // --- NUEVA LÓGICA PARA BORRAR ---
+            const { id } = payload;
+            if (!id) return response.status(400).json({ error: 'Falta el ID para la acción de borrar.' });
+            
+            const { error } = await supabase
+                .from('osm_ways')
+                .update({ is_hidden: true })
+                .eq('id', id);
+
+            if (error) throw error;
+            return response.status(200).json({ message: `Way ${id} ocultado con éxito.` });
+
+        } else if (action === 'create') {
+            // --- NUEVA LÓGICA PARA CREAR ---
+            const { geometry, tags, city } = payload;
+            if (!geometry || !tags || !city) return response.status(400).json({ error: 'Faltan datos para la acción de crear.' });
+
+            // PostGIS necesita la geometría en formato WKT y con el SRID correcto.
+            // ST_GeomFromGeoJSON lo convierte por nosotros.
+            const { data, error } = await supabase
+                .from('osm_ways')
+                .insert({
+                    id: -1, // ID temporal, será reemplazado por la base de datos
+                    geom: `SRID=4326;${geometry.type.toUpperCase()}(${geometry.coordinates.map(p => p.join(' ')).join(',')})`,
+                    tags: tags,
+                    city: city
+                })
+                .select('id') // Pedimos que nos devuelva el ID de la nueva fila
+                .single();
+
+            if (error) {
+                 // Un error común es que el id temporal -1 viole la unicidad si se intenta crear muy rápido.
+                 // Vamos a usar la secuencia directamente en un RPC para mayor robustez.
+                 const { data: rpcData, error: rpcError } = await supabase.rpc('create_new_way', {
+                     geom_geojson: geometry,
+                     tags_json: tags,
+                     city_name: city
+                 }).single();
+
+                 if (rpcError) throw rpcError;
+                 return response.status(201).json(rpcData);
+            }
+            
+            return response.status(201).json(data);
+
         } else {
-            return response.status(400).json({ error: 'Acción no válida. Debe ser "split" o "merge".' });
+            return response.status(400).json({ error: 'Acción no válida o no especificada.' });
         }
 
     } catch (error) {

@@ -1,4 +1,4 @@
-// --- editor.js (VERSIÓN 10 - COMPLETA Y VERIFICADA) ---
+// --- editor.js (VERSIÓN FINAL COMPLETA Y VERIFICADA) ---
 
 document.addEventListener('DOMContentLoaded', () => {
 
@@ -63,13 +63,14 @@ document.addEventListener('DOMContentLoaded', () => {
     function toggleMode(mode, buttonElement) {
         const wasActive = buttonElement?.classList.contains('active');
 
+        // Resetea siempre todos los estados y UI
         isCuttingMode = false;
         isMergingMode = false;
         document.querySelector('.leaflet-pm-icon-cut').classList.remove('active');
         document.querySelector('.leaflet-pm-icon-polygon').classList.remove('active');
-        
         resetMergeSelection(false);
 
+        // Si el modo que se clickó no estaba activo, lo activamos
         if (!wasActive) {
             if (mode === 'cut') {
                 isCuttingMode = true;
@@ -88,12 +89,13 @@ document.addEventListener('DOMContentLoaded', () => {
         selectedLayer = layer;
         const properties = layer.feature.properties;
         const currentName = properties.tags.name || '';
-        streetNameInput.value = currentName;
-        streetIdDisplay.textContent = properties.id;
 
-        // Ocultamos el panel de unión y mostramos el original
+        // Ocultamos el panel de unión y mostramos el panel de edición original
         const mergePanel = document.getElementById('merge-panel');
         if (mergePanel) mergePanel.style.display = 'none';
+        
+        streetNameInput.value = currentName;
+        streetIdDisplay.textContent = properties.id;
         editPanel.style.display = 'block';
     }
 
@@ -159,7 +161,6 @@ document.addEventListener('DOMContentLoaded', () => {
         updateMergeUI();
     }
     
-    // Función que crea y gestiona el panel de Unión
     function updateMergeUI() {
         let mergePanel = document.getElementById('merge-panel');
         if (!mergePanel) {
@@ -182,7 +183,7 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        editPanel.style.display = 'none'; // Ocultamos el panel de edición normal
+        editPanel.style.display = 'none';
         
         const streetNames = streetsToMerge.map(l => `<li>${l.feature.properties.tags.name || `ID: ${l.feature.properties.id}`}</li>`).join('');
         mergePanel.innerHTML = `<h3>Unir Calles</h3><p>Calles seleccionadas (${streetsToMerge.length}):</p><ul style="font-size: 14px; margin-left: 20px;">${streetNames}</ul><p style="font-size: 12px; color: #555;">La calle más larga determinará el nombre.</p><button id="confirm-merge-btn">Confirmar Unión</button><button id="cancel-merge-btn">Cancelar</button>`;
@@ -191,7 +192,6 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('confirm-merge-btn').onclick = handleMergeStreet;
         document.getElementById('cancel-merge-btn').onclick = () => resetMergeSelection(true);
     }
-
 
     function resetMergeSelection(deactivateMode) {
         streetsToMerge.forEach(layer => layer.setStyle({ color: '#3388ff', weight: 3 }));
@@ -239,26 +239,20 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
     
-    // Este es el listener original que se asigna una sola vez al cargar la página
     saveChangesBtn.addEventListener('click', async () => {
         if (!selectedLayer) return;
-
         const osm_id = selectedLayer.feature.properties.id;
         const newName = streetNameInput.value.trim();
         const city = 'Badajoz';
-
         if (!newName) {
             alert('El nombre de la calle no puede estar vacío.');
             return;
         }
-        
         try {
             const { data: { session } } = await supabase.auth.getSession();
             if (!session) throw new Error('No hay sesión activa.');
-
             saveChangesBtn.textContent = 'Guardando...';
             saveChangesBtn.disabled = true;
-
             const response = await fetch('/api/updateStreetName', {
                 method: 'POST',
                 headers: {
@@ -271,20 +265,14 @@ document.addEventListener('DOMContentLoaded', () => {
                     city: city,
                 }),
             });
-            
             const result = await response.json();
-            
             if (!response.ok) {
                 throw new Error(result.error || 'Error desconocido del servidor.');
             }
-
             console.log('Respuesta de la API:', result.message);
-
             selectedLayer.bindPopup(`<b>${newName}</b><br>ID: ${osm_id}`);
             selectedLayer.feature.properties.tags.name = newName;
-            
             closeEditPanel();
-
         } catch (error) {
             console.error('Error al guardar los cambios:', error);
             alert(`No se pudo guardar el cambio: ${error.message}`);
@@ -301,7 +289,6 @@ document.addEventListener('DOMContentLoaded', () => {
         let totalFeaturesCargadas = 0;
         let seguirCargando = true;
         console.log('Iniciando carga paginada de calles...');
-
         geojsonLayer = L.geoJSON(null, {
             style: function(feature) {
                 const hasName = feature.properties.tags && feature.properties.tags.name;
@@ -309,10 +296,8 @@ document.addEventListener('DOMContentLoaded', () => {
             },
             onEachFeature: function(feature, layer) {
                 const tags = feature.properties.tags;
-                
                 const onLayerClick = (e) => {
                     L.DomEvent.stopPropagation(e);
-                    
                     if (isCuttingMode) {
                         handleCutStreet(e.target, e.latlng);
                     } else if (isMergingMode) {
@@ -323,7 +308,6 @@ document.addEventListener('DOMContentLoaded', () => {
                         }
                     }
                 };
-
                 if (tags && tags.name) {
                     layer.bindPopup(`<b>${tags.name}</b><br>ID: ${feature.properties.id}`);
                     layer.on('click', onLayerClick);
@@ -332,7 +316,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
         }).addTo(map);
-
         while (seguirCargando) {
             try {
                 loadingText.textContent = `Cargando lote ${currentPage}...`;
@@ -365,7 +348,7 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
         console.log('Sesión encontrada. Verificando rol de administrador...');
-        const { data: profile, error: profileError } = await supabase.from('profiles').select('role').eq('id', user.id).single();
+        const { data: profile, error: profileError } = await supabase.from('profiles').select('role').eq('id', session.user.id).single();
         if (profileError || !profile || profile.role !== 'admin') {
             console.log('Acceso denigado. Se requiere rol de administrador. Redirigiendo...');
             window.location.href = '/';

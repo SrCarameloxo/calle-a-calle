@@ -11,7 +11,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- LÓGICA PRINCIPAL DEL EDITOR (encapsulada) ---
     // Esta función solo se llamará si la autenticación es exitosa.
     function iniciarEditor() {
-        console.log('¡Administrador verificado! Iniciando la construcción del editor...');
+        console.log('¡Usuario verificado! Iniciando la construcción del editor...');
 
         const loadingOverlay = document.getElementById('loading-overlay');
         const loadingText = loadingOverlay.querySelector('p');
@@ -170,30 +170,22 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Manejamos los dos eventos que nos interesan para la carga inicial
         if (event === 'INITIAL_SESSION' || event === 'SIGNED_IN') {
-            // Para evitar que se ejecute dos veces, comprobamos si el editor ya está iniciado
-            if (window.editorIniciado) return;
-
+            
+            // --- INICIO DEL CAMBIO (BYPASS DE SEGURIDAD TEMPORAL) ---
             if (session) {
-                console.log("Sesión encontrada. Verificando rol para el usuario:", session.user.id);
-                const { data: profile, error } = await supabase.from('profiles').select('role').eq('id', session.user.id).single();
-
-                if (error) {
-                    console.error("Error al obtener el perfil:", error);
-                    window.location.href = '/';
-                    return;
-                }
-
-                if (profile && profile.role === 'admin') {
-                    window.editorIniciado = true; // Marcamos que ya hemos iniciado
+                // Si hay una sesión, sea quien sea, iniciamos el editor.
+                console.log("Sesión encontrada. Omitiendo verificación de rol para depuración.");
+                if (!window.editorIniciado) {
+                    window.editorIniciado = true;
                     iniciarEditor();
-                } else {
-                    console.log(`El perfil del usuario no es admin. Rol encontrado: ${profile ? profile.role : 'ninguno'}. Redirigiendo...`);
-                    window.location.href = '/';
                 }
             } else if (event === 'INITIAL_SESSION') {
+                // Si no hay sesión, redirigimos como siempre.
                 console.log("No hay sesión inicial. Redirigiendo...");
                 window.location.href = '/';
             }
+            // --- FIN DEL CAMBIO ---
+
         } else if (event === 'SIGNED_OUT') {
             console.log("Sesión cerrada. Redirigiendo...");
             window.location.href = '/';

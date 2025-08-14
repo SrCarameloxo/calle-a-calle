@@ -1,4 +1,4 @@
-// --- editor.js (VERSIÓN FINAL COMPLETA Y VERIFICADA) ---
+// --- editor.js (VERSIÓN 11 - CON MEJORAS DE USABILIDAD) ---
 
 document.addEventListener('DOMContentLoaded', () => {
 
@@ -62,15 +62,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function toggleMode(mode, buttonElement) {
         const wasActive = buttonElement?.classList.contains('active');
-
-        // Resetea siempre todos los estados y UI
         isCuttingMode = false;
         isMergingMode = false;
         document.querySelector('.leaflet-pm-icon-cut').classList.remove('active');
         document.querySelector('.leaflet-pm-icon-polygon').classList.remove('active');
         resetMergeSelection(false);
-
-        // Si el modo que se clickó no estaba activo, lo activamos
         if (!wasActive) {
             if (mode === 'cut') {
                 isCuttingMode = true;
@@ -83,37 +79,47 @@ document.addEventListener('DOMContentLoaded', () => {
         map.getContainer().style.cursor = isCuttingMode || isMergingMode ? 'pointer' : '';
     }
 
+    // <-- MEJORA AÑADIDA: Lógica de resaltado -->
     function openEditPanel(layer) {
         if (isCuttingMode || isMergingMode) toggleMode('none');
 
+        // 1. Si ya había una capa seleccionada, la devolvemos a su estilo original
+        if (selectedLayer) {
+            selectedLayer.setStyle({ color: '#3388ff', weight: 3 });
+        }
+
+        // 2. Actualizamos la selección y aplicamos el nuevo estilo de resaltado
         selectedLayer = layer;
+        selectedLayer.setStyle({ color: 'orange', weight: 5 });
+
         const properties = layer.feature.properties;
         const currentName = properties.tags.name || '';
-
-        // Ocultamos el panel de unión y mostramos el panel de edición original
         const mergePanel = document.getElementById('merge-panel');
         if (mergePanel) mergePanel.style.display = 'none';
-        
         streetNameInput.value = currentName;
         streetIdDisplay.textContent = properties.id;
         editPanel.style.display = 'block';
     }
 
+    // <-- MEJORA AÑADIDA: Lógica de limpieza de resaltado -->
     function closeEditPanel() {
-        editPanel.style.display = 'none';
+        // 1. Si hay una capa seleccionada, la devolvemos a su estilo original
+        if (selectedLayer) {
+            selectedLayer.setStyle({ color: '#3388ff', weight: 3 });
+        }
+        // 2. Limpiamos la selección
         selectedLayer = null;
+        
+        editPanel.style.display = 'none';
     }
 
     async function handleCutStreet(layer, cutLatLng) {
         if (!confirm('¿Seguro que quieres dividir esta calle?')) return;
-
         loadingOverlay.style.display = 'flex';
         loadingText.textContent = 'Dividiendo calle...';
-
         try {
             const { data: { session } } = await supabase.auth.getSession();
             if (!session) throw new Error('No hay sesión activa.');
-
             const response = await fetch('/api/streetActions', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
@@ -128,7 +134,6 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             const result = await response.json();
             if (!response.ok) throw new Error(result.details || result.error || 'Error del servidor.');
-
             geojsonLayer.removeLayer(layer);
             const newWaysGeoJSON = {
                 type: "FeatureCollection",
@@ -138,7 +143,6 @@ document.addEventListener('DOMContentLoaded', () => {
             };
             geojsonLayer.addData(newWaysGeoJSON);
             loadingText.textContent = '¡Calle dividida!';
-            
         } catch (error) {
             alert(`No se pudo dividir: ${error.message}`);
         } finally {
@@ -150,7 +154,6 @@ document.addEventListener('DOMContentLoaded', () => {
     function handleMergeSelection(layer) {
         const layerId = layer._leaflet_id;
         const index = streetsToMerge.findIndex(item => item._leaflet_id === layerId);
-
         if (index > -1) {
             streetsToMerge.splice(index, 1);
             layer.setStyle({ color: '#3388ff', weight: 3 });
@@ -177,18 +180,14 @@ document.addEventListener('DOMContentLoaded', () => {
             mergePanel.style.width = '300px';
             document.body.appendChild(mergePanel);
         }
-
         if (streetsToMerge.length < 2) {
             mergePanel.style.display = 'none';
             return;
         }
-
         editPanel.style.display = 'none';
-        
         const streetNames = streetsToMerge.map(l => `<li>${l.feature.properties.tags.name || `ID: ${l.feature.properties.id}`}</li>`).join('');
         mergePanel.innerHTML = `<h3>Unir Calles</h3><p>Calles seleccionadas (${streetsToMerge.length}):</p><ul style="font-size: 14px; margin-left: 20px;">${streetNames}</ul><p style="font-size: 12px; color: #555;">La calle más larga determinará el nombre.</p><button id="confirm-merge-btn">Confirmar Unión</button><button id="cancel-merge-btn">Cancelar</button>`;
         mergePanel.style.display = 'block';
-
         document.getElementById('confirm-merge-btn').onclick = handleMergeStreet;
         document.getElementById('cancel-merge-btn').onclick = () => resetMergeSelection(true);
     }
@@ -203,14 +202,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function handleMergeStreet() {
         if (streetsToMerge.length < 2) return;
-        
         loadingOverlay.style.display = 'flex';
         loadingText.textContent = 'Uniendo calles...';
-        
         try {
             const { data: { session } } = await supabase.auth.getSession();
             if (!session) throw new Error('No hay sesión activa.');
-            
             const response = await fetch('/api/streetActions', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
@@ -223,14 +219,11 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             const newWay = await response.json();
             if (!response.ok) throw new Error(newWay.details || newWay.error || 'Error del servidor.');
-            
             streetsToMerge.forEach(layer => geojsonLayer.removeLayer(layer));
             geojsonLayer.addData({
                 type: "Feature", geometry: newWay.geom, properties: { id: newWay.id, tags: newWay.tags }
             });
-            
             loadingText.textContent = '¡Calles unidas!';
-
         } catch (error) {
             alert(`No se pudieron unir: ${error.message}`);
         } finally {
@@ -296,21 +289,43 @@ document.addEventListener('DOMContentLoaded', () => {
             },
             onEachFeature: function(feature, layer) {
                 const tags = feature.properties.tags;
+                
+                // <-- MEJORA AÑADIDA: Lógica del "carril invisible" para facilitar el clic -->
+                // 1. Creamos una copia invisible y más ancha de la calle
+                const invisibleHitbox = L.polyline(layer.getLatLngs(), {
+                    color: 'transparent',
+                    weight: 20, // 20 píxeles de ancho, mucho más fácil de acertar
+                    interactive: true,
+                });
+                
+                // 2. Guardamos una referencia a la capa visible para poder manipularla luego
+                invisibleHitbox.visibleLayer = layer;
+                
+                // 3. Añadimos esta capa invisible al grupo de capas
+                invisibleHitbox.addTo(geojsonLayer);
+                
+                // 4. El manejador de clics se asigna a la capa INVISIBLE
                 const onLayerClick = (e) => {
                     L.DomEvent.stopPropagation(e);
+                    
+                    // Obtenemos la capa VISIBLE a través de la referencia que guardamos
+                    const visibleLayer = e.target.visibleLayer;
+                    
                     if (isCuttingMode) {
-                        handleCutStreet(e.target, e.latlng);
+                        handleCutStreet(visibleLayer, e.latlng);
                     } else if (isMergingMode) {
-                        handleMergeSelection(e.target);
+                        handleMergeSelection(visibleLayer);
                     } else {
                         if (tags && tags.name) {
-                           openEditPanel(layer);
+                           openEditPanel(visibleLayer);
                         }
                     }
                 };
+                invisibleHitbox.on('click', onLayerClick);
+
+                // La capa visible original solo muestra el popup, pero no captura el clic principal
                 if (tags && tags.name) {
                     layer.bindPopup(`<b>${tags.name}</b><br>ID: ${feature.properties.id}`);
-                    layer.on('click', onLayerClick);
                 } else {
                     layer.options.interactive = false;
                 }

@@ -2,46 +2,53 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Prueba de Supabase</title>
+    <title>Prueba de Autenticación</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
-    <h1>Probando la conexión a Supabase...</h1>
-    <p id="status">Iniciando...</p>
+    <h1>Probando la autenticación de Supabase...</h1>
+    <div id="status">Esperando...</div>
 
     <script>
-        const SUPABASE_URL = 'https://hppzwfwtedghpsxfonoh.supabase.co';
-        // Asegúrate de que esta es la clave ANON correcta y funcional
-        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhwcHp3Znd0ZWRnaHBzeGZvbm9oIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQxMjQzNDMsImV4cCI6MjA2OTcwMDM0M30.BAh6i5iJ5YkDBoydfkC9azAD4eMdYBkEBdxws9kj5Hg';
-        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-        const statusEl = document.getElementById('status');
+        document.addEventListener('DOMContentLoaded', () => {
+            const statusDiv = document.getElementById('status');
+            
+            const SUPABASE_URL = 'https://hppzwfwtedghpsxfonoh.supabase.co';
+            const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhwcHp3Znd0ZWRnaHBzeGZvbm9oIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQxMjQzNDMsImV4cCI6MjA2OTcwMDQ0M30.BAh6i5iJ5YkDBoydfkC9azAD4eMdYBkEBdxws9kj5Hg';
+            const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-        supabase.auth.onAuthStateChange(async (event, session) => {
-            if (session) {
-                statusEl.textContent = `Sesión encontrada para ${session.user.email}. Verificando rol...`;
-                try {
-                    const { data: profile, error } = await supabase
-                        .from('profiles')
-                        .select('role')
-                        .eq('id', session.user.id)
-                        .single();
+            statusDiv.textContent = "Cliente de Supabase creado. Esperando evento de autenticación...";
 
-                    if (error) throw error;
+            supabase.auth.onAuthStateChange(async (event, session) => {
+                statusDiv.innerHTML += `<br>Evento de Auth recibido: ${event}`;
 
-                    if (profile) {
-                        statusEl.textContent = `¡ÉXITO! Tu rol es: ${profile.role}`;
-                        statusEl.style.color = 'green';
-                    } else {
-                        statusEl.textContent = 'ERROR: No se encontró un perfil para tu usuario.';
-                        statusEl.style.color = 'red';
+                if (event === 'INITIAL_SESSION' || event === 'SIGNED_IN') {
+                    if (session) {
+                        statusDiv.innerHTML += `<br>Sesión encontrada para el usuario: ${session.user.id}. Verificando rol...`;
+                        
+                        try {
+                            const { data: profile, error } = await supabase.from('profiles').select('role').eq('id', session.user.id).single();
+
+                            if (error) {
+                                statusDiv.innerHTML += `<br><strong style="color:red;">ERROR al obtener el perfil: ${error.message}</strong>`;
+                                return;
+                            }
+
+                            if (profile) {
+                                statusDiv.innerHTML += `<br><strong style="color:green;">¡ÉXITO! Perfil encontrado. Rol: ${profile.role}</strong>`;
+                            } else {
+                                statusDiv.innerHTML += `<br><strong style="color:orange;">AVISO: No se encontró un perfil para este usuario.</strong>`;
+                            }
+
+                        } catch (e) {
+                             statusDiv.innerHTML += `<br><strong style="color:red;">EXCEPCIÓN al obtener el perfil: ${e.message}</strong>`;
+                        }
+
+                    } else if (event === 'INITIAL_SESSION') {
+                        statusDiv.innerHTML += `<br><strong style="color:red;">No hay sesión inicial.</strong>`;
                     }
-                } catch (err) {
-                    statusEl.textContent = `ERROR en la consulta: ${err.message}`;
-                    statusEl.style.color = 'red';
                 }
-            } else {
-                statusEl.textContent = 'No hay sesión. Por favor, inicia sesión en la app principal primero y luego ven aquí.';
-            }
+            });
         });
     </script>
 </body>

@@ -1,4 +1,4 @@
-// --- editor.js (Versión 7 - Con Corte de Calles) ---
+// --- editor.js (Versión 8 - CORRECCIÓN DEFINITIVA del botón de corte) ---
 
 document.addEventListener('DOMContentLoaded', () => {
 
@@ -32,29 +32,44 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     map.pm.setPathOptions({ color: 'orange', fillColor: 'orange', fillOpacity: 0.4 });
 
-    // <-- AÑADIDO: Botón personalizado para CORTAR en la barra de Geoman -->
+    // <-- BLOQUE MODIFICADO: Ahora gestionamos el toggle manualmente -->
     map.pm.Toolbar.createCustomControl({
         name: 'CutLayer',
         block: 'custom',
-        title: 'Cortar Calle (Activar Modo Corte)',
-        className: 'leaflet-pm-icon-cut', // Geoman ya tiene un ícono de tijeras!
-        onClick: () => {
-            // No se necesita lógica aquí, el toggle se encarga
-        },
-        toggle: true, // Importante: hace que el botón se quede "pulsado"
-        afterClick: (e) => {
-            // Actualizamos el estado y el cursor cuando el botón cambia
-            isCuttingMode = e.target.classList.contains('active');
-            map.getContainer().style.cursor = isCuttingMode ? 'crosshair' : '';
-            console.log(`// <-- DEBUG: Modo corte cambiado a: ${isCuttingMode}`); // <-- DEBUG 1
+        title: 'Cortar Calle (Activar/Desactivar Modo Corte)',
+        className: 'leaflet-pm-icon-cut',
+        toggle: false, // Lo ponemos a false para evitar conflictos
+        onClick: (e) => {
+            // Invertimos nuestro estado manualmente cada vez que se hace clic
+            isCuttingMode = !isCuttingMode;
+
+            // Sincronizamos el estilo del botón y el cursor con nuestro estado
+            if (isCuttingMode) {
+                // Activando modo corte
+                e.target.classList.add('active'); // Añadimos la clase para que se vea "pulsado"
+                map.getContainer().style.cursor = 'crosshair';
+            } else {
+                // Desactivando modo corte
+                e.target.classList.remove('active'); // Quitamos la clase
+                map.getContainer().style.cursor = '';
+            }
+            
+            console.log(`// <-- DEBUG: Modo corte cambiado a: ${isCuttingMode}`);
         },
     });
 
     // --- LÓGICA DE EDICIÓN ---
     let selectedLayer = null;
-    let isCuttingMode = false; // <-- AÑADIDO: Variable de estado para el modo corte
+    let isCuttingMode = false;
 
     function openEditPanel(layer) {
+        // Al abrir el panel de edición, nos aseguramos de que el modo corte esté desactivado
+        if (isCuttingMode) {
+            isCuttingMode = false;
+            map.getContainer().style.cursor = '';
+            const cutButton = document.querySelector('.leaflet-pm-icon-cut');
+            if(cutButton) cutButton.classList.remove('active');
+        }
         selectedLayer = layer;
         const properties = layer.feature.properties;
         const currentName = properties.tags.name || '';
@@ -68,16 +83,14 @@ document.addEventListener('DOMContentLoaded', () => {
         selectedLayer = null;
     }
     
-    // <-- AÑADIDO: Nueva función para manejar la lógica de corte -->
     async function handleCutStreet(layer, cutLatLng) {
         if (!confirm('¿Estás seguro de que quieres dividir esta calle en este punto?')) {
             return;
         }
 
         const osm_id = layer.feature.properties.id;
-        const city = 'Badajoz'; // O la ciudad activa que tengas
+        const city = 'Badajoz';
 
-        // Mostrar feedback visual al usuario
         loadingOverlay.style.display = 'flex';
         loadingText.textContent = 'Dividiendo calle...';
 
@@ -100,20 +113,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const result = await response.json();
             if (!response.ok) {
-                // Si la API devuelve un error con detalles, lo mostramos
                 throw new Error(result.details || result.error || 'Error desconocido del servidor.');
             }
 
-            // --- Éxito: Actualizar el mapa dinámicamente ---
-            // 1. Eliminar la capa original del mapa
             geojsonLayer.removeLayer(layer);
 
-            // 2. Añadir las nuevas capas que nos ha devuelto la API
             const newWaysGeoJSON = {
                 type: "FeatureCollection",
                 features: result.map(way => ({
                     type: "Feature",
-                    geometry: way.geom, // La API ya devuelve el formato GeoJSON correcto
+                    geometry: way.geom,
                     properties: { id: way.id, tags: way.tags }
                 }))
             };
@@ -129,21 +138,15 @@ document.addEventListener('DOMContentLoaded', () => {
             alert(`No se pudo dividir la calle: ${error.message}`);
             loadingOverlay.style.display = 'none';
         } finally {
-            // Desactivamos y reactivamos el modo edición para resetear el estado de Geoman
-            map.pm.disableGlobalEditMode();
-            map.pm.enableGlobalEditMode();
-            
             isCuttingMode = false;
             map.getContainer().style.cursor = '';
             
-            // Asegurarse de que el botón de la UI no se quede "activo" visualmente
-            const cutButton = document.querySelector('.leaflet-pm-icon-cut').parentElement;
-            if(cutButton && cutButton.classList.contains('active')) {
+            const cutButton = document.querySelector('.leaflet-pm-icon-cut');
+             if(cutButton && cutButton.classList.contains('active')) {
                 cutButton.classList.remove('active');
             }
         }
     }
-
 
     saveChangesBtn.addEventListener('click', async () => {
         if (!selectedLayer) return;
@@ -201,7 +204,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     cancelBtn.addEventListener('click', closeEditPanel);
 
-    // --- FUNCIÓN DE CARGA PAGINADA ---
     async function cargarCallesPaginado() {
         let currentPage = 1;
         let totalFeaturesCargadas = 0;
@@ -213,34 +215,25 @@ document.addEventListener('DOMContentLoaded', () => {
                 const hasName = feature.properties.tags && feature.properties.tags.name;
                 return { color: hasName ? "#3388ff" : "#999999", weight: hasName ? 3 : 2, opacity: hasName ? 1.0 : 0.6 };
             },
-            // <-- MODIFICADO: onEachFeature ahora gestiona ambos modos (edición y corte) -->
             onEachFeature: function(feature, layer) {
                 const tags = feature.properties.tags;
 
-                // Función central para manejar el clic en cualquier capa de calle
                 const onLayerClick = (e) => {
-                    console.log("// <-- DEBUG: ¡Clic en la capa detectado!"); // <-- DEBUG 2
-                    L.DomEvent.stopPropagation(e); // Evita que el clic se propague al mapa
-
-                    console.log(`// <-- DEBUG: El valor de isCuttingMode es: ${isCuttingMode}`); // <-- DEBUG 3
+                    L.DomEvent.stopPropagation(e);
 
                     if (isCuttingMode) {
-                        // Si estamos en modo corte, llamamos a la función de corte
                         handleCutStreet(e.target, e.latlng);
                     } else {
-                        // Si estamos en modo normal, abrimos el panel de edición
                         if (tags && tags.name) {
                            openEditPanel(layer);
                         }
                     }
                 };
 
-                // Asignamos el manejador de clics a las capas que son interactivas
                 if (tags && tags.name) {
                     layer.bindPopup(`<b>${tags.name}</b><br>ID: ${feature.properties.id}`);
                     layer.on('click', onLayerClick);
                 } else {
-                    // Las calles sin nombre o sin tags no son interactivas
                     layer.options.interactive = false;
                 }
             }
@@ -270,7 +263,6 @@ document.addEventListener('DOMContentLoaded', () => {
         setTimeout(() => loadingOverlay.style.display = 'none', 2000);
     }
     
-    // --- LÓGICA DE AUTENTICACIÓN (sin cambios) ---
     async function checkAuthAndLoad() {
         const { data: { session }, error: sessionError } = await supabase.auth.getSession();
         if (sessionError || !session) {
@@ -279,7 +271,7 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
         console.log('Sesión encontrada. Verificando rol de administrador...');
-        const { data: profile, error: profileError } = await supabase.from('profiles').select('role').eq('id', session.user.id).single();
+        const { data: profile, error: profileError } = await supabase.from('profiles').select('role').eq('id', user.id).single();
         if (profileError || !profile || profile.role !== 'admin') {
             console.log('Acceso denigado. Se requiere rol de administrador. Redirigiendo...');
             window.location.href = '/';

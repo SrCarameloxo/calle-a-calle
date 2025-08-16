@@ -290,9 +290,6 @@ window.addEventListener('DOMContentLoaded', () => {
     uiElements.drawZoneBtn.addEventListener('click', startDrawing);
     uiElements.undoPointBtn.addEventListener('click', undoLastPoint);
     
-    // --- INICIO: CORRECCIÓN MODO REVANCHA ---
-    // Se añade la condición `|| currentGameMode === 'revancha'` para que el botón "Siguiente"
-    // funcione correctamente en ambos modos de juego, ya que comparten la misma lógica de avance.
     uiElements.nextBtn.addEventListener('click', () => {
         if (currentGameMode === 'classic' || currentGameMode === 'revancha') {
             uiElements.nextBtn.disabled = true;
@@ -301,7 +298,6 @@ window.addEventListener('DOMContentLoaded', () => {
             activeModeControls.next();
         }
     });
-    // --- FIN: CORRECCIÓN MODO REVANCHA ---
 
     uiElements.reportBtnFAB.addEventListener('click', reportIncident);
     uiElements.adminPanelBtn.addEventListener('click', () => { window.location.href = '/admin.html'; });
@@ -797,6 +793,11 @@ window.addEventListener('DOMContentLoaded', () => {
           zonePoints = [];
           playing = false;
           uiElements.progressBar.style.width = '0%';
+          // --- INICIO: CORRECCIÓN INTERFAZ FANTASMA ---
+          // Esta línea vacía el contenedor de opciones del Modo Instinto,
+          // asegurando que no aparezca en otros modos de juego.
+          uiElements.instintoOptionsContainer.innerHTML = '';
+          // --- FIN: CORRECCIÓN INTERFAZ FANTASMA ---
       });
 
       if (!isSimpleReset) {
@@ -805,6 +806,11 @@ window.addEventListener('DOMContentLoaded', () => {
   }
 
   function playFromHistory(zoneString) {
+    // --- INICIO: CORRECCIÓN INTERFAZ FANTASMA ---
+    // También limpiamos el contenedor aquí para asegurar que al cargar una zona
+    // guardada no queden restos de una partida anterior en Modo Instinto.
+    uiElements.instintoOptionsContainer.innerHTML = '';
+    // --- FIN: CORRECCIÓN INTERFAZ FANTASMA ---
     gameMap.off('click', addVertex);
     const points = zoneString.split(';').map(pair => {
       const [lat, lng] = pair.split(',');

@@ -496,13 +496,26 @@ button.game-control-btn:disabled { opacity: .4; cursor: default; }
 }
 /* --- FIN: CÓDIGO MODIFICADO --- */
 
+
 /* --- INICIO: ESTILOS MODO INSTINTO --- */
-/* Esta nueva regla crea el recuadro gris sutil que agrupará
-   visualmente los botones de opciones en el Modo Instinto. */
+
+/* Se elimina el estilo del contenedor para que no tenga fondo ni padding,
+   así el "recuadro fantasma" desaparece de los otros modos. */
 #instinto-options-container {
-    background-color: rgba(0, 0, 0, 0.05); /* Fondo gris muy sutil */
-    border-radius: 8px; /* Bordes redondeados */
-    padding: 1rem; /* Espacio interior para que los botones no se peguen a los bordes */
-    margin-top: 0.5rem; /* Pequeño margen superior para separarlo del texto de la pregunta */
+    margin-top: 0.5rem;
 }
+
+/* Se crea una nueva regla que SÓLO afecta a los botones dentro del modo instinto.
+   Esto hace que cada botón sea un recuadro gris individual. */
+#instinto-options-container .game-control-btn {
+    background-color: #f3f4f6; /* Fondo gris claro */
+    color: #1f2937; /* Texto oscuro para contraste */
+    border: 1px solid #e5e7eb; /* Borde sutil */
+}
+
+/* Se añade un estilo hover específico para estos botones grises */
+#instinto-options-container .game-control-btn:not(:disabled):hover {
+    background-color: #e5e7eb;
+}
+
 /* --- FIN: ESTILOS MODO INSTINTO --- */

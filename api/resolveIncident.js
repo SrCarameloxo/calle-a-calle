@@ -1,4 +1,12 @@
 const { createClient } = require('@supabase/supabase-js');
+const { createClient: createKvClient } = require('@vercel/kv');
+const { extractNameParts } = require('./_lib/helpers.js');
+
+// Cliente para la caché de Vercel
+const kv = createKvClient({
+  url: process.env.KV_REST_API_URL,
+  token: process.env.KV_REST_API_TOKEN,
+});
 
 // Esta API segura solo puede ser llamada por administradores.
 // Su trabajo es actualizar una incidencia y, si es necesario, crear una regla de anulación o bloqueo.
@@ -73,6 +81,15 @@ module.exports = async (request, response) => {
                 return response.status(400).json({ error: 'actionType no válido. Debe ser "override" o "block".' });
             }
             // --- FIN DE LA LÓGICA MODIFICADA ---
+
+            // --- INICIO: Invalidación de caché ---
+            // Una vez guardada la regla, borramos la caché para que el cambio se refleje.
+            const parts = extractNameParts(osmName);
+            if (parts.baseName) {
+                const cacheKey = `street_v18:${city}:${parts.baseName.replace(/\s/g, '_')}`;
+                await kv.del(cacheKey);
+            }
+            // --- FIN: Invalidación de caché ---
         }
 
         // 3. Actualizamos el estado de la incidencia a 'resuelta' o 'rechazada'

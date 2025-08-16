@@ -1,6 +1,6 @@
 const { createClient } = require('@supabase/supabase-js');
 const { createClient: createKvClient } = require('@vercel/kv');
-const { extractNameParts } = require('./_lib/helpers.js'); // <-- AÑADIDO
+const { extractNameParts } = require('./_lib/helpers.js');
 
 // Cliente para la caché
 const kv = createKvClient({
@@ -20,8 +20,27 @@ module.exports = async (request, response) => {
     );
 
     try {
-        // --- 1. Verificación de Seguridad (sin cambios) ---
-        // ... (código de verificación de token y rol de admin)
+        // --- 1. Verificación de Seguridad ---
+        const authHeader = request.headers.authorization;
+        if (!authHeader) {
+            return response.status(401).json({ error: 'Authorization header required' });
+        }
+        const token = authHeader.split('Bearer ')[1];
+        
+        const { data: { user }, error: userError } = await supabaseAdmin.auth.getUser(token);
+        if (userError || !user) {
+            return response.status(401).json({ error: 'Invalid or expired token' });
+        }
+
+        const { data: profile, error: profileError } = await supabaseAdmin
+            .from('profiles')
+            .select('role')
+            .eq('id', user.id)
+            .single();
+
+        if (profileError || !profile || profile.role !== 'admin') {
+            return response.status(403).json({ error: 'Forbidden: Admin access required.' });
+        }
 
         // --- 2. Lógica de la API (El usuario ya está verificado como admin) ---
         if (request.method === 'GET') {
@@ -35,21 +54,28 @@ module.exports = async (request, response) => {
         }
         
         else if (request.method === 'PUT') {
-            const { ruleId, osmName, displayName, city } = request.body;
-            if (!ruleId || !osmName || !displayName || !city) {
+            const { ruleId, osmName, displayName, city, oldOsmName } = request.body;
+            if (!ruleId || !osmName || !displayName || !city || !oldOsmName) {
                  return response.status(400).json({ error: 'Faltan datos para actualizar la regla.' });
             }
             
-            const { error: updateError } = await supabaseAdmin.from('street_overrides')
+            // CORREGIDO: Usamos la tabla correcta 'street_overrides_old'
+            const { error: updateError } = await supabaseAdmin.from('street_overrides_old')
                 .update({ osm_name: osmName, display_name: displayName, city: city })
                 .eq('id', ruleId);
             if (updateError) throw updateError;
             
             // --- INICIO: Invalidación de caché ---
-            const parts = extractNameParts(osmName);
-            if (parts.baseName) {
-                const cacheKey = `street_v10:${city}:${parts.baseName.replace(/\s/g, '_')}`;
-                await kv.del(cacheKey);
+            // Borramos la caché tanto para el nombre antiguo como para el nuevo, por si acaso.
+            const oldParts = extractNameParts(oldOsmName);
+            if (oldParts.baseName) {
+                const oldCacheKey = `street_v18:${city}:${oldParts.baseName.replace(/\s/g, '_')}`;
+                await kv.del(oldCacheKey);
+            }
+            const newParts = extractNameParts(osmName);
+            if (newParts.baseName) {
+                const newCacheKey = `street_v18:${city}:${newParts.baseName.replace(/\s/g, '_')}`;
+                await kv.del(newCacheKey);
             }
             // --- FIN: Invalidación de caché ---
 
@@ -62,14 +88,15 @@ module.exports = async (request, response) => {
                 return response.status(400).json({ error: 'Faltan parámetros para eliminar.' });
             }
             
-            const table = type === 'override' ? 'street_overrides' : 'street_blocklist';
+            // CORREGIDO: Usamos la tabla correcta 'street_overrides_old'
+            const table = type === 'override' ? 'street_overrides_old' : 'street_blocklist';
             const { error } = await supabaseAdmin.from(table).delete().eq('id', ruleId);
             if (error) throw error;
             
             // --- INICIO: Invalidación de caché ---
             const parts = extractNameParts(osmName);
             if (parts.baseName) {
-                const cacheKey = `street_v10:${city}:${parts.baseName.replace(/\s/g, '_')}`;
+                const cacheKey = `street_v18:${city}:${parts.baseName.replace(/\s/g, '_')}`;
                 await kv.del(cacheKey);
             }
             // --- FIN: Invalidación de caché ---

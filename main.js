@@ -250,7 +250,10 @@ window.addEventListener('DOMContentLoaded', () => {
 
             setGameMode(selectedMode);
             uiElements.menuContentPanel.classList.add('hidden');
-            resetToInitialView(true);
+            // --- INICIO: CAMBIO CLAVE ---
+            // Se llama a la función de reseteo aquí, ANTES de iniciar la lógica del nuevo modo.
+            resetToInitialView();
+            // --- FIN: CAMBIO CLAVE ---
 
             if (selectedMode === 'revancha') {
                 uiElements.drawZoneBtn.classList.add('hidden');
@@ -317,7 +320,7 @@ window.addEventListener('DOMContentLoaded', () => {
             }
         }
         setGameMode('classic');
-        resetToInitialView(true);
+        resetToInitialView();
     });
     
     uiElements.backFromReviewBtn.addEventListener('click', exitReviewMode);
@@ -412,7 +415,7 @@ window.addEventListener('DOMContentLoaded', () => {
               uiElements.startBtn.classList.remove('hidden');
             } else {
               alert('No se encontraron calles válidas en esta zona. Por favor, dibuja otra.');
-              resetToInitialView(true);
+              resetToInitialView();
             }
         });
     };
@@ -772,56 +775,65 @@ window.addEventListener('DOMContentLoaded', () => {
     uiElements.nextBtn.disabled = true;
   }
   
-  function resetToInitialView(isSimpleReset = false) {
-      // Limpiar el modo activo anterior si existe
-      if (!isSimpleReset && activeModeControls && typeof activeModeControls.clear === 'function') {
+  // --- INICIO: FUNCIÓN DE RESETEO "MAESTRA" MODIFICADA ---
+  // Esta función ahora es la responsable de hacer una limpieza COMPLETA
+  // tanto de la interfaz como del estado de la partida anterior.
+  function resetToInitialView() {
+      // 1. Limpiar estado del modo anterior si existe (para modos complejos como Instinto)
+      if (activeModeControls && typeof activeModeControls.clear === 'function') {
         activeModeControls.clear();
       }
       activeModeControls = null;
 
+      // 2. Limpiar todas las capas del mapa
       clear(true);
 
-      // --- INICIO: RESETEO DE ESTADO COMPLETO ---
-      // Se reinician todas las variables de estado de la partida para asegurar
-      // que no queden "restos" de un modo de juego al cambiar a otro.
+      // 3. Resetear TODAS las variables de estado de la partida
       streetList = [];
       totalQuestions = 0;
       streetsGuessedCorrectly = 0;
       qIdx = 0;
       currentStreak = 0;
-      // --- FIN: RESETEO DE ESTADO COMPLETO ---
+      playing = false;
+      zonePoints = [];
+      zonePoly = null;
+      oldZonePoly = null;
 
+      // 4. Resetear la interfaz de usuario a su estado inicial
       updatePanelUI(() => {
+          // Ocultar TODOS los contenedores de juego
           ['start-options', 'loaded-zone-options', 'checkbox-wrapper', 'game-interface', 'end-game-options', 'back-from-review-btn'].forEach(id => {
               const el = document.getElementById(id);
               if (el) el.classList.add('hidden');
           });
+          
+          // Ocultar botones flotantes
           uiElements.reportBtnFAB.classList.add('hidden');
+
+          // Mostrar solo el botón inicial
           uiElements.drawZoneBtn.classList.remove('hidden');
-          if (zonePoly) gameMap.removeLayer(zonePoly);
-          if (oldZonePoly) gameMap.removeLayer(oldZonePoly);
-          zonePoly = oldZonePoly = null;
-          zonePoints = [];
-          playing = false;
+          
+          // Limpiar cualquier contenido dinámico
           uiElements.progressBar.style.width = '0%';
           uiElements.instintoOptionsContainer.innerHTML = '';
-          // --- INICIO: LIMPIEZA ADICIONAL DE UI ---
-          // Se limpia el texto de la pregunta y los contadores para que no muestren
-          // información de la partida anterior.
           uiElements.gameQuestion.textContent = '';
           uiElements.progressCounter.textContent = '';
           uiElements.scoreDisplayToggle.textContent = '';
           uiElements.streakDisplay.classList.remove('visible');
-          // --- FIN: LIMPIEZA ADICIONAL DE UI ---
       });
 
-      if (!isSimpleReset) {
-          setGameMode('classic');
-      }
+      // 5. Restablecer el modo de juego por defecto si es necesario (manejado fuera)
   }
+  // --- FIN: FUNCIÓN DE RESETEO "MAESTRA" ---
+
 
   function playFromHistory(zoneString) {
-    uiElements.instintoOptionsContainer.innerHTML = '';
+    // --- INICIO: CAMBIO CLAVE ---
+    // Se llama a la función de reseteo MAESTRA al principio para asegurar
+    // que cualquier estado anterior (como estar en modo revisión) se limpie por completo.
+    resetToInitialView();
+    // --- FIN: CAMBIO CLAVE ---
+    
     gameMap.off('click', addVertex);
     const points = zoneString.split(';').map(pair => {
       const [lat, lng] = pair.split(',');
@@ -830,9 +842,10 @@ window.addEventListener('DOMContentLoaded', () => {
     if (points.length < 3) return;
     
     updatePanelUI(() => {
-        ['drawZone', 'start-options', 'game-interface', 'end-game-options'].forEach(id => document.getElementById(id).classList.add('hidden'));
-        clear(true);
-        if (zonePoly) gameMap.removeLayer(zonePoly);
+        // La limpieza principal ya la hizo resetToInitialView, aquí solo mostramos lo necesario
+        uiElements.drawZoneBtn.classList.add('hidden');
+        
+        // El resto de la lógica de esta función para dibujar la zona y mostrar los botones correctos
         tempMarkers.forEach(m => gameMap.removeLayer(m));
         tempMarkers = [];
         zonePoints = points.map(p => L.latLng(p.lat, p.lng));
@@ -848,10 +861,10 @@ window.addEventListener('DOMContentLoaded', () => {
                 startGameFlow();
             } else {
                 alert('No se encontraron calles válidas en esta zona.');
-                resetToInitialView(true);
+                resetToInitialView();
             }
         };
-        uiElements.drawNewZoneBtn.onclick = () => resetToInitialView(true);
+        uiElements.drawNewZoneBtn.onclick = () => resetToInitialView();
         uiElements.loadedZoneOptions.classList.remove('hidden');
         uiElements.checkboxWrapper.classList.remove('hidden');
         uiElements.includePOICheckbox.disabled = false;

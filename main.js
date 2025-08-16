@@ -241,9 +241,14 @@ window.addEventListener('DOMContentLoaded', () => {
         button.addEventListener('click', () => {
             const selectedMode = button.dataset.mode;
             if (button.disabled) return;
-            
+
+            // --- INICIO: CAMBIO CLAVE 1 ---
+            // Se llama a la función de reseteo "Maestra" justo al principio,
+            // garantizando una limpieza total antes de hacer cualquier otra cosa.
             resetToInitialView();
-            
+            // --- FIN: CAMBIO CLAVE 1 ---
+
+            // Limpiar el estado del modo anterior antes de cambiar
             if (activeModeControls && typeof activeModeControls.clear === 'function') {
                 activeModeControls.clear();
             }
@@ -253,7 +258,7 @@ window.addEventListener('DOMContentLoaded', () => {
             uiElements.menuContentPanel.classList.add('hidden');
 
             if (selectedMode === 'classic') {
-                // El reset ya dejó la UI lista para el modo clásico.
+                // No se necesita hacer nada especial, el reset ya dejó la UI lista para el modo clásico.
             } else if (selectedMode === 'revancha') {
                 uiElements.drawZoneBtn.classList.add('hidden');
                 startRevanchaGame({
@@ -774,38 +779,45 @@ window.addEventListener('DOMContentLoaded', () => {
     uiElements.nextBtn.disabled = true;
   }
   
+  // --- INICIO: FUNCIÓN DE RESETEO "MAESTRA" MODIFICADA ---
+  // Esta función ahora es la responsable de hacer una limpieza COMPLETA
+  // tanto de la interfaz como del estado de la partida anterior.
   function resetToInitialView() {
+      // 1. Limpiar estado del modo anterior si existe (para modos complejos como Instinto)
       if (activeModeControls && typeof activeModeControls.clear === 'function') {
         activeModeControls.clear();
       }
       activeModeControls = null;
 
+      // 2. Limpiar todas las capas del mapa
       clear(true);
 
+      // 3. Resetear TODAS las variables de estado de la partida
       streetList = [];
       totalQuestions = 0;
       streetsGuessedCorrectly = 0;
       qIdx = 0;
       currentStreak = 0;
       playing = false;
-      // --- INICIO: CORRECCIÓN POLÍGONO FANTASMA ---
-      // Se resetea explícitamente el estado de "dibujo" para asegurar que si el usuario
-      // cambia de modo mientras dibuja, el proceso se cancele por completo.
-      drawing = false;
-      // --- FIN: CORRECCIÓN POLÍGONO FANTASMA ---
       zonePoints = [];
       zonePoly = null;
       oldZonePoly = null;
 
+      // 4. Resetear la interfaz de usuario a su estado inicial
       updatePanelUI(() => {
+          // Ocultar TODOS los contenedores de juego
           ['start-options', 'loaded-zone-options', 'checkbox-wrapper', 'game-interface', 'end-game-options', 'back-from-review-btn'].forEach(id => {
               const el = document.getElementById(id);
               if (el) el.classList.add('hidden');
           });
           
+          // Ocultar botones flotantes
           uiElements.reportBtnFAB.classList.add('hidden');
+
+          // Mostrar solo el botón inicial
           uiElements.drawZoneBtn.classList.remove('hidden');
           
+          // Limpiar cualquier contenido dinámico
           uiElements.progressBar.style.width = '0%';
           uiElements.instintoOptionsContainer.innerHTML = '';
           uiElements.gameQuestion.textContent = '';
@@ -814,9 +826,14 @@ window.addEventListener('DOMContentLoaded', () => {
           uiElements.streakDisplay.classList.remove('visible');
       });
   }
+  // --- FIN: FUNCIÓN DE RESETEO "MAESTRA" ---
 
   function playFromHistory(zoneString) {
+    // --- INICIO: CAMBIO CLAVE 2 ---
+    // Se llama a la función de reseteo MAESTRA al principio para asegurar
+    // que cualquier estado anterior (como estar en modo revisión) se limpie por completo.
     resetToInitialView();
+    // --- FIN: CAMBIO CLAVE 2 ---
     
     gameMap.off('click', addVertex);
     const points = zoneString.split(';').map(pair => {

@@ -259,26 +259,27 @@ button.game-control-btn:disabled { opacity: .4; cursor: default; }
 .menu-tabs {
   display: flex;
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-  overflow-x: auto; /* Permite el scroll horizontal si el contenido se desborda */
-  scrollbar-width: none; /* Oculta la barra de scroll en Firefox */
-  -ms-overflow-style: none;  /* Oculta la barra de scroll en IE y Edge */
+  overflow-x: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  /* --- INICIO: CAMBIO PARA DISTRIBUCIÓN --- */
+  /* Esta propiedad distribuye los botones de forma equitativa en el espacio disponible. */
+  justify-content: space-around;
+  /* --- FIN: CAMBIO PARA DISTRIBUCIÓN --- */
 }
 
-/* --- INICIO: CAMBIO ÚNICO --- */
-/* Se crea un "espaciador fantasma" al final del contenedor de pestañas para garantizar un margen simétrico */
-.menu-tabs::after {
-    content: '';
-    min-width: 1rem;
-}
-/* --- FIN: CAMBIO ÚNICO --- */
-
-/* Oculta la barra de scroll en navegadores Webkit (Chrome, Safari) */
 .menu-tabs::-webkit-scrollbar {
     display: none;
 }
 
 .menu-tab-btn {
-  /* Se elimina flex: 1 para que los botones se ajusten a su contenido */
+  /* --- INICIO: CAMBIO PARA DISTRIBUCIÓN --- */
+  /* flex: 1; hace que cada botón crezca para ocupar el mismo espacio. */
+  /* display: flex y justify-content: center; centran el icono SVG dentro del botón. */
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  /* --- FIN: CAMBIO PARA DISTRIBUCIÓN --- */
   padding: 1rem;
   background: none;
   border: none;
@@ -290,19 +291,16 @@ button.game-control-btn:disabled { opacity: .4; cursor: default; }
 .menu-tab-btn:hover { background-color: rgba(255,255,255,0.05); color: white; }
 .menu-tab-btn.active { color: white; border-bottom: 2px solid #3b82f6; }
 
-/* --- INICIO: NUEVO ESTILO PARA ICONOS EN PESTAÑAS --- */
-/* Esta regla asegura que todos los iconos SVG dentro de las pestañas tengan un tamaño uniforme. */
 .menu-tab-btn svg {
     width: 24px;
     height: 24px;
 }
-/* --- FIN: NUEVO ESTILO PARA ICONOS EN PESTAÑAS --- */
 
 .menu-content-area {
   padding: 1rem;
   overflow-y: auto;
-  flex-grow: 1; /* Hace que esta área ocupe todo el espacio vertical sobrante */
-  min-height: 0; /* Soluciona un bug de cálculo de altura de flexbox en algunos navegadores */
+  flex-grow: 1;
+  min-height: 0;
 }
 .content-panel { display: none; }
 .content-panel.active { display: block; }

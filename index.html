@@ -116,7 +116,6 @@
 
     <div id="menu-content-panel" class="hidden">
         <div class="menu-tabs">
-            <!-- --- INICIO: CAMBIO DE TEXTO A ICONOS --- -->
             <button class="menu-tab-btn active" data-panel="profile-content" title="Perfil">
                 <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" viewBox="0 0 16 16"><path d="M8 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm2-3a2 2 0 1 1-4 0 2 2 0 0 1 4 0zm4 8c0 1-1 1-1 1H3s-1 0-1-1 1-4 6-4 6 3 6 4zm-1-.004c-.001-.246-.154-.986-.832-1.664C11.516 10.68 10.289 10 8 10c-2.29 0-3.516.68-4.168 1.332-.678.678-.83 1.418-.832 1.664h10z"/></svg>
             </button>
@@ -127,9 +126,14 @@
                 <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" viewBox="0 0 16 16"><path d="M2 2a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v13.5a.5.5 0 0 1-.777.416L8 13.101l-5.223 2.815A.5.5 0 0 1 2 15.5V2zm2-1a1 1 0 0 0-1 1v12.566l4.723-2.482a.5.5 0 0 1 .554 0L13 14.566V2a1 1 0 0 0-1-1H4z"/></svg>
             </button>
             <button class="menu-tab-btn" data-panel="modes-content" title="Modos">
-                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" viewBox="0 0 16 16"><path d="M11.5 6.027a.5.5 0 1 1-1 0 .5.5 0 0 1 1 0zm-1.5 1.5a.5.5 0 1 0 0-1 .5.5 0 0 0 0 1zm2.5-.5a.5.5 0 1 1-1 0 .5.5 0 0 1 1 0zm-1.5 1.5a.5.5 0 1 0 0-1 .5.5 0 0 0 0 1zm-6.5-3h1v1h1v-1h1v-1h-1v-1h-1v1h-1v1z"/><path d="M3.051 3.26a.5.5 0 0 1 .354-.613l1.932-.518a.5.5 0 0 1 .62.39c.655 2.443 3.402 3.86 6.733 3.86s6.078-1.417 6.733-3.86a.5.5 0 0 1 .62-.39l1.932.518a.5.5 0 0 1 .354.613C15.56 7.604 12.866 10 8 10S.44 7.604.052 3.261a.5.5 0 0 1 .3-.601zm1.226 1.58L3 4.99v.002c.032.144.07.29.112.436.315 1.156 1.488 2.064 3.449 2.527-1.96.463-3.134 1.37-3.45 2.527-.04.146-.08.292-.112.436v.002l.278.159c.224.128.48.24.752.338C5.242 11.23 6.88 11.5 8 11.5s2.758-.27 3.849-.757c.271-.098.528-.21.752-.338l.278-.159v-.002c-.032-.144-.07-.29-.112-.436-.316-1.156-1.49-2.064-3.45-2.527 1.96-.463 3.134-1.37 3.449-2.527.04-.146.08-.292.112-.436v-.002l-.278-.159A31.878 31.878 0 0 0 8 3.5c-2.33 0-4.322.37-5.914.99l-.278.159z"/></svg>
+                <!-- --- INICIO: CAMBIO DE ICONO --- -->
+                <!-- Se reemplaza el SVG complejo por uno más simple y claro que representa un mando de consola. -->
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-controller" viewBox="0 0 16 16">
+                    <path d="M11.5 6.027a.5.5 0 1 1-1 0 .5.5 0 0 1 1 0zm-1.5 1.5a.5.5 0 1 0 0-1 .5.5 0 0 0 0 1zm2.5-.5a.5.5 0 1 1-1 0 .5.5 0 0 1 1 0zm-1.5 1.5a.5.5 0 1 0 0-1 .5.5 0 0 0 0 1zm-6.5-3h1v1h1v-1h1v-1h-1v-1h-1v1h-1v1z"/>
+                    <path d="M3.051 3.26a.5.5 0 0 1 .354-.613l1.932-.518a.5.5 0 0 1 .62.39c.655 2.443 3.402 3.86 6.733 3.86s6.078-1.417 6.733-3.86a.5.5 0 0 1 .62-.39l1.932.518a.5.5 0 0 1 .354.613C15.56 7.604 12.866 10 8 10S.44 7.604.052 3.261a.5.5 0 0 1 .3-.601zm1.226 1.58L3 4.99v.002c.032.144.07.29.112.436.315 1.156 1.488 2.064 3.449 2.527-1.96.463-3.134 1.37-3.45 2.527-.04.146-.08.292-.112.436v.002l.278.159c.224.128.48.24.752.338C5.242 11.23 6.88 11.5 8 11.5s2.758-.27 3.849-.757c.271-.098.528-.21.752-.338l.278-.159v-.002c-.032-.144-.07-.29-.112-.436-.316-1.156-1.49-2.064-3.45-2.527 1.96-.463 3.134-1.37 3.449-2.527.04-.146.08-.292.112-.436v-.002l-.278-.159A31.878 31.878 0 0 0 8 3.5c-2.33 0-4.322.37-5.914.99l-.278.159z"/>
+                </svg>
+                <!-- --- FIN: CAMBIO DE ICONO --- -->
             </button>
-            <!-- --- FIN: CAMBIO DE TEXTO A ICONOS --- -->
         </div>
         <div class="menu-content-area">
             <div id="profile-content" class="content-panel active">
@@ -147,17 +151,12 @@
                 <div id="saved-zones-list" class="space-y-2"></div>
             </div>
             <div id="modes-content" class="content-panel">
-                <!-- --- INICIO: CAMBIO DE TÍTULO REDUNDANTE --- -->
-                <!-- Se elimina el h3 "Modos" que era redundante con el título "Modos de Juego" -->
                 <h3 class="mb-4 text-xl font-bold">Modos de Juego</h3>
-                <!-- --- FIN: CAMBIO DE TÍTULO REDUNDANTE --- -->
                 <div id="game-modes-list" class="space-y-2">
                     <button data-mode="classic" class="w-full game-control-btn mode-select-btn">
                         <div class="mode-select-content">
                             <div>
-                                <!-- --- INICIO: SIMPLIFICACIÓN DE TEXTO --- -->
                                 <span class="font-bold">Clásico</span>
-                                <!-- --- FIN: SIMPLIFICACIÓN DE TEXTO --- -->
                                 <span class="block text-sm opacity-80">La experiencia original. Dibuja una zona y adivina.</span>
                             </div>
                             <span class="mode-tick">✓</span>
@@ -166,9 +165,7 @@
                     <button data-mode="revancha" class="w-full game-control-btn mode-select-btn">
                          <div class="mode-select-content">
                             <div>
-                                <!-- --- INICIO: SIMPLIFICACIÓN DE TEXTO --- -->
                                 <span class="font-bold">Revancha</span>
-                                <!-- --- FIN: SIMPLIFICACIÓN DE TEXTO --- -->
                                 <span class="block text-sm opacity-80">Enfréntate a las calles que has fallado en tu ciudad.</span>
                             </div>
                             <span class="mode-tick">✓</span>
@@ -177,12 +174,8 @@
                     <button data-mode="instinto" class="w-full game-control-btn mode-select-btn">
                          <div class="mode-select-content">
                             <div>
-                                <!-- --- INICIO: SIMPLIFICACIÓN DE TEXTO --- -->
                                 <span class="font-bold">Instinto</span>
-                                <!-- --- FIN: SIMPLIFICACIÓN DE TEXTO --- -->
-                                <!-- --- INICIO: ACTUALIZACIÓN DE DESCRIPCIÓN --- -->
                                 <span class="block text-sm opacity-80">Adivina el nombre correcto de la calle entre varias opciones.</span>
-                                <!-- --- FIN: ACTUALIZACIÓN DE DESCRIPCIÓN --- -->
                             </div>
                             <span class="mode-tick">✓</span>
                         </div>

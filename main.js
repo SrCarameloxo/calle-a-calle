@@ -290,15 +290,18 @@ window.addEventListener('DOMContentLoaded', () => {
     uiElements.drawZoneBtn.addEventListener('click', startDrawing);
     uiElements.undoPointBtn.addEventListener('click', undoLastPoint);
     
-    // Listener inteligente para el botón "Siguiente"
+    // --- INICIO: CORRECCIÓN MODO REVANCHA ---
+    // Se añade la condición `|| currentGameMode === 'revancha'` para que el botón "Siguiente"
+    // funcione correctamente en ambos modos de juego, ya que comparten la misma lógica de avance.
     uiElements.nextBtn.addEventListener('click', () => {
-        if (currentGameMode === 'classic') {
+        if (currentGameMode === 'classic' || currentGameMode === 'revancha') {
             uiElements.nextBtn.disabled = true;
             nextQ();
         } else if (currentGameMode === 'instinto' && activeModeControls) {
             activeModeControls.next();
         }
     });
+    // --- FIN: CORRECCIÓN MODO REVANCHA ---
 
     uiElements.reportBtnFAB.addEventListener('click', reportIncident);
     uiElements.adminPanelBtn.addEventListener('click', () => { window.location.href = '/admin.html'; });

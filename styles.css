@@ -495,3 +495,14 @@ button.game-control-btn:disabled { opacity: .4; cursor: default; }
     -webkit-background-clip: text; background-clip: text; color: transparent;
 }
 /* --- FIN: CÓDIGO MODIFICADO --- */
+
+/* --- INICIO: ESTILOS MODO INSTINTO --- */
+/* Esta nueva regla crea el recuadro gris sutil que agrupará
+   visualmente los botones de opciones en el Modo Instinto. */
+#instinto-options-container {
+    background-color: rgba(0, 0, 0, 0.05); /* Fondo gris muy sutil */
+    border-radius: 8px; /* Bordes redondeados */
+    padding: 1rem; /* Espacio interior para que los botones no se peguen a los bordes */
+    margin-top: 0.5rem; /* Pequeño margen superior para separarlo del texto de la pregunta */
+}
+/* --- FIN: ESTILOS MODO INSTINTO --- */

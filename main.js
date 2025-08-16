@@ -790,7 +790,6 @@ window.addEventListener('DOMContentLoaded', () => {
       activeModeControls = null;
 
       // 2. Limpiar todas las capas del mapa
-      if (zonePoly && gameMap.hasLayer(zonePoly)) gameMap.removeLayer(zonePoly);
       clear(true);
 
       // 3. Resetear TODAS las variables de estado de la partida

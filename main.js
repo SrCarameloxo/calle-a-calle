@@ -34,7 +34,6 @@ window.addEventListener('DOMContentLoaded', () => {
     drawNewZoneBtn: document.getElementById('drawNewZone'),
     checkboxWrapper: document.querySelector('.checkbox-wrapper'),
     drawHelpContainer: document.getElementById('draw-help-container'),
-    dismissDrawHelpBtn: document.getElementById('dismiss-draw-help'),
     gameInterface: document.getElementById('game-interface'),
     gameQuestion: document.getElementById('game-question'),
     scoreDisplayToggle: document.getElementById('score-display-toggle'),
@@ -790,6 +789,7 @@ window.addEventListener('DOMContentLoaded', () => {
       activeModeControls = null;
 
       // 2. Limpiar todas las capas del mapa
+      if (zonePoly && gameMap.hasLayer(zonePoly)) gameMap.removeLayer(zonePoly);
       clear(true);
 
       // 3. Resetear TODAS las variables de estado de la partida

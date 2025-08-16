@@ -242,6 +242,12 @@ window.addEventListener('DOMContentLoaded', () => {
             const selectedMode = button.dataset.mode;
             if (button.disabled) return;
 
+            // --- INICIO: CAMBIO CLAVE 1 ---
+            // Se llama a la función de reseteo "Maestra" justo al principio,
+            // garantizando una limpieza total antes de hacer cualquier otra cosa.
+            resetToInitialView();
+            // --- FIN: CAMBIO CLAVE 1 ---
+
             // Limpiar el estado del modo anterior antes de cambiar
             if (activeModeControls && typeof activeModeControls.clear === 'function') {
                 activeModeControls.clear();
@@ -250,12 +256,10 @@ window.addEventListener('DOMContentLoaded', () => {
 
             setGameMode(selectedMode);
             uiElements.menuContentPanel.classList.add('hidden');
-            // --- INICIO: CAMBIO CLAVE ---
-            // Se llama a la función de reseteo aquí, ANTES de iniciar la lógica del nuevo modo.
-            resetToInitialView();
-            // --- FIN: CAMBIO CLAVE ---
 
-            if (selectedMode === 'revancha') {
+            if (selectedMode === 'classic') {
+                // No se necesita hacer nada especial, el reset ya dejó la UI lista para el modo clásico.
+            } else if (selectedMode === 'revancha') {
                 uiElements.drawZoneBtn.classList.add('hidden');
                 startRevanchaGame({
                     startGame: (revanchaStreets) => {
@@ -821,18 +825,15 @@ window.addEventListener('DOMContentLoaded', () => {
           uiElements.scoreDisplayToggle.textContent = '';
           uiElements.streakDisplay.classList.remove('visible');
       });
-
-      // 5. Restablecer el modo de juego por defecto si es necesario (manejado fuera)
   }
   // --- FIN: FUNCIÓN DE RESETEO "MAESTRA" ---
 
-
   function playFromHistory(zoneString) {
-    // --- INICIO: CAMBIO CLAVE ---
+    // --- INICIO: CAMBIO CLAVE 2 ---
     // Se llama a la función de reseteo MAESTRA al principio para asegurar
     // que cualquier estado anterior (como estar en modo revisión) se limpie por completo.
     resetToInitialView();
-    // --- FIN: CAMBIO CLAVE ---
+    // --- FIN: CAMBIO CLAVE 2 ---
     
     gameMap.off('click', addVertex);
     const points = zoneString.split(';').map(pair => {
@@ -842,10 +843,7 @@ window.addEventListener('DOMContentLoaded', () => {
     if (points.length < 3) return;
     
     updatePanelUI(() => {
-        // La limpieza principal ya la hizo resetToInitialView, aquí solo mostramos lo necesario
         uiElements.drawZoneBtn.classList.add('hidden');
-        
-        // El resto de la lógica de esta función para dibujar la zona y mostrar los botones correctos
         tempMarkers.forEach(m => gameMap.removeLayer(m));
         tempMarkers = [];
         zonePoints = points.map(p => L.latLng(p.lat, p.lng));

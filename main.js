@@ -780,6 +780,17 @@ window.addEventListener('DOMContentLoaded', () => {
       activeModeControls = null;
 
       clear(true);
+
+      // --- INICIO: RESETEO DE ESTADO COMPLETO ---
+      // Se reinician todas las variables de estado de la partida para asegurar
+      // que no queden "restos" de un modo de juego al cambiar a otro.
+      streetList = [];
+      totalQuestions = 0;
+      streetsGuessedCorrectly = 0;
+      qIdx = 0;
+      currentStreak = 0;
+      // --- FIN: RESETEO DE ESTADO COMPLETO ---
+
       updatePanelUI(() => {
           ['start-options', 'loaded-zone-options', 'checkbox-wrapper', 'game-interface', 'end-game-options', 'back-from-review-btn'].forEach(id => {
               const el = document.getElementById(id);
@@ -793,11 +804,15 @@ window.addEventListener('DOMContentLoaded', () => {
           zonePoints = [];
           playing = false;
           uiElements.progressBar.style.width = '0%';
-          // --- INICIO: CORRECCIÓN INTERFAZ FANTASMA ---
-          // Esta línea vacía el contenedor de opciones del Modo Instinto,
-          // asegurando que no aparezca en otros modos de juego.
           uiElements.instintoOptionsContainer.innerHTML = '';
-          // --- FIN: CORRECCIÓN INTERFAZ FANTASMA ---
+          // --- INICIO: LIMPIEZA ADICIONAL DE UI ---
+          // Se limpia el texto de la pregunta y los contadores para que no muestren
+          // información de la partida anterior.
+          uiElements.gameQuestion.textContent = '';
+          uiElements.progressCounter.textContent = '';
+          uiElements.scoreDisplayToggle.textContent = '';
+          uiElements.streakDisplay.classList.remove('visible');
+          // --- FIN: LIMPIEZA ADICIONAL DE UI ---
       });
 
       if (!isSimpleReset) {
@@ -806,11 +821,7 @@ window.addEventListener('DOMContentLoaded', () => {
   }
 
   function playFromHistory(zoneString) {
-    // --- INICIO: CORRECCIÓN INTERFAZ FANTASMA ---
-    // También limpiamos el contenedor aquí para asegurar que al cargar una zona
-    // guardada no queden restos de una partida anterior en Modo Instinto.
     uiElements.instintoOptionsContainer.innerHTML = '';
-    // --- FIN: CORRECCIÓN INTERFAZ FANTASMA ---
     gameMap.off('click', addVertex);
     const points = zoneString.split(';').map(pair => {
       const [lat, lng] = pair.split(',');

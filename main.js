@@ -34,6 +34,7 @@ window.addEventListener('DOMContentLoaded', () => {
     drawNewZoneBtn: document.getElementById('drawNewZone'),
     checkboxWrapper: document.querySelector('.checkbox-wrapper'),
     drawHelpContainer: document.getElementById('draw-help-container'),
+    dismissDrawHelpBtn: document.getElementById('dismiss-draw-help'),
     gameInterface: document.getElementById('game-interface'),
     gameQuestion: document.getElementById('game-question'),
     scoreDisplayToggle: document.getElementById('score-display-toggle'),

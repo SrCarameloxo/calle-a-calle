@@ -1,5 +1,5 @@
 
-// Ruta: /api/streetActions.js (VERSIÓN CON DELETE, CREATE Y UPDATENAME)
+// Ruta: /api/streetActions.js (VERSIÓN CON CORRECCIÓN EN UPDATENAME)
 
 const { createClient } = require('@supabase/supabase-js');
 
@@ -52,26 +52,27 @@ module.exports = async (request, response) => {
             return response.status(200).json(data[0]);
 
         } 
-        // --- INICIO DE LA MODIFICACIÓN ---
         else if (action === 'updateName') {
-            // --- NUEVA LÓGICA PARA ACTUALIZAR NOMBRE ---
+            // --- LÓGICA PARA ACTUALIZAR NOMBRE ---
             const { osm_id, display_name, city } = payload;
             if (!osm_id || !display_name || !city) {
                 return response.status(400).json({ error: 'Faltan datos (osm_id, display_name, city) para actualizar.' });
             }
 
+            // --- INICIO DE LA MODIFICACIÓN ---
+            // Usamos la tabla correcta del editor 'street_overrides' y corregimos el onConflict
             const { error } = await supabase
                 .from('street_overrides')
                 .upsert({ 
                     osm_id: osm_id, 
                     display_name: display_name, 
                     city: city 
-                }, { onConflict: 'osm_id, city' }); // IMPORTANTE: onConflict usa ambas columnas
+                }, { onConflict: 'osm_id' }); // CORRECCIÓN: El conflicto es solo sobre osm_id en esta tabla
+            // --- FIN DE LA MODIFICACIÓN ---
 
             if (error) throw error;
             return response.status(200).json({ message: 'Nombre de calle actualizado con éxito.' });
         }
-        // --- FIN DE LA MODIFICACIÓN ---
         else if (action === 'delete') {
             // --- LÓGICA PARA BORRAR ---
             const { id } = payload;

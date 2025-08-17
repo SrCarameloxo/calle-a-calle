@@ -242,11 +242,12 @@ window.addEventListener('DOMContentLoaded', () => {
             const selectedMode = button.dataset.mode;
             if (button.disabled) return;
 
-            // --- INICIO: CAMBIO CLAVE 1 ---
-            // Se llama a la función de reseteo "Maestra" justo al principio,
-            // garantizando una limpieza total antes de hacer cualquier otra cosa.
+            // --- ESTA ES LA CLAVE (1/2): RESETEO AL CAMBIAR DE MODO ---
+            // Al hacer clic en un nuevo modo, esta función se ejecuta PRIMERO,
+            // limpiando cualquier partida anterior (polígonos, botones, etc.)
+            // antes de que la lógica del nuevo modo comience.
             resetToInitialView();
-            // --- FIN: CAMBIO CLAVE 1 ---
+            // --- FIN DE LA CLAVE ---
 
             // Limpiar el estado del modo anterior antes de cambiar
             if (activeModeControls && typeof activeModeControls.clear === 'function') {
@@ -779,20 +780,20 @@ window.addEventListener('DOMContentLoaded', () => {
     uiElements.nextBtn.disabled = true;
   }
   
-  // --- INICIO: FUNCIÓN DE RESETEO "MAESTRA" MODIFICADA ---
-  // Esta función ahora es la responsable de hacer una limpieza COMPLETA
-  // tanto de la interfaz como del estado de la partida anterior.
+  // --- INICIO: FUNCIÓN DE RESETEO "MAESTRA" ---
+  // Esta es la función más importante para solucionar el bug. Se encarga de
+  // hacer una limpieza COMPLETA del estado del juego.
   function resetToInitialView() {
-      // 1. Limpiar estado del modo anterior si existe (para modos complejos como Instinto)
+      // 1. Limpia la lógica de modos especiales (como Instinto)
       if (activeModeControls && typeof activeModeControls.clear === 'function') {
         activeModeControls.clear();
       }
       activeModeControls = null;
 
-      // 2. Limpiar todas las capas del mapa
+      // 2. Limpia TODAS las capas del mapa (polígonos, calles, etc.)
       clear(true);
 
-      // 3. Resetear TODAS las variables de estado de la partida
+      // 3. Resetea TODAS las variables de la partida a su estado inicial
       streetList = [];
       totalQuestions = 0;
       streetsGuessedCorrectly = 0;
@@ -803,21 +804,21 @@ window.addEventListener('DOMContentLoaded', () => {
       zonePoly = null;
       oldZonePoly = null;
 
-      // 4. Resetear la interfaz de usuario a su estado inicial
+      // 4. Restaura la interfaz de usuario a como estaba al principio
       updatePanelUI(() => {
-          // Ocultar TODOS los contenedores de juego
+          // Oculta TODOS los posibles contenedores de juego
           ['start-options', 'loaded-zone-options', 'checkbox-wrapper', 'game-interface', 'end-game-options', 'back-from-review-btn'].forEach(id => {
               const el = document.getElementById(id);
               if (el) el.classList.add('hidden');
           });
           
-          // Ocultar botones flotantes
+          // Oculta los botones flotantes
           uiElements.reportBtnFAB.classList.add('hidden');
 
-          // Mostrar solo el botón inicial
+          // Muestra ÚNICAMENTE el botón de inicio
           uiElements.drawZoneBtn.classList.remove('hidden');
           
-          // Limpiar cualquier contenido dinámico
+          // Limpia cualquier texto o barra de progreso que pudiera quedar
           uiElements.progressBar.style.width = '0%';
           uiElements.instintoOptionsContainer.innerHTML = '';
           uiElements.gameQuestion.textContent = '';
@@ -829,11 +830,12 @@ window.addEventListener('DOMContentLoaded', () => {
   // --- FIN: FUNCIÓN DE RESETEO "MAESTRA" ---
 
   function playFromHistory(zoneString) {
-    // --- INICIO: CAMBIO CLAVE 2 ---
+    // --- ESTA ES LA CLAVE (2/2): RESETEO AL CARGAR UNA ZONA ---
     // Se llama a la función de reseteo MAESTRA al principio para asegurar
-    // que cualquier estado anterior (como estar en modo revisión) se limpie por completo.
+    // que cualquier estado anterior se limpie por completo antes de
+    // dibujar la nueva zona y sus correspondientes botones.
     resetToInitialView();
-    // --- FIN: CAMBIO CLAVE 2 ---
+    // --- FIN DE LA CLAVE ---
     
     gameMap.off('click', addVertex);
     const points = zoneString.split(';').map(pair => {

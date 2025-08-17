@@ -582,12 +582,7 @@ window.addEventListener('DOMContentLoaded', () => {
     });
     userMk = guide = streetGrp = null;
     if(clearFull){
-        // --- INICIO DE LA CORRECCIÓN ---
-        // Se añade la comprobación y eliminación del polígono ACTIVO (`zonePoly`).
-        // Esta era la línea que faltaba y que causaba que el polígono se quedara visible.
         if(zonePoly && gameMap.hasLayer(zonePoly)) gameMap.removeLayer(zonePoly);
-        // --- FIN DE LA CORRECCIÓN ---
-
         if(reviewLayer && gameMap.hasLayer(reviewLayer)) gameMap.removeLayer(reviewLayer);
         if(oldZonePoly && gameMap.hasLayer(oldZonePoly)) gameMap.removeLayer(oldZonePoly);
         reviewLayer = oldZonePoly = zonePoly = null;
@@ -659,6 +654,9 @@ window.addEventListener('DOMContentLoaded', () => {
         
         uiElements.drawZoneBtn.classList.add('hidden');
 
+        // --- INICIO DE LA CORRECCIÓN ---
+        // Se añade una condición explícita para cada modo. El 'else' anterior
+        // causaba que los botones del modo clásico aparecieran en otros modos.
         if (currentGameMode === 'revancha') {
             uiElements.saveZoneBtn.classList.add('hidden');
             uiElements.repeatZoneBtn.textContent = 'Jugar Revancha de Nuevo';
@@ -673,12 +671,14 @@ window.addEventListener('DOMContentLoaded', () => {
                 });
             };
             uiElements.repeatZoneBtn.disabled = false;
-        } else { // Modo clásico
+        } else if (currentGameMode === 'classic') { // Se cambia 'else' por 'else if' para ser específico
             uiElements.saveZoneBtn.classList.remove('hidden');
             uiElements.repeatZoneBtn.textContent = 'Repetir Zona';
             uiElements.repeatZoneBtn.onclick = repeatLastZone; 
             uiElements.repeatZoneBtn.disabled = (lastGameZonePoints.length < 3 || lastGameStreetList.length === 0);
         }
+        // Si el modo es 'instinto', este bloque no hace nada, evitando que aparezcan botones incorrectos.
+        // --- FIN DE LA CORRECCIÓN ---
 
         uiElements.endGameOptions.classList.remove('hidden');
         uiElements.backToMenuBtn.classList.remove('hidden');

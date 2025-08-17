@@ -1,4 +1,4 @@
-// --- editor.js (VERSIÓN 13 - MEJORAS DE USABILIDAD) ---
+// --- editor.js (VERSIÓN 14 - CON SELECTOR DE CIUDAD) ---
 
 document.addEventListener('DOMContentLoaded', () => {
 
@@ -16,9 +16,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const saveChangesBtn = document.getElementById('save-changes-btn');
     const cancelBtn = document.getElementById('cancel-btn');
     const statusPanel = document.getElementById('status-panel');
+    // --- INICIO DE LA MODIFICACIÓN ---
+    const citySelectorModal = document.getElementById('city-selector-modal');
+    const cityListContainer = document.getElementById('city-list');
+    // --- FIN DE LA MODIFICACIÓN ---
 
     // --- INICIALIZACIÓN DEL MAPA ---
-    const map = L.map('editor-map').setView([38.88, -6.97], 13);
+    const map = L.map('editor-map').setView([40.41, -3.70], 6); // Vista inicial general de España
     L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
         attribution: '© CARTO', maxZoom: 20
     }).addTo(map);
@@ -94,6 +98,9 @@ document.addEventListener('DOMContentLoaded', () => {
     let isCuttingMode = false;
     let isMergingMode = false;
     let streetsToMerge = [];
+    // --- INICIO DE LA MODIFICACIÓN ---
+    let selectedCity = null; // Guardará la ciudad elegida
+    // --- FIN DE LA MODIFICACIÓN ---
 
     function updateStatusPanel(text, active = true) {
         if (active && text) {
@@ -172,7 +179,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     payload: {
                         osm_id: layer.feature.properties.id,
                         cut_point: cutLatLng,
-                        city: 'Badajoz',
+                        // --- INICIO DE LA MODIFICACIÓN ---
+                        city: selectedCity.name,
+                        // --- FIN DE LA MODIFICACIÓN ---
                     }
                 }),
             });
@@ -220,13 +229,10 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!mergePanel) {
             mergePanel = document.createElement('div');
             mergePanel.id = 'merge-panel';
-            // ======== INICIO: CAMBIO REALIZADO ========
-            // Se ajustan los estilos para posicionar el panel en la esquina superior derecha.
             mergePanel.style.position = 'absolute';
             mergePanel.style.top = '10px';
             mergePanel.style.right = '10px';
-            mergePanel.style.width = '300px'; // Ancho similar al panel de edición
-            // ======== FIN: CAMBIO REALIZADO ========
+            mergePanel.style.width = '300px'; 
             mergePanel.style.zIndex = '1001';
             mergePanel.style.background = 'white';
             mergePanel.style.padding = '15px';
@@ -290,7 +296,6 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             const newWay = await response.json();
             if (!response.ok) {
-                // El error ahora puede venir del backend con un mensaje claro
                 throw new Error(newWay.details || newWay.error || 'Error del servidor.');
             }
             streetsToMerge.forEach(layer => geojsonLayer.removeLayer(layer));
@@ -326,7 +331,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 const response = await fetch('/api/updateStreetName', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
-                    body: JSON.stringify({ osm_id, display_name: newName, city: 'Badajoz' }),
+                    // --- INICIO DE LA MODIFICACIÓN ---
+                    body: JSON.stringify({ osm_id, display_name: newName, city: selectedCity.name }),
+                    // --- FIN DE LA MODIFICACIÓN ---
                 });
                 const result = await response.json();
                 if (!response.ok) throw new Error(result.error || 'Error del servidor.');
@@ -342,7 +349,9 @@ document.addEventListener('DOMContentLoaded', () => {
                         payload: {
                             geometry: selectedLayer.toGeoJSON().geometry,
                             tags: { name: newName },
-                            city: 'Badajoz',
+                            // --- INICIO DE LA MODIFICACIÓN ---
+                            city: selectedCity.name,
+                            // --- FIN DE LA MODIFICACIÓN ---
                         }
                     }),
                 });
@@ -398,12 +407,19 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-
-    async function cargarCallesPaginado() {
+    // --- INICIO DE LA MODIFICACIÓN ---
+    // Esta función ahora acepta el nombre de la ciudad como parámetro
+    async function cargarCallesPaginado(cityName) {
         let currentPage = 1;
         let totalFeaturesCargadas = 0;
         let seguirCargando = true;
-        console.log('Iniciando carga paginada de calles...');
+        console.log(`Iniciando carga paginada para la ciudad: ${cityName}...`);
+
+        // Limpiamos la capa anterior si existiera
+        if (geojsonLayer) {
+            map.removeLayer(geojsonLayer);
+        }
+
         geojsonLayer = L.geoJSON(null, {
             style: function(feature) {
                 const hasName = feature.properties.tags && feature.properties.tags.name;
@@ -437,10 +453,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
         }).addTo(map);
+
+        loadingOverlay.style.display = 'flex'; // Mostrar overlay de carga
+
         while (seguirCargando) {
             try {
-                loadingText.textContent = `Cargando lote ${currentPage}...`;
-                const response = await fetch(`/api/getCityStreets?page=${currentPage}`);
+                loadingText.textContent = `Cargando lote ${currentPage} de ${cityName}...`;
+                // Usamos la nueva URL con el parámetro de la ciudad
+                const response = await fetch(`/api/getCityStreets?page=${currentPage}&city=${cityName}`);
                 if (!response.ok) throw new Error('Respuesta de API no válida.');
                 const geojsonData = await response.json();
                 const numFeatures = geojsonData.features.length;
@@ -457,9 +477,37 @@ document.addEventListener('DOMContentLoaded', () => {
                 seguirCargando = false;
             }
         }
-        loadingText.textContent = `¡Carga completada! ${totalFeaturesCargadas} calles en el mapa.`;
+        loadingText.textContent = `¡Carga completada! ${totalFeaturesCargadas} calles de ${cityName} en el mapa.`;
         setTimeout(() => loadingOverlay.style.display = 'none', 2000);
     }
+
+    async function showCitySelector() {
+        citySelectorModal.style.display = 'flex';
+        cityListContainer.innerHTML = '<p>Cargando ciudades...</p>';
+        try {
+            const { data: cities, error } = await supabase.from('cities').select('*').order('name');
+            if (error) throw error;
+            
+            cityListContainer.innerHTML = ''; // Limpiamos el mensaje de carga
+            cities.forEach(city => {
+                const button = document.createElement('button');
+                button.textContent = city.name;
+                button.addEventListener('click', () => {
+                    selectedCity = city; // Guardamos la ciudad seleccionada
+                    citySelectorModal.style.display = 'none'; // Ocultamos el modal
+                    // Centramos el mapa en la ciudad elegida
+                    map.setView([city.center_lat, city.center_lng], city.default_zoom);
+                    // Iniciamos la carga de calles para esa ciudad
+                    cargarCallesPaginado(city.name);
+                });
+                cityListContainer.appendChild(button);
+            });
+
+        } catch (error) {
+            cityListContainer.innerHTML = `<p style="color:red;">Error al cargar las ciudades: ${error.message}</p>`;
+        }
+    }
+    // --- FIN DE LA MODIFICACIÓN ---
     
     async function checkAuthAndLoad() {
         const { data: { session }, error: sessionError } = await supabase.auth.getSession();
@@ -475,8 +523,12 @@ document.addEventListener('DOMContentLoaded', () => {
             window.location.href = '/';
             return;
         }
-        console.log('¡Administrador verificado! Iniciando editor...');
-        cargarCallesPaginado();
+        // --- INICIO DE LA MODIFICACIÓN ---
+        // En lugar de cargar las calles directamente, mostramos el selector de ciudad
+        console.log('¡Administrador verificado! Mostrando selector de ciudad...');
+        loadingOverlay.style.display = 'none'; // Ocultamos el overlay inicial
+        showCitySelector();
+        // --- FIN DE LA MODIFICACIÓN ---
     }
     checkAuthAndLoad();
 });

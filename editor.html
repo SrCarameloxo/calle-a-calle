@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -37,6 +38,50 @@
         #edit-panel button { width: 100%; padding: 10px; border: none; border-radius: 4px; color: white; cursor: pointer; }
         #save-changes-btn { background-color: #28a745; }
         #cancel-btn { background-color: #dc3545; margin-top: 5px; }
+
+        /* --- INICIO DE LA MODIFICACIÓN --- */
+        #city-selector-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.85);
+            z-index: 10001;
+            display: none; /* Oculto por defecto */
+            align-items: center;
+            justify-content: center;
+        }
+        #city-selector-content {
+            background: white;
+            padding: 2rem;
+            border-radius: 8px;
+            text-align: center;
+            max-width: 500px;
+            width: 90%;
+        }
+        #city-selector-content h2 {
+            margin-top: 0;
+            font-size: 1.5rem;
+            color: #333;
+        }
+        #city-list button {
+            display: block;
+            width: 100%;
+            padding: 1rem;
+            margin-top: 1rem;
+            font-size: 1.1rem;
+            border: 1px solid #ccc;
+            background: #f0f0f0;
+            cursor: pointer;
+            border-radius: 5px;
+            transition: background-color 0.2s, transform 0.2s;
+        }
+        #city-list button:hover {
+            background-color: #e0e0e0;
+            transform: scale(1.02);
+        }
+        /* --- FIN DE LA MODIFICACIÓN --- */
     </style>
 </head>
 <body>
@@ -65,8 +110,20 @@
     <!-- Contenedor del Mapa -->
     <div id="editor-map"></div>
     
+    <!-- --- INICIO DE LA MODIFICACIÓN --- -->
+    <!-- Panel para el Selector de Ciudad -->
+    <div id="city-selector-modal">
+        <div id="city-selector-content">
+            <h2>Selecciona una ciudad para editar</h2>
+            <div id="city-list">
+                <!-- Los botones de las ciudades se insertarán aquí con JS -->
+            </div>
+        </div>
+    </div>
+    <!-- --- FIN DE LA MODIFICACIÓN --- -->
+
     <!-- Mensaje de Carga -->
-    <div id="loading-overlay"><p>Cargando datos del editor...</p></div>
+    <div id="loading-overlay"><p>Verificando acceso...</p></div>
     
     <!-- Panel de Edición (empezará oculto) -->
     <div id="edit-panel">

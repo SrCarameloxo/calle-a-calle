@@ -1,4 +1,5 @@
-// Ruta: /api/streetActions.js (VERSIÓN CON DELETE Y CREATE)
+
+// Ruta: /api/streetActions.js (VERSIÓN CON DELETE, CREATE Y UPDATENAME)
 
 const { createClient } = require('@supabase/supabase-js');
 
@@ -43,18 +44,36 @@ module.exports = async (request, response) => {
             const { ids } = payload;
             if (!ids || !Array.isArray(ids) || ids.length < 2) return response.status(400).json({ error: 'Faltan datos para la acción de unir.' });
             
-            // ======== INICIO: CAMBIO REALIZADO ========
-            // Se llama a la nueva función de la base de datos que usa ST_Union y es más robusta.
             const { data, error } = await supabase.rpc('union_ways_and_hide_originals', {
                 original_way_ids: ids
             });
-            // ======== FIN: CAMBIO REALIZADO ========
 
             if (error) throw error;
             return response.status(200).json(data[0]);
 
-        } else if (action === 'delete') {
-            // --- NUEVA LÓGICA PARA BORRAR ---
+        } 
+        // --- INICIO DE LA MODIFICACIÓN ---
+        else if (action === 'updateName') {
+            // --- NUEVA LÓGICA PARA ACTUALIZAR NOMBRE ---
+            const { osm_id, display_name, city } = payload;
+            if (!osm_id || !display_name || !city) {
+                return response.status(400).json({ error: 'Faltan datos (osm_id, display_name, city) para actualizar.' });
+            }
+
+            const { error } = await supabase
+                .from('street_overrides')
+                .upsert({ 
+                    osm_id: osm_id, 
+                    display_name: display_name, 
+                    city: city 
+                }, { onConflict: 'osm_id, city' }); // IMPORTANTE: onConflict usa ambas columnas
+
+            if (error) throw error;
+            return response.status(200).json({ message: 'Nombre de calle actualizado con éxito.' });
+        }
+        // --- FIN DE LA MODIFICACIÓN ---
+        else if (action === 'delete') {
+            // --- LÓGICA PARA BORRAR ---
             const { id } = payload;
             if (!id) return response.status(400).json({ error: 'Falta el ID para la acción de borrar.' });
             
@@ -67,26 +86,22 @@ module.exports = async (request, response) => {
             return response.status(200).json({ message: `Way ${id} ocultado con éxito.` });
 
         } else if (action === 'create') {
-            // --- NUEVA LÓGICA PARA CREAR ---
+            // --- LÓGICA PARA CREAR ---
             const { geometry, tags, city } = payload;
             if (!geometry || !tags || !city) return response.status(400).json({ error: 'Faltan datos para la acción de crear.' });
 
-            // PostGIS necesita la geometría en formato WKT y con el SRID correcto.
-            // ST_GeomFromGeoJSON lo convierte por nosotros.
             const { data, error } = await supabase
                 .from('osm_ways')
                 .insert({
-                    id: -1, // ID temporal, será reemplazado por la base de datos
+                    id: -1, 
                     geom: `SRID=4326;${geometry.type.toUpperCase()}(${geometry.coordinates.map(p => p.join(' ')).join(',')})`,
                     tags: tags,
                     city: city
                 })
-                .select('id') // Pedimos que nos devuelva el ID de la nueva fila
+                .select('id')
                 .single();
 
             if (error) {
-                 // Un error común es que el id temporal -1 viole la unicidad si se intenta crear muy rápido.
-                 // Vamos a usar la secuencia directamente en un RPC para mayor robustez.
                  const { data: rpcData, error: rpcError } = await supabase.rpc('create_new_way', {
                      geom_geojson: geometry,
                      tags_json: tags,

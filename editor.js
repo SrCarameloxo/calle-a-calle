@@ -1,4 +1,4 @@
-// --- editor.js (VERSIÓN 14 - CON SELECTOR DE CIUDAD) ---
+// --- editor.js (VERSIÓN 15 - CORRIGIENDO GUARDADO DE NOMBRE) ---
 
 document.addEventListener('DOMContentLoaded', () => {
 
@@ -16,10 +16,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const saveChangesBtn = document.getElementById('save-changes-btn');
     const cancelBtn = document.getElementById('cancel-btn');
     const statusPanel = document.getElementById('status-panel');
-    // --- INICIO DE LA MODIFICACIÓN ---
     const citySelectorModal = document.getElementById('city-selector-modal');
     const cityListContainer = document.getElementById('city-list');
-    // --- FIN DE LA MODIFICACIÓN ---
 
     // --- INICIALIZACIÓN DEL MAPA ---
     const map = L.map('editor-map').setView([40.41, -3.70], 6); // Vista inicial general de España
@@ -98,9 +96,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let isCuttingMode = false;
     let isMergingMode = false;
     let streetsToMerge = [];
-    // --- INICIO DE LA MODIFICACIÓN ---
     let selectedCity = null; // Guardará la ciudad elegida
-    // --- FIN DE LA MODIFICACIÓN ---
 
     function updateStatusPanel(text, active = true) {
         if (active && text) {
@@ -179,9 +175,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     payload: {
                         osm_id: layer.feature.properties.id,
                         cut_point: cutLatLng,
-                        // --- INICIO DE LA MODIFICACIÓN ---
                         city: selectedCity.name,
-                        // --- FIN DE LA MODIFICACIÓN ---
                     }
                 }),
             });
@@ -328,18 +322,26 @@ document.addEventListener('DOMContentLoaded', () => {
             saveChangesBtn.disabled = true;
 
             if (osm_id) {
-                const response = await fetch('/api/updateStreetName', {
+                // --- INICIO DE LA MODIFICACIÓN ---
+                // Se cambia la llamada a la API /api/streetActions
+                const response = await fetch('/api/streetActions', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
-                    // --- INICIO DE LA MODIFICACIÓN ---
-                    body: JSON.stringify({ osm_id, display_name: newName, city: selectedCity.name }),
-                    // --- FIN DE LA MODIFICACIÓN ---
+                    body: JSON.stringify({
+                        action: 'updateName',
+                        payload: {
+                            osm_id: osm_id,
+                            display_name: newName,
+                            city: selectedCity.name
+                        }
+                    }),
                 });
                 const result = await response.json();
-                if (!response.ok) throw new Error(result.error || 'Error del servidor.');
+                if (!response.ok) throw new Error(result.details || result.error || 'Error del servidor.');
                 
                 selectedLayer.feature.properties.tags.name = newName;
                 selectedLayer.bindPopup(`<b>${newName}</b><br>ID: ${osm_id}`);
+                // --- FIN DE LA MODIFICACIÓN ---
             } else {
                 const response = await fetch('/api/streetActions', {
                     method: 'POST',
@@ -349,9 +351,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         payload: {
                             geometry: selectedLayer.toGeoJSON().geometry,
                             tags: { name: newName },
-                            // --- INICIO DE LA MODIFICACIÓN ---
                             city: selectedCity.name,
-                            // --- FIN DE LA MODIFICACIÓN ---
                         }
                     }),
                 });
@@ -407,15 +407,13 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // --- INICIO DE LA MODIFICACIÓN ---
-    // Esta función ahora acepta el nombre de la ciudad como parámetro
+
     async function cargarCallesPaginado(cityName) {
         let currentPage = 1;
         let totalFeaturesCargadas = 0;
         let seguirCargando = true;
         console.log(`Iniciando carga paginada para la ciudad: ${cityName}...`);
 
-        // Limpiamos la capa anterior si existiera
         if (geojsonLayer) {
             map.removeLayer(geojsonLayer);
         }
@@ -454,12 +452,11 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }).addTo(map);
 
-        loadingOverlay.style.display = 'flex'; // Mostrar overlay de carga
+        loadingOverlay.style.display = 'flex';
 
         while (seguirCargando) {
             try {
                 loadingText.textContent = `Cargando lote ${currentPage} de ${cityName}...`;
-                // Usamos la nueva URL con el parámetro de la ciudad
                 const response = await fetch(`/api/getCityStreets?page=${currentPage}&city=${cityName}`);
                 if (!response.ok) throw new Error('Respuesta de API no válida.');
                 const geojsonData = await response.json();
@@ -488,16 +485,14 @@ document.addEventListener('DOMContentLoaded', () => {
             const { data: cities, error } = await supabase.from('cities').select('*').order('name');
             if (error) throw error;
             
-            cityListContainer.innerHTML = ''; // Limpiamos el mensaje de carga
+            cityListContainer.innerHTML = '';
             cities.forEach(city => {
                 const button = document.createElement('button');
                 button.textContent = city.name;
                 button.addEventListener('click', () => {
-                    selectedCity = city; // Guardamos la ciudad seleccionada
-                    citySelectorModal.style.display = 'none'; // Ocultamos el modal
-                    // Centramos el mapa en la ciudad elegida
+                    selectedCity = city; 
+                    citySelectorModal.style.display = 'none'; 
                     map.setView([city.center_lat, city.center_lng], city.default_zoom);
-                    // Iniciamos la carga de calles para esa ciudad
                     cargarCallesPaginado(city.name);
                 });
                 cityListContainer.appendChild(button);
@@ -507,7 +502,6 @@ document.addEventListener('DOMContentLoaded', () => {
             cityListContainer.innerHTML = `<p style="color:red;">Error al cargar las ciudades: ${error.message}</p>`;
         }
     }
-    // --- FIN DE LA MODIFICACIÓN ---
     
     async function checkAuthAndLoad() {
         const { data: { session }, error: sessionError } = await supabase.auth.getSession();
@@ -523,12 +517,9 @@ document.addEventListener('DOMContentLoaded', () => {
             window.location.href = '/';
             return;
         }
-        // --- INICIO DE LA MODIFICACIÓN ---
-        // En lugar de cargar las calles directamente, mostramos el selector de ciudad
         console.log('¡Administrador verificado! Mostrando selector de ciudad...');
-        loadingOverlay.style.display = 'none'; // Ocultamos el overlay inicial
+        loadingOverlay.style.display = 'none'; 
         showCitySelector();
-        // --- FIN DE LA MODIFICACIÓN ---
     }
     checkAuthAndLoad();
 });

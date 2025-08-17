@@ -242,12 +242,11 @@ window.addEventListener('DOMContentLoaded', () => {
             const selectedMode = button.dataset.mode;
             if (button.disabled) return;
 
-            // --- ESTA ES LA CLAVE (1/2): RESETEO AL CAMBIAR DE MODO ---
-            // Al hacer clic en un nuevo modo, esta función se ejecuta PRIMERO,
-            // limpiando cualquier partida anterior (polígonos, botones, etc.)
-            // antes de que la lógica del nuevo modo comience.
+            // --- INICIO: CAMBIO CLAVE 1 ---
+            // Se llama a la función de reseteo "Maestra" justo al principio,
+            // garantizando una limpieza total antes de hacer cualquier otra cosa.
             resetToInitialView();
-            // --- FIN DE LA CLAVE ---
+            // --- FIN: CAMBIO CLAVE 1 ---
 
             // Limpiar el estado del modo anterior antes de cambiar
             if (activeModeControls && typeof activeModeControls.clear === 'function') {
@@ -583,9 +582,15 @@ window.addEventListener('DOMContentLoaded', () => {
     });
     userMk = guide = streetGrp = null;
     if(clearFull){
-        if(reviewLayer) gameMap.removeLayer(reviewLayer);
-        if(oldZonePoly) gameMap.removeLayer(oldZonePoly);
-        reviewLayer = oldZonePoly = null;
+        // --- INICIO DE LA CORRECCIÓN ---
+        // Se añade la comprobación y eliminación del polígono ACTIVO (`zonePoly`).
+        // Esta era la línea que faltaba y que causaba que el polígono se quedara visible.
+        if(zonePoly && gameMap.hasLayer(zonePoly)) gameMap.removeLayer(zonePoly);
+        // --- FIN DE LA CORRECCIÓN ---
+
+        if(reviewLayer && gameMap.hasLayer(reviewLayer)) gameMap.removeLayer(reviewLayer);
+        if(oldZonePoly && gameMap.hasLayer(oldZonePoly)) gameMap.removeLayer(oldZonePoly);
+        reviewLayer = oldZonePoly = zonePoly = null;
         if (drawing) {
             gameMap.off('click', addVertex);
             drawing = false;
@@ -780,20 +785,20 @@ window.addEventListener('DOMContentLoaded', () => {
     uiElements.nextBtn.disabled = true;
   }
   
-  // --- INICIO: FUNCIÓN DE RESETEO "MAESTRA" ---
-  // Esta es la función más importante para solucionar el bug. Se encarga de
-  // hacer una limpieza COMPLETA del estado del juego.
+  // --- INICIO: FUNCIÓN DE RESETEO "MAESTRA" MODIFICADA ---
+  // Esta función ahora es la responsable de hacer una limpieza COMPLETA
+  // tanto de la interfaz como del estado de la partida anterior.
   function resetToInitialView() {
-      // 1. Limpia la lógica de modos especiales (como Instinto)
+      // 1. Limpiar estado del modo anterior si existe (para modos complejos como Instinto)
       if (activeModeControls && typeof activeModeControls.clear === 'function') {
         activeModeControls.clear();
       }
       activeModeControls = null;
 
-      // 2. Limpia TODAS las capas del mapa (polígonos, calles, etc.)
+      // 2. Limpiar todas las capas del mapa
       clear(true);
 
-      // 3. Resetea TODAS las variables de la partida a su estado inicial
+      // 3. Resetear TODAS las variables de estado de la partida
       streetList = [];
       totalQuestions = 0;
       streetsGuessedCorrectly = 0;
@@ -804,21 +809,21 @@ window.addEventListener('DOMContentLoaded', () => {
       zonePoly = null;
       oldZonePoly = null;
 
-      // 4. Restaura la interfaz de usuario a como estaba al principio
+      // 4. Resetear la interfaz de usuario a su estado inicial
       updatePanelUI(() => {
-          // Oculta TODOS los posibles contenedores de juego
+          // Ocultar TODOS los contenedores de juego
           ['start-options', 'loaded-zone-options', 'checkbox-wrapper', 'game-interface', 'end-game-options', 'back-from-review-btn'].forEach(id => {
               const el = document.getElementById(id);
               if (el) el.classList.add('hidden');
           });
           
-          // Oculta los botones flotantes
+          // Ocultar botones flotantes
           uiElements.reportBtnFAB.classList.add('hidden');
 
-          // Muestra ÚNICAMENTE el botón de inicio
+          // Mostrar solo el botón inicial
           uiElements.drawZoneBtn.classList.remove('hidden');
           
-          // Limpia cualquier texto o barra de progreso que pudiera quedar
+          // Limpiar cualquier contenido dinámico
           uiElements.progressBar.style.width = '0%';
           uiElements.instintoOptionsContainer.innerHTML = '';
           uiElements.gameQuestion.textContent = '';
@@ -830,12 +835,11 @@ window.addEventListener('DOMContentLoaded', () => {
   // --- FIN: FUNCIÓN DE RESETEO "MAESTRA" ---
 
   function playFromHistory(zoneString) {
-    // --- ESTA ES LA CLAVE (2/2): RESETEO AL CARGAR UNA ZONA ---
+    // --- INICIO: CAMBIO CLAVE 2 ---
     // Se llama a la función de reseteo MAESTRA al principio para asegurar
-    // que cualquier estado anterior se limpie por completo antes de
-    // dibujar la nueva zona y sus correspondientes botones.
+    // que cualquier estado anterior (como estar en modo revisión) se limpie por completo.
     resetToInitialView();
-    // --- FIN DE LA CLAVE ---
+    // --- FIN: CAMBIO CLAVE 2 ---
     
     gameMap.off('click', addVertex);
     const points = zoneString.split(';').map(pair => {

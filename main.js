@@ -18,6 +18,7 @@ window.addEventListener('DOMContentLoaded', () => {
     logoutBtn: document.getElementById('logout-btn'),
     userInfoDetails: document.getElementById('user-info-details'),
     adminPanelBtn: document.getElementById('admin-panel-btn'),
+    editorModeBtn: document.getElementById('editor-mode-btn'),
     gameUiContainer: document.getElementById('game-ui-container'),
     drawZoneBtn: document.getElementById('drawZone'),
     undoPointBtn: document.getElementById('undoPoint'),
@@ -148,7 +149,10 @@ window.addEventListener('DOMContentLoaded', () => {
         userProfile.subscribedCity = profile.subscribed_city;
         userProfile.showDrawHelp = profile.mostrar_ayuda_dibujo;
         
-        if (profile.role === 'admin') uiElements.adminPanelBtn.classList.remove('hidden');
+        if (profile.role === 'admin') {
+            uiElements.adminPanelBtn.classList.remove('hidden');
+            uiElements.editorModeBtn.classList.remove('hidden');
+        }
         if (profile.subscribed_city) {
             const { data: city, error: cityError } = await supabaseClient.from('cities').select('*').eq('name', profile.subscribed_city).single();
             if (cityError) throw new Error(`No se encontraron datos para la ciudad: ${profile.subscribed_city}`);
@@ -308,6 +312,7 @@ window.addEventListener('DOMContentLoaded', () => {
 
     uiElements.reportBtnFAB.addEventListener('click', reportIncident);
     uiElements.adminPanelBtn.addEventListener('click', () => { window.location.href = '/admin.html'; });
+    uiElements.editorModeBtn.addEventListener('click', () => { window.location.href = '/editor.html'; });
     uiElements.dismissDrawHelpBtn.addEventListener('click', dismissDrawHelp);
     uiElements.scoreDisplayToggle.addEventListener('click', toggleScoreDisplay);
 

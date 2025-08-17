@@ -15,7 +15,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const streetIdDisplay = document.getElementById('street-id-display');
     const saveChangesBtn = document.getElementById('save-changes-btn');
     const cancelBtn = document.getElementById('cancel-btn');
-    const statusPanel = document.getElementById('status-panel'); // <-- MEJORA 2: Referencia al nuevo panel
+    const statusPanel = document.getElementById('status-panel');
 
     // --- INICIALIZACIÓN DEL MAPA ---
     const map = L.map('editor-map').setView([38.88, -6.97], 13);
@@ -26,16 +26,12 @@ document.addEventListener('DOMContentLoaded', () => {
     let geojsonLayer;
 
     // --- INICIALIZACIÓN DE GEOMAN ---
-    // <-- MEJORA 3: Barra de herramientas simplificada -->
     map.pm.addControls({
       position: 'topleft',
-      // Herramientas de dibujo que queremos
       drawPolyline: true,
-      // Herramientas de edición que queremos
       editMode: true,
       dragMode: true,
       removalMode: true,
-      // Todas las demás herramientas que NO usamos, las desactivamos
       drawMarker: false,
       drawCircleMarker: false,
       drawPolygon: false,
@@ -61,14 +57,13 @@ document.addEventListener('DOMContentLoaded', () => {
         name: 'MergeLayers',
         block: 'custom',
         title: 'Unir Calles (Activar/Desactivar Modo Unión)',
-        className: 'leaflet-pm-icon-polygon', // Se podría cambiar a un icono más representativo
+        className: 'leaflet-pm-icon-polygon',
         toggle: false,
         onClick: (e) => {
             toggleMode('merge', e.target);
         },
     });
 
-    // <-- MEJORA 2: Listeners para los modos de Geoman para actualizar el panel de estado -->
     map.on('pm:globaldrawmodetoggled', (e) => {
         if (e.enabled) {
             updateStatusPanel('MODO CREAR: Dibuja una nueva calle en el mapa.');
@@ -98,9 +93,8 @@ document.addEventListener('DOMContentLoaded', () => {
     let selectedLayer = null;
     let isCuttingMode = false;
     let isMergingMode = false;
-    let streetsToMerge = []; // <-- MEJORA 1: Cambiamos el nombre de la variable para mayor claridad
+    let streetsToMerge = [];
 
-    // <-- MEJORA 2: Nueva función para gestionar el panel de estado -->
     function updateStatusPanel(text, active = true) {
         if (active && text) {
             statusPanel.textContent = text;
@@ -121,14 +115,14 @@ document.addEventListener('DOMContentLoaded', () => {
             if (mode === 'cut') {
                 isCuttingMode = true;
                 if (buttonElement) buttonElement.classList.add('active');
-                updateStatusPanel('MODO CORTAR: Haz clic en una calle para dividirla.'); // <-- MEJORA 2
+                updateStatusPanel('MODO CORTAR: Haz clic en una calle para dividirla.');
             } else if (mode === 'merge') {
                 isMergingMode = true;
                 if (buttonElement) buttonElement.classList.add('active');
-                updateStatusPanel('MODO UNIR: Selecciona dos calles para unirlas.'); // <-- MEJORA 2
+                updateStatusPanel('MODO UNIR: Selecciona dos calles para unirlas.');
             }
         } else {
-            updateStatusPanel('', false); // <-- MEJORA 2: Ocultar panel si se desactiva el modo
+            updateStatusPanel('', false);
         }
         map.getContainer().style.cursor = isCuttingMode || isMergingMode ? 'pointer' : '';
     }
@@ -201,7 +195,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // <-- MEJORA 1: Lógica de unión completamente reescrita -->
     function handleMergeSelection(layer) {
         const layerId = layer.feature.properties.id;
         if (!layerId) {
@@ -212,11 +205,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const index = streetsToMerge.findIndex(item => item.feature.properties.id === layerId);
         
         if (index > -1) {
-            // Deseleccionar: quitar del array y restaurar estilo
             streetsToMerge.splice(index, 1);
             layer.setStyle({ color: '#3388ff', weight: 3 });
         } else {
-            // Seleccionar: añadir al array y cambiar estilo
             streetsToMerge.push(layer);
             layer.setStyle({ color: '#28a745', weight: 5 });
         }
@@ -224,16 +215,18 @@ document.addEventListener('DOMContentLoaded', () => {
         updateMergeUI();
     }
     
-    // <-- MEJORA 1: Lógica de la UI de unión mejorada -->
     function updateMergeUI() {
         let mergePanel = document.getElementById('merge-panel');
         if (!mergePanel) {
             mergePanel = document.createElement('div');
             mergePanel.id = 'merge-panel';
+            // ======== INICIO: CAMBIO REALIZADO ========
+            // Se ajustan los estilos para posicionar el panel en la esquina superior derecha.
             mergePanel.style.position = 'absolute';
-            mergePanel.style.bottom = '20px';
-            mergePanel.style.left = '50%';
-            mergePanel.style.transform = 'translateX(-50%)';
+            mergePanel.style.top = '10px';
+            mergePanel.style.right = '10px';
+            mergePanel.style.width = '300px'; // Ancho similar al panel de edición
+            // ======== FIN: CAMBIO REALIZADO ========
             mergePanel.style.zIndex = '1001';
             mergePanel.style.background = 'white';
             mergePanel.style.padding = '15px';
@@ -247,14 +240,13 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        // Si intentan unir segmentos de la misma calle, se bloquea la acción.
         const uniqueIds = new Set(streetsToMerge.map(l => l.feature.properties.id));
         const canMerge = uniqueIds.size > 1;
 
-        editPanel.style.display = 'none'; // Ocultar panel de edición al entrar en modo unión
+        editPanel.style.display = 'none';
         const streetNames = streetsToMerge.map(l => `<li>${l.feature.properties.tags.name || `ID: ${l.feature.properties.id}`}</li>`).join('');
         
-        let mergeButtonHTML = `<button id="confirm-merge-btn" style="background-color: #28a745; color: white; padding: 10px; border: none; width: 100%; border-radius: 4px;">Confirmar Unión</button>`;
+        let mergeButtonHTML = `<button id="confirm-merge-btn" style="background-color: #28a745; color: white; padding: 10px; border: none; width: 100%; border-radius: 4px; cursor: pointer;">Confirmar Unión</button>`;
         let warningMessage = `<p style="font-size: 12px; color: #555;">La calle más larga determinará el nombre.</p>`;
         
         if (!canMerge) {
@@ -262,7 +254,7 @@ document.addEventListener('DOMContentLoaded', () => {
             mergeButtonHTML = `<button id="confirm-merge-btn" disabled style="background-color: #6c757d; color: white; padding: 10px; border: none; width: 100%; border-radius: 4px; cursor: not-allowed;">Confirmar Unión</button>`;
         }
         
-        mergePanel.innerHTML = `<h3>Unir Calles</h3><p>Calles seleccionadas (${streetsToMerge.length}):</p><ul style="font-size: 14px; margin-left: 20px;">${streetNames}</ul>${warningMessage}${mergeButtonHTML}<button id="cancel-merge-btn" style="background-color: #dc3545; color: white; padding: 10px; border: none; width: 100%; border-radius: 4px; margin-top: 5px;">Cancelar</button>`;
+        mergePanel.innerHTML = `<h3>Unir Calles</h3><p>Calles seleccionadas (${streetsToMerge.length}):</p><ul style="font-size: 14px; margin-left: 20px;">${streetNames}</ul>${warningMessage}${mergeButtonHTML}<button id="cancel-merge-btn" style="background-color: #dc3545; color: white; padding: 10px; border: none; width: 100%; border-radius: 4px; margin-top: 5px; cursor: pointer;">Cancelar</button>`;
         mergePanel.style.display = 'block';
         
         if (canMerge) {
@@ -297,7 +289,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 }),
             });
             const newWay = await response.json();
-            if (!response.ok) throw new Error(newWay.details || newWay.error || 'Error del servidor.');
+            if (!response.ok) {
+                // El error ahora puede venir del backend con un mensaje claro
+                throw new Error(newWay.details || newWay.error || 'Error del servidor.');
+            }
             streetsToMerge.forEach(layer => geojsonLayer.removeLayer(layer));
             geojsonLayer.addData({
                 type: "Feature", geometry: newWay.geom, properties: { id: newWay.id, tags: newWay.tags }
@@ -355,7 +350,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (!response.ok) throw new Error(result.details || 'Error al crear la calle.');
 
                 selectedLayer.feature.properties.id = result.id;
-                selectedLayer.feature.properties.tags = { name: newName }; // Asegurarse que los tags se actualizan
+                selectedLayer.feature.properties.tags = { name: newName };
                 selectedLayer.bindPopup(`<b>${newName}</b><br>ID: ${result.id}`);
             }
             closeEditPanel();
@@ -431,7 +426,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     } else if (isMergingMode) {
                         handleMergeSelection(visibleLayer);
                     } else {
-                        // Solo abrir panel de edición si la calle tiene nombre o es una calle sin nombre (gris)
                         openEditPanel(visibleLayer);
                     }
                 };

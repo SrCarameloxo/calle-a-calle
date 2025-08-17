@@ -43,9 +43,12 @@ module.exports = async (request, response) => {
             const { ids } = payload;
             if (!ids || !Array.isArray(ids) || ids.length < 2) return response.status(400).json({ error: 'Faltan datos para la acción de unir.' });
             
-            const { data, error } = await supabase.rpc('merge_ways_and_hide_originals', {
+            // ======== INICIO: CAMBIO REALIZADO ========
+            // Se llama a la nueva función de la base de datos que usa ST_Union y es más robusta.
+            const { data, error } = await supabase.rpc('union_ways_and_hide_originals', {
                 original_way_ids: ids
             });
+            // ======== FIN: CAMBIO REALIZADO ========
 
             if (error) throw error;
             return response.status(200).json(data[0]);

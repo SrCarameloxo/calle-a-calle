@@ -582,7 +582,7 @@ window.addEventListener('DOMContentLoaded', () => {
     });
     userMk = guide = streetGrp = null;
     if(clearFull){
-        if(zonePoly && gameMap.hasLayer(zonePoly)) gameMap.removeLayer(zonePoly);
+        if(zonePoly) gameMap.removeLayer(zonePoly);
         if(reviewLayer) gameMap.removeLayer(reviewLayer);
         if(oldZonePoly) gameMap.removeLayer(oldZonePoly);
         reviewLayer = oldZonePoly = null;
@@ -645,6 +645,16 @@ window.addEventListener('DOMContentLoaded', () => {
   }
 
   function endGame() {
+    // --- INICIO DE LA CORRECCIÓN DEFINITIVA ---
+    // Esta cláusula de guarda es la solución. Si esta función es llamada
+    // por error mientras el juego está en modo 'instinto', simplemente
+    // se detiene y no hace nada, evitando mostrar los botones incorrectos.
+    if (currentGameMode === 'instinto') {
+        console.warn("Llamada a endGame() genérico prevenida durante el modo Instinto.");
+        return;
+    }
+    // --- FIN DE LA CORRECCIÓN DEFINITIVA ---
+
     updatePanelUI(() => {
         lastGameZonePoints = [...zonePoints];
         lastGameStreetList = [...streetList];
@@ -803,6 +813,10 @@ window.addEventListener('DOMContentLoaded', () => {
       zonePoints = [];
       zonePoly = null;
       oldZonePoly = null;
+
+      uiElements.repeatZoneBtn.onclick = null;
+      uiElements.reviewGameBtn.onclick = null;
+      uiElements.saveZoneBtn.onclick = null;
 
       // 4. Resetear la interfaz de usuario a su estado inicial
       updatePanelUI(() => {

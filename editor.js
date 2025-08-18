@@ -1,5 +1,5 @@
 
-// --- editor.js (VERSIÓN 16 - CON CHIVATOS DE DEBUG) ---
+// --- editor.js (VERSIÓN 17 - VOLVIENDO A LA API ORIGINAL) ---
 
 document.addEventListener('DOMContentLoaded', () => {
 
@@ -21,7 +21,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const cityListContainer = document.getElementById('city-list');
 
     // --- INICIALIZACIÓN DEL MAPA ---
-    const map = L.map('editor-map').setView([40.41, -3.70], 6); // Vista inicial general de España
+    const map = L.map('editor-map').setView([40.41, -3.70], 6);
     L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
         attribution: '© CARTO', maxZoom: 20
     }).addTo(map);
@@ -97,7 +97,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let isCuttingMode = false;
     let isMergingMode = false;
     let streetsToMerge = [];
-    let selectedCity = null; // Guardará la ciudad elegida
+    let selectedCity = null;
 
     function updateStatusPanel(text, active = true) {
         if (active && text) {
@@ -324,31 +324,25 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (osm_id) {
                 // --- INICIO DE LA MODIFICACIÓN ---
-                // Chivato 1: Ver qué datos estamos a punto de enviar.
-                const requestBody = {
-                    action: 'updateName',
-                    payload: {
-                        osm_id: osm_id,
-                        display_name: newName,
-                        city: selectedCity.name
-                    }
-                };
-                console.log("--- CHIVATO 1 (Frontend) ---");
-                console.log("Enviando a /api/streetActions:");
-                console.table(requestBody.payload);
-                // --- FIN DE LA MODIFICACIÓN ---
-
-                const response = await fetch('/api/streetActions', {
+                // Volvemos a llamar a la API dedicada /api/updateStreetName
+                const response = await fetch('/api/updateStreetName', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
-                    body: JSON.stringify(requestBody), // Usamos la variable que acabamos de crear
+                    // El cuerpo ahora es simple, sin 'action' ni 'payload'
+                    body: JSON.stringify({ 
+                        osm_id: osm_id, 
+                        display_name: newName, 
+                        city: selectedCity.name 
+                    }),
                 });
+                // --- FIN DE LA MODIFICACIÓN ---
                 const result = await response.json();
-                if (!response.ok) throw new Error(result.details || result.error || 'Error del servidor.');
+                if (!response.ok) throw new Error(result.error || 'Error del servidor.');
                 
                 selectedLayer.feature.properties.tags.name = newName;
                 selectedLayer.bindPopup(`<b>${newName}</b><br>ID: ${osm_id}`);
             } else {
+                // La creación de calles nuevas sigue usando streetActions, lo cual es correcto
                 const response = await fetch('/api/streetActions', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
@@ -529,3 +523,4 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     checkAuthAndLoad();
 });
+

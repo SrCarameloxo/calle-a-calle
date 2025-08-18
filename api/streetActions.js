@@ -1,4 +1,5 @@
-// Ruta: /api/streetActions.js (VERSIÓN CON CHIVATOS DE ALTA PRECISIÓN)
+
+// Ruta: /api/streetActions.js (Limpiado, sin updateName)
 
 const { createClient } = require('@supabase/supabase-js');
 
@@ -22,8 +23,6 @@ module.exports = async (request, response) => {
 
         // 2. Lógica de enrutamiento basada en la acción
         const { action, payload } = request.body;
-        
-        console.log(`--- CHIVATO INICIAL --- Acción recibida: ${action}`);
 
         if (action === 'split') {
             const { osm_id, cut_point, city } = payload;
@@ -51,44 +50,7 @@ module.exports = async (request, response) => {
             return response.status(200).json(data[0]);
 
         } 
-        else if (action === 'updateName') {
-            const { osm_id, display_name, city } = payload;
-            if (!osm_id || !display_name || !city) {
-                return response.status(400).json({ error: 'Faltan datos (osm_id, display_name, city) para actualizar.' });
-            }
-            
-            console.log("--- CHIVATO 'updateName' [PASO 1] ---");
-            console.log("Datos para el UPSERT:", { osm_id, display_name, city });
-            
-            // --- INICIO DE LA MODIFICACIÓN ---
-            // Capturamos la respuesta completa de Supabase, no solo data y error
-            const supabaseResponse = await supabase
-                .from('street_overrides')
-                .upsert({ 
-                    osm_id: osm_id, 
-                    display_name: display_name, 
-                    city: city 
-                }, { onConflict: 'osm_id' });
-            
-            console.log("--- CHIVATO 'updateName' [PASO 2] ---");
-            console.log("Respuesta COMPLETA de Supabase recibida.");
-            console.log("Status:", supabaseResponse.status);
-            console.log("Status Text:", supabaseResponse.statusText);
-            console.log("Count (filas afectadas):", supabaseResponse.count);
-            console.log("Error Object:", supabaseResponse.error);
-            console.log("Data Object:", supabaseResponse.data);
-            // --- FIN DE LA MODIFICACIÓN ---
-
-            if (supabaseResponse.error) {
-                console.error("Error DETALLADO de Supabase:", supabaseResponse.error);
-                throw supabaseResponse.error;
-            }
-            
-            console.log("--- CHIVATO 'updateName' [PASO 3] ---");
-            console.log("La operación se completó sin lanzar un error. Devolviendo mensaje de éxito.");
-
-            return response.status(200).json({ message: 'Nombre de calle actualizado con éxito.' });
-        }
+        // --- SE HA ELIMINADO EL BLOQUE "updateName" DE AQUÍ ---
         else if (action === 'delete') {
             const { id } = payload;
             if (!id) return response.status(400).json({ error: 'Falta el ID para la acción de borrar.' });

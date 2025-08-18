@@ -1,4 +1,6 @@
-// --- editor.js (VERSIÓN 15 - CORRIGIENDO GUARDADO DE NOMBRE) ---
+--- START OF FILE editor.js ---
+
+// --- editor.js (VERSIÓN 16 - CON CHIVATOS DE DEBUG) ---
 
 document.addEventListener('DOMContentLoaded', () => {
 
@@ -323,25 +325,30 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (osm_id) {
                 // --- INICIO DE LA MODIFICACIÓN ---
-                // Se cambia la llamada a la API /api/streetActions
+                // Chivato 1: Ver qué datos estamos a punto de enviar.
+                const requestBody = {
+                    action: 'updateName',
+                    payload: {
+                        osm_id: osm_id,
+                        display_name: newName,
+                        city: selectedCity.name
+                    }
+                };
+                console.log("--- CHIVATO 1 (Frontend) ---");
+                console.log("Enviando a /api/streetActions:");
+                console.table(requestBody.payload);
+                // --- FIN DE LA MODIFICACIÓN ---
+
                 const response = await fetch('/api/streetActions', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
-                    body: JSON.stringify({
-                        action: 'updateName',
-                        payload: {
-                            osm_id: osm_id,
-                            display_name: newName,
-                            city: selectedCity.name
-                        }
-                    }),
+                    body: JSON.stringify(requestBody), // Usamos la variable que acabamos de crear
                 });
                 const result = await response.json();
                 if (!response.ok) throw new Error(result.details || result.error || 'Error del servidor.');
                 
                 selectedLayer.feature.properties.tags.name = newName;
                 selectedLayer.bindPopup(`<b>${newName}</b><br>ID: ${osm_id}`);
-                // --- FIN DE LA MODIFICACIÓN ---
             } else {
                 const response = await fetch('/api/streetActions', {
                     method: 'POST',
@@ -523,3 +530,5 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     checkAuthAndLoad();
 });
+
+--- END OF FILE editor.js ---

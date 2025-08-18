@@ -1,5 +1,4 @@
-
-// Ruta: /api/streetActions.js (VERSIÓN CON CORRECCIÓN FINAL DE TIPO DE DATO)
+// Ruta: /api/streetActions.js (VERSIÓN CON CHIVATOS DE ALTA PRECISIÓN)
 
 const { createClient } = require('@supabase/supabase-js');
 
@@ -23,6 +22,8 @@ module.exports = async (request, response) => {
 
         // 2. Lógica de enrutamiento basada en la acción
         const { action, payload } = request.body;
+        
+        console.log(`--- CHIVATO INICIAL --- Acción recibida: ${action}`);
 
         if (action === 'split') {
             const { osm_id, cut_point, city } = payload;
@@ -55,25 +56,37 @@ module.exports = async (request, response) => {
             if (!osm_id || !display_name || !city) {
                 return response.status(400).json({ error: 'Faltan datos (osm_id, display_name, city) para actualizar.' });
             }
-
-            const { error } = await supabase
+            
+            console.log("--- CHIVATO 'updateName' [PASO 1] ---");
+            console.log("Datos para el UPSERT:", { osm_id, display_name, city });
+            
+            // --- INICIO DE LA MODIFICACIÓN ---
+            // Capturamos la respuesta completa de Supabase, no solo data y error
+            const supabaseResponse = await supabase
                 .from('street_overrides')
                 .upsert({ 
-                    // --- INICIO DE LA CORRECCIÓN ---
-                    // Nos aseguramos de que osm_id sea un número, que es el tipo correcto en la BD.
-                    // Quitamos el .toString() que añadimos erróneamente.
                     osm_id: osm_id, 
-                    // --- FIN DE LA CORRECCIÓN ---
                     display_name: display_name, 
                     city: city 
                 }, { onConflict: 'osm_id' });
+            
+            console.log("--- CHIVATO 'updateName' [PASO 2] ---");
+            console.log("Respuesta COMPLETA de Supabase recibida.");
+            console.log("Status:", supabaseResponse.status);
+            console.log("Status Text:", supabaseResponse.statusText);
+            console.log("Count (filas afectadas):", supabaseResponse.count);
+            console.log("Error Object:", supabaseResponse.error);
+            console.log("Data Object:", supabaseResponse.data);
+            // --- FIN DE LA MODIFICACIÓN ---
 
-            if (error) {
-                // Si sigue fallando, este log nos dará el error exacto de Supabase
-                console.error("Error devuelto por Supabase en el upsert:", error);
-                throw error;
+            if (supabaseResponse.error) {
+                console.error("Error DETALLADO de Supabase:", supabaseResponse.error);
+                throw supabaseResponse.error;
             }
             
+            console.log("--- CHIVATO 'updateName' [PASO 3] ---");
+            console.log("La operación se completó sin lanzar un error. Devolviendo mensaje de éxito.");
+
             return response.status(200).json({ message: 'Nombre de calle actualizado con éxito.' });
         }
         else if (action === 'delete') {
@@ -125,4 +138,3 @@ module.exports = async (request, response) => {
         return response.status(500).json({ error: 'Error interno del servidor', details: error.message });
     }
 };
-

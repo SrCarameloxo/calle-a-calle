@@ -1,14 +1,12 @@
 
-// Ruta: /api/streetActions.js (VERSIÓN CON CHIVATOS DE DEBUG)
+// Ruta: /api/streetActions.js (VERSIÓN CON CORRECCIÓN DE TIPO DE DATO)
 
 const { createClient } = require('@supabase/supabase-js');
 
 module.exports = async (request, response) => {
-    // --- INICIO DE LA MODIFICACIÓN ---
-    // Chivato 2: Ver qué datos llegan a la API.
+    // ... (código de los chivatos y seguridad sin cambios)
     console.log("--- CHIVATO 2 (Backend) ---");
     console.log("Datos recibidos en el cuerpo de la petición:", request.body);
-    // --- FIN DE LA MODIFICACIÓN ---
 
     if (request.method !== 'POST') {
         return response.status(405).json({ error: 'Method Not Allowed' });
@@ -54,8 +52,6 @@ module.exports = async (request, response) => {
                 return response.status(400).json({ error: 'Faltan datos (osm_id, display_name, city) para actualizar.' });
             }
 
-            // --- INICIO DE LA MODIFICACIÓN ---
-            // Chivato 3: Confirmar que entramos en el bloque correcto y con qué datos.
             console.log("--- CHIVATO 3 (Backend) ---");
             console.log(`Intentando hacer UPSERT en la tabla 'street_overrides'`);
             console.table({ osm_id, display_name, city });
@@ -63,18 +59,18 @@ module.exports = async (request, response) => {
             const { data, error } = await supabase
                 .from('street_overrides')
                 .upsert({ 
-                    osm_id: osm_id, 
+                    // --- INICIO DE LA MODIFICACIÓN ---
+                    osm_id: osm_id.toString(), // Forzamos que el ID sea un string
+                    // --- FIN DE LA MODIFICACIÓN ---
                     display_name: display_name, 
                     city: city 
                 }, { onConflict: 'osm_id' }); 
             
-            // Chivato 4: Ver la respuesta de Supabase, sea cual sea.
             console.log("--- CHIVATO 4 (Backend) ---");
             console.log("Respuesta de Supabase - Datos:", data);
             console.log("Respuesta de Supabase - Error:", error);
-            // --- FIN DE LA MODIFICACIÓN ---
 
-            if (error) throw error; // Si hay un error, la función se detendrá aquí y lo mostrará
+            if (error) throw error; 
             
             return response.status(200).json({ message: 'Nombre de calle actualizado con éxito.' });
         }
@@ -107,4 +103,3 @@ module.exports = async (request, response) => {
         return response.status(500).json({ error: 'Error interno del servidor', details: error.message });
     }
 };
-

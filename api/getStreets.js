@@ -150,6 +150,50 @@ module.exports = async (request, response) => {
     const geoResult = await geocode(center, process.env.GOOGLE_API_KEY);
     const currentCity = geoResult ? geoResult.city : null;
 
+    // --- INICIO: BLOQUE AÑADIDO PARA EL FLUJO HÍBRIDO ---
+    let initialData = { elements: [] };
+
+    try {
+        // --- PLAN A: INTENTAR OBTENER CALLES DESDE SUPABASE ---
+        console.log("Plan A: Intentando obtener calles desde Supabase DB...");
+        
+        // 1. Convertir los puntos del polígono a formato WKT que PostGIS entiende.
+        const polygonCoords = zonePoints.map(p => `${p.lng} ${p.lat}`).join(', ');
+        const polygonWKT = `POLYGON((${polygonCoords}, ${zonePoints[0].lng} ${zonePoints[0].lat}))`;
+
+        // 2. Llamar a la función RPC que creamos en la base de datos.
+        const { data: streetsFromDb, error: rpcError } = await supabaseAdmin.rpc('get_streets_in_polygon', {
+            polygon_wkt: polygonWKT
+        });
+
+        if (rpcError) {
+            console.error("Error en RPC de Supabase, pasando a Overpass:", rpcError.message);
+            throw rpcError; 
+        }
+
+        if (streetsFromDb && streetsFromDb.length > 0) {
+            console.log(`¡Éxito! Se encontraron ${streetsFromDb.length} calles en Supabase DB.`);
+            // 3. Transformar los datos al formato que el resto del código espera.
+            initialData.elements = streetsFromDb.map(street => ({
+                id: street.id,
+                tags: street.tags,
+            }));
+        } else {
+            console.log("No se encontraron calles en Supabase DB para esta zona. Pasando a Overpass.");
+            throw new Error("Zona vacía en DB, se necesita fallback a Overpass.");
+        }
+
+    } catch (error) {
+        // --- PLAN B: FALLBACK A OVERPASS API ---
+        console.log("Plan B: Se activó el fallback a Overpass API.");
+        const coords = zonePoints.map(p => `${p.lat} ${p.lng}`).join(' ');
+        const initialQuery = `[out:json][timeout:25]; way(poly:"${coords}")["name"]; out tags;`;
+        let res = await fetch('https://overpass-api.de/api/interpreter', { method: 'POST', body: initialQuery });
+        if (!res.ok) throw new Error(`Overpass API error: ${res.statusText}`);
+        initialData = await res.json();
+    }
+    // --- FIN: BLOQUE AÑADIDO PARA EL FLUJO HÍBRIDO ---
+    
     const overrideRules = new Map();
     const blockedNames = new Set();
 
@@ -161,12 +205,6 @@ module.exports = async (request, response) => {
         if (!blockedError) blocked.forEach(rule => blockedNames.add(rule.osm_name));
     }
 
-    const coords = zonePoints.map(p => `${p.lat} ${p.lng}`).join(' ');
-    const initialQuery = `[out:json][timeout:25]; way(poly:"${coords}")["name"]; out tags;`;
-    let res = await fetch('https://overpass-api.de/api/interpreter', { method: 'POST', body: initialQuery });
-    if (!res.ok) throw new Error(`Overpass API error: ${res.statusText}`);
-    let initialData = await res.json();
-    
     const initialOsmNames = new Set(initialData.elements.map(el => el.tags.name));
     const streetNamesInPoly = [...initialOsmNames].filter(name => !blockedNames.has(name));
     
@@ -228,7 +266,7 @@ module.exports = async (request, response) => {
 
                 const queryNames = entity.osmNames.map(n => `way["name"="${n}"](around:${radius}, ${center.lat}, ${center.lng});`).join('');
                 const geometryQuery = `[out:json][timeout:25]; (${queryNames}); out body; >; out skel qt;`;
-                res = await fetch('https://overpass-api.de/api/interpreter', { method: 'POST', body: geometryQuery });
+                let res = await fetch('https://overpass-api.de/api/interpreter', { method: 'POST', body: geometryQuery });
                 const geomData = await res.json();
                 const elementsById = geomData.elements.reduce((acc, el) => { acc[el.id] = el; return acc; }, {});
                 const geometries = geomData.elements.filter(el => el.type === 'way').map(el => ({

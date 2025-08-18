@@ -1,4 +1,3 @@
-
 // Ruta: /api/getCityStreets.js (Versión 3 - Paginada y por Ciudad)
 
 const { createClient } = require('@supabase/supabase-js');
@@ -59,14 +58,59 @@ module.exports = async (request, response) => {
         // --- FIN DE LA MODIFICACIÓN ---
 
         if (error) throw error;
+        
+        // --- INICIO DEL CÓDIGO AÑADIDO ---
+
+        // 1. Obtener todas las reglas de renombrado de la tabla 'street_overrides' para la ciudad actual.
+        const { data: overrides, error: overridesError } = await supabase
+            .from('street_overrides') // La tabla que usa el editor.
+            .select('osm_id, display_name')
+            .eq('city', city);
+
+        if (overridesError) {
+            // Si falla la obtención de overrides, no detenemos todo.
+            // Simplemente mostraremos los nombres originales.
+            console.error('Error al cargar los overrides del editor:', overridesError.message);
+        }
+
+        // 2. Crear un Mapa para una búsqueda súper rápida.
+        // La clave será el ID de la calle y el valor será el nuevo nombre.
+        const overrideMap = new Map();
+        if (overrides) {
+            for (const rule of overrides) {
+                overrideMap.set(rule.osm_id, rule.display_name);
+            }
+        }
+        
+        // --- FIN DEL CÓDIGO AÑADIDO ---
+
 
         const geojsonData = {
             type: "FeatureCollection",
-            features: data.map(row => ({
-                type: "Feature",
-                geometry: row.geometry,
-                properties: { id: row.id, tags: row.tags }
-            }))
+            features: data.map(row => {
+                
+                // --- INICIO DEL CÓDIGO AÑADIDO ---
+
+                // 3. Para cada calle, comprobamos si tiene una regla de renombrado.
+                if (overrideMap.has(row.id)) {
+                    // Si la encontramos en nuestro mapa de reglas, sobrescribimos el nombre.
+                    if (row.tags) {
+                        row.tags.name = overrideMap.get(row.id);
+                    } else {
+                        // En el caso raro de que una calle no tenga 'tags', se los creamos.
+                        row.tags = { name: overrideMap.get(row.id) };
+                    }
+                }
+
+                // --- FIN DEL CÓDIGO AÑADIDO ---
+
+                // Devolvemos el objeto Feature con el nombre ya corregido (si era necesario).
+                return {
+                    type: "Feature",
+                    geometry: row.geometry,
+                    properties: { id: row.id, tags: row.tags }
+                };
+            })
         };
         
         response.status(200).json(geojsonData);
@@ -76,4 +120,3 @@ module.exports = async (request, response) => {
         response.status(500).json({ error: 'Error interno del servidor.', details: error.message });
     }
 };
-

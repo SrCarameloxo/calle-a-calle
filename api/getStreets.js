@@ -167,8 +167,9 @@ module.exports = async (request, response) => {
         });
 
         if (rpcError) {
-            console.error("Error en RPC de Supabase, pasando a Overpass:", rpcError.message);
-            throw rpcError; 
+            console.error("Error en RPC de Supabase (probablemente geometría inválida), pasando a Overpass:", rpcError.message);
+            // CORRECCIÓN: NO lanzamos un error, forzamos el fallback creando una excepción controlada.
+            throw new Error("Fallback a Overpass por error en RPC."); 
         }
 
         if (streetsFromDb && streetsFromDb.length > 0) {
@@ -185,7 +186,7 @@ module.exports = async (request, response) => {
 
     } catch (error) {
         // --- PLAN B: FALLBACK A OVERPASS API ---
-        console.log("Plan B: Se activó el fallback a Overpass API.");
+        console.log(`Plan B activado. Razón: ${error.message}`);
         const coords = zonePoints.map(p => `${p.lat} ${p.lng}`).join(' ');
         const initialQuery = `[out:json][timeout:25]; way(poly:"${coords}")["name"]; out tags;`;
         let res = await fetch('https://overpass-api.de/api/interpreter', { method: 'POST', body: initialQuery });
@@ -205,7 +206,8 @@ module.exports = async (request, response) => {
         if (!blockedError) blocked.forEach(rule => blockedNames.add(rule.osm_name));
     }
 
-    const initialOsmNames = new Set(initialData.elements.map(el => el.tags.name));
+    // LÍNEA CRÍTICA CORREGIDA: Nos aseguramos de que cualquier calle que procesemos tenga un nombre.
+    const initialOsmNames = new Set(initialData.elements.filter(el => el.tags && el.tags.name).map(el => el.tags.name));
     const streetNamesInPoly = [...initialOsmNames].filter(name => !blockedNames.has(name));
     
     const groupedByBaseName = new Map();

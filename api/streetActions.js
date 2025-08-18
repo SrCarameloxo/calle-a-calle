@@ -1,13 +1,9 @@
 
-// Ruta: /api/streetActions.js (VERSIÓN CON CORRECCIÓN DE TIPO DE DATO)
+// Ruta: /api/streetActions.js (VERSIÓN CON CORRECCIÓN FINAL DE TIPO DE DATO)
 
 const { createClient } = require('@supabase/supabase-js');
 
 module.exports = async (request, response) => {
-    // ... (código de los chivatos y seguridad sin cambios)
-    console.log("--- CHIVATO 2 (Backend) ---");
-    console.log("Datos recibidos en el cuerpo de la petición:", request.body);
-
     if (request.method !== 'POST') {
         return response.status(405).json({ error: 'Method Not Allowed' });
     }
@@ -29,19 +25,27 @@ module.exports = async (request, response) => {
         const { action, payload } = request.body;
 
         if (action === 'split') {
-            // ... (código sin cambios)
             const { osm_id, cut_point, city } = payload;
             if (!osm_id || !cut_point || !city) return response.status(400).json({ error: 'Faltan datos para la acción de dividir.' });
+            
             const cut_point_wkt = `SRID=4326;POINT(${cut_point.lng} ${cut_point.lat})`;
-            const { data, error } = await supabase.rpc('split_way_and_hide_original', { original_way_id: osm_id, cut_point_geom: cut_point_wkt, city_name: city });
+            const { data, error } = await supabase.rpc('split_way_and_hide_original', {
+                original_way_id: osm_id,
+                cut_point_geom: cut_point_wkt,
+                city_name: city
+            });
+            
             if (error) throw error;
             return response.status(200).json(data);
 
         } else if (action === 'merge') {
-            // ... (código sin cambios)
             const { ids } = payload;
             if (!ids || !Array.isArray(ids) || ids.length < 2) return response.status(400).json({ error: 'Faltan datos para la acción de unir.' });
-            const { data, error } = await supabase.rpc('union_ways_and_hide_originals', { original_way_ids: ids });
+            
+            const { data, error } = await supabase.rpc('union_ways_and_hide_originals', {
+                original_way_ids: ids
+            });
+
             if (error) throw error;
             return response.status(200).json(data[0]);
 
@@ -52,46 +56,64 @@ module.exports = async (request, response) => {
                 return response.status(400).json({ error: 'Faltan datos (osm_id, display_name, city) para actualizar.' });
             }
 
-            console.log("--- CHIVATO 3 (Backend) ---");
-            console.log(`Intentando hacer UPSERT en la tabla 'street_overrides'`);
-            console.table({ osm_id, display_name, city });
-
-            const { data, error } = await supabase
+            const { error } = await supabase
                 .from('street_overrides')
                 .upsert({ 
-                    // --- INICIO DE LA MODIFICACIÓN ---
-                    osm_id: osm_id.toString(), // Forzamos que el ID sea un string
-                    // --- FIN DE LA MODIFICACIÓN ---
+                    // --- INICIO DE LA CORRECCIÓN ---
+                    // Nos aseguramos de que osm_id sea un número, que es el tipo correcto en la BD.
+                    // Quitamos el .toString() que añadimos erróneamente.
+                    osm_id: osm_id, 
+                    // --- FIN DE LA CORRECCIÓN ---
                     display_name: display_name, 
                     city: city 
-                }, { onConflict: 'osm_id' }); 
-            
-            console.log("--- CHIVATO 4 (Backend) ---");
-            console.log("Respuesta de Supabase - Datos:", data);
-            console.log("Respuesta de Supabase - Error:", error);
+                }, { onConflict: 'osm_id' });
 
-            if (error) throw error; 
+            if (error) {
+                // Si sigue fallando, este log nos dará el error exacto de Supabase
+                console.error("Error devuelto por Supabase en el upsert:", error);
+                throw error;
+            }
             
             return response.status(200).json({ message: 'Nombre de calle actualizado con éxito.' });
         }
         else if (action === 'delete') {
-            // ... (código sin cambios)
             const { id } = payload;
             if (!id) return response.status(400).json({ error: 'Falta el ID para la acción de borrar.' });
-            const { error } = await supabase.from('osm_ways').update({ is_hidden: true }).eq('id', id);
+            
+            const { error } = await supabase
+                .from('osm_ways')
+                .update({ is_hidden: true })
+                .eq('id', id);
+
             if (error) throw error;
             return response.status(200).json({ message: `Way ${id} ocultado con éxito.` });
 
         } else if (action === 'create') {
-            // ... (código sin cambios)
             const { geometry, tags, city } = payload;
             if (!geometry || !tags || !city) return response.status(400).json({ error: 'Faltan datos para la acción de crear.' });
-            const { data, error } = await supabase.from('osm_ways').insert({ id: -1, geom: `SRID=4326;${geometry.type.toUpperCase()}(${geometry.coordinates.map(p => p.join(' ')).join(',')})`, tags: tags, city: city }).select('id').single();
+
+            const { data, error } = await supabase
+                .from('osm_ways')
+                .insert({
+                    id: -1, 
+                    geom: `SRID=4326;${geometry.type.toUpperCase()}(${geometry.coordinates.map(p => p.join(' ')).join(',')})`,
+                    tags: tags,
+                    city: city
+                })
+                .select('id')
+                .single();
+
             if (error) {
-                 const { data: rpcData, error: rpcError } = await supabase.rpc('create_new_way', { geom_geojson: geometry, tags_json: tags, city_name: city }).single();
+                 const { data: rpcData, error: rpcError } = await supabase.rpc('create_new_way', {
+                     geom_geojson: geometry,
+                     tags_json: tags,
+                     city_name: city
+                 }).single();
+
                  if (rpcError) throw rpcError;
                  return response.status(201).json(rpcData);
             }
+            
             return response.status(201).json(data);
 
         } else {
@@ -103,3 +125,4 @@ module.exports = async (request, response) => {
         return response.status(500).json({ error: 'Error interno del servidor', details: error.message });
     }
 };
+

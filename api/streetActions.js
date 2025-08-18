@@ -1,6 +1,4 @@
 
---- START OF FILE streetActions.js ---
-
 // Ruta: /api/streetActions.js (VERSIÓN CON CHIVATOS DE DEBUG)
 
 const { createClient } = require('@supabase/supabase-js');
@@ -110,4 +108,3 @@ module.exports = async (request, response) => {
     }
 };
 
---- END OF FILE streetActions.js ---

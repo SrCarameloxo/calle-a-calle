@@ -1,4 +1,3 @@
---- START OF FILE editor.js ---
 
 // --- editor.js (VERSIÓN 16 - CON CHIVATOS DE DEBUG) ---
 
@@ -530,5 +529,3 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     checkAuthAndLoad();
 });
-
---- END OF FILE editor.js ---

@@ -262,10 +262,7 @@ button.game-control-btn:disabled { opacity: .4; cursor: default; }
   overflow-x: auto;
   scrollbar-width: none;
   -ms-overflow-style: none;
-  /* --- INICIO: CAMBIO PARA DISTRIBUCIÓN --- */
-  /* Esta propiedad distribuye los botones de forma equitativa en el espacio disponible. */
   justify-content: space-around;
-  /* --- FIN: CAMBIO PARA DISTRIBUCIÓN --- */
 }
 
 .menu-tabs::-webkit-scrollbar {
@@ -273,13 +270,9 @@ button.game-control-btn:disabled { opacity: .4; cursor: default; }
 }
 
 .menu-tab-btn {
-  /* --- INICIO: CAMBIO PARA DISTRIBUCIÓN --- */
-  /* flex: 1; hace que cada botón crezca para ocupar el mismo espacio. */
-  /* display: flex y justify-content: center; centran el icono SVG dentro del botón. */
   flex: 1;
   display: flex;
   justify-content: center;
-  /* --- FIN: CAMBIO PARA DISTRIBUCIÓN --- */
   padding: 1rem;
   background: none;
   border: none;
@@ -641,7 +634,7 @@ input[type="range"]::-moz-range-thumb {
     transition: max-height 0.4s ease-in-out, margin-top 0.4s ease-in-out;
 }
 #user-settings-section.open {
-    max-height: 300px; /* Un valor suficientemente grande */
+    max-height: 300px;
     margin-top: 1rem;
 }
 

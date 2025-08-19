@@ -621,21 +621,4 @@ input[type="range"]::-moz-range-thumb {
     border: 2px solid #3b82f6;
 }
 
-/* --- Estilos para el Desplegable de Configuración --- */
-#settings-toggle #settings-arrow {
-    transition: transform 0.3s ease-in-out;
-}
-#settings-toggle.open #settings-arrow {
-    transform: rotate(180deg);
-}
-#user-settings-section {
-    max-height: 0;
-    overflow: hidden;
-    transition: max-height 0.4s ease-in-out, margin-top 0.4s ease-in-out;
-}
-#user-settings-section.open {
-    max-height: 300px;
-    margin-top: 1rem;
-}
-
 /* ======== FIN: NUEVOS ESTILOS PARA CONFIGURACIÓN (Y CORRECCIONES) ======== */

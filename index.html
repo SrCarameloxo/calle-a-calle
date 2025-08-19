@@ -138,14 +138,9 @@
 
                 <!-- ======== INICIO: SECCIÓN DE CONFIGURACIÓN MODIFICADA ======== -->
                 <div class="mt-6 pt-4 border-t border-gray-600">
-                    <h4 id="settings-toggle" class="flex items-center justify-between mb-3 text-lg font-semibold text-gray-300 cursor-pointer">
-                        <span>Configuración</span>
-                        <svg id="settings-arrow" class="w-4 h-4 transition-transform" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-                        </svg>
-                    </h4>
+                    <h4 class="mb-3 text-lg font-semibold text-gray-300">Configuración</h4>
                     
-                    <div id="user-settings-section" class="hidden">
+                    <div id="user-settings-section">
                         <div class="space-y-4 text-gray-200">
                             <!-- Opción de Sonido -->
                             <div class="flex items-center justify-between">
@@ -165,7 +160,7 @@
                                 <input type="checkbox" id="setting-street-animation" class="toggle-checkbox">
                             </div>
 
-                            <!-- Opción de Animación del Panel (NOMBRE CAMBIADO) -->
+                            <!-- Opción de Animación del Panel -->
                             <div class="flex items-center justify-between">
                                 <label for="setting-feedback-animation">Animación del Panel</label>
                                 <input type="checkbox" id="setting-feedback-animation" class="toggle-checkbox">

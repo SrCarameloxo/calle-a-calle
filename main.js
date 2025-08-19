@@ -51,6 +51,7 @@ window.addEventListener('DOMContentLoaded', () => {
     backToMenuBtn: document.getElementById('back-to-menu-btn'),
     backFromReviewBtn: document.getElementById('back-from-review-btn'),
     instintoOptionsContainer: document.getElementById('instinto-options-container'),
+    // ======== INICIO: CORRECCIÓN DE SELECTORES ========
     settings: {
         soundsEnabled: document.getElementById('setting-sounds-enabled'),
         soundVolume: document.getElementById('setting-sound-volume'),
@@ -58,10 +59,9 @@ window.addEventListener('DOMContentLoaded', () => {
         feedbackAnimation: document.getElementById('setting-feedback-animation'),
         volumeControlWrapper: document.getElementById('volume-control-wrapper')
     },
-    // ======== INICIO: AÑADIDO DE SELECTORES PARA EL DESPLEGABLE ========
     settingsToggle: document.getElementById('settings-toggle'),
     settingsSection: document.getElementById('user-settings-section')
-    // ======== FIN: AÑADIDO DE SELECTORES PARA EL DESPLEGABLE ========
+    // ======== FIN: CORRECCIÓN DE SELECTORES ========
   };
 
   let backgroundMap, gameMap = null;
@@ -665,15 +665,11 @@ window.addEventListener('DOMContentLoaded', () => {
           }, 800);
       }
       
-      // ======== INICIO: APLICACIÓN DE ANIMACIÓN DE CALLE (CORREGIDO) ========
-      // Se aplica después de determinar si es correcto o no para poder usar el color adecuado
       if (userProfile.settings.enable_street_animation) {
           streetGrp.eachLayer(layer => {
               const element = layer.getElement();
               if (element) {
-                  // Se quitan clases previas para reiniciar la animación si fuera necesario
                   element.classList.remove('street-reveal-animation', 'street-reveal-animation-fail');
-                  // Se usa un pequeño delay para que el navegador registre el cambio de clase
                   setTimeout(() => {
                       const animationClass = isCorrect ? 'street-reveal-animation' : 'street-reveal-animation-fail';
                       element.classList.add(animationClass);
@@ -681,7 +677,6 @@ window.addEventListener('DOMContentLoaded', () => {
               }
           });
       }
-      // ======== FIN: APLICACIÓN DE ANIMACIÓN DE CALLE (CORREGIDO) ========
 
       const progress = totalQuestions > 0 ? ((qIdx) / totalQuestions) * 100 : 0;
       uiElements.progressBar.style.width = `${progress}%`;

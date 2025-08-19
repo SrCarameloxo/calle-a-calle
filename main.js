@@ -51,31 +51,26 @@ window.addEventListener('DOMContentLoaded', () => {
     backToMenuBtn: document.getElementById('back-to-menu-btn'),
     backFromReviewBtn: document.getElementById('back-from-review-btn'),
     instintoOptionsContainer: document.getElementById('instinto-options-container'),
-    // ======== INICIO: NUEVOS ELEMENTOS DE CONFIGURACIÓN ========
     settings: {
-        // --- INICIO DE LA MODIFICACIÓN: AÑADIDOS SELECTORES PARA EL DESPLEGABLE ---
         toggleHeader: document.getElementById('settings-toggle-header'),
         arrow: document.querySelector('.settings-arrow'),
         content: document.getElementById('user-settings-section'),
-        // --- FIN DE LA MODIFICACIÓN ---
         soundsEnabled: document.getElementById('setting-sounds-enabled'),
         soundVolume: document.getElementById('setting-sound-volume'),
         streetAnimation: document.getElementById('setting-street-animation'),
         feedbackAnimation: document.getElementById('setting-feedback-animation'),
         volumeControlWrapper: document.getElementById('volume-control-wrapper')
     }
-    // ======== FIN: NUEVOS ELEMENTOS DE CONFIGURACIÓN ========
   };
 
   let backgroundMap, gameMap = null;
-  // --- INICIO DE LA MODIFICACIÓN: NUEVO COLOR DE FALLO ---
-  const COL_ZONE = '#663399', COL_TRACE = '#007a2f', COL_FAIL_TRACE = '#E63946', COL_DASH = '#1976d2';
+  // --- INICIO DE LA MODIFICACIÓN: NUEVO ROJO MÁS POTENTE ---
+  const COL_ZONE = '#663399', COL_TRACE = '#007a2f', COL_FAIL_TRACE = '#FF0033', COL_DASH = '#1976d2';
   // --- FIN DE LA MODIFICACIÓN ---
   let drawing=false, zonePoly=null, tempMarkers=[], zonePoints=[], oldZonePoly=null, reviewLayer=null;
   let playing=false, qIdx=0, target=null, userMk, guide, streetGrp;
   let streetList = [], totalQuestions = 0, streetsGuessedCorrectly = 0, lastGameZonePoints = [];
   let lastGameStreetList = [];
-  // ======== INICIO: MODIFICACIÓN DE userProfile PARA INCLUIR AJUSTES ========
   let userProfile = { 
     id: null, 
     cityData: null, 
@@ -89,7 +84,6 @@ window.addEventListener('DOMContentLoaded', () => {
         enable_feedback_animation: true
     }
   };
-  // ======== FIN: MODIFICACIÓN DE userProfile ========
   let currentStreak = 0;
   let showScoreAsPercentage = false;
 
@@ -162,27 +156,23 @@ window.addEventListener('DOMContentLoaded', () => {
   async function fetchUserProfile(user) {
     if (!user) return;
     try {
-        // ======== INICIO: MODIFICACIÓN PARA CARGAR AJUSTES ========
         const { data: profile, error } = await supabaseClient.from('profiles')
           .select('role, subscribed_city, mostrar_ayuda_dibujo, enable_sounds, sound_volume, enable_street_animation, enable_feedback_animation')
           .eq('id', user.id)
           .single();
-        // ======== FIN: MODIFICACIÓN PARA CARGAR AJUSTES ========
         if (error) { throw error; }
 
         userProfile.id = user.id;
         userProfile.role = profile.role;
         userProfile.subscribedCity = profile.subscribed_city;
         userProfile.showDrawHelp = profile.mostrar_ayuda_dibujo;
-        // ======== INICIO: GUARDAR AJUSTES CARGADOS ========
         userProfile.settings = {
             enable_sounds: profile.enable_sounds,
             sound_volume: profile.sound_volume,
             enable_street_animation: profile.enable_street_animation,
             enable_feedback_animation: profile.enable_feedback_animation
         };
-        updateSettingsUI(); // Actualiza la UI con los valores cargados
-        // ======== FIN: GUARDAR AJUSTES CARGADOS ========
+        updateSettingsUI();
         
         if (profile.role === 'admin') {
             uiElements.adminPanelBtn.classList.remove('hidden');
@@ -304,17 +294,12 @@ window.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // ======== INICIO: NUEVAS FUNCIONES DE CONFIGURACIÓN ========
-  /**
-   * Actualiza la UI de configuración para que coincida con los valores guardados en userProfile.
-   */
   function updateSettingsUI() {
     uiElements.settings.soundsEnabled.checked = userProfile.settings.enable_sounds;
     uiElements.settings.soundVolume.value = userProfile.settings.sound_volume;
     uiElements.settings.streetAnimation.checked = userProfile.settings.enable_street_animation;
     uiElements.settings.feedbackAnimation.checked = userProfile.settings.enable_feedback_animation;
 
-    // Activa/desactiva el slider de volumen
     if (userProfile.settings.enable_sounds) {
         uiElements.settings.volumeControlWrapper.classList.remove('disabled');
     } else {
@@ -322,32 +307,21 @@ window.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  /**
-   * Guarda un ajuste específico en Supabase.
-   * @param {string} key - El nombre de la columna en la tabla 'profiles'.
-   * @param {*} value - El nuevo valor a guardar.
-   */
   async function updateUserSetting(key, value) {
     if (!userProfile.id) return;
     
-    // Actualiza el estado local primero para una respuesta instantánea
     userProfile.settings[key] = value;
 
     const { error } = await supabaseClient
         .from('profiles')
-        .update({ [key]: value }) // [key] permite usar una variable como nombre de columna
+        .update({ [key]: value })
         .eq('id', userProfile.id);
 
     if (error) {
         console.error(`Error al guardar el ajuste '${key}':`, error);
-        // Opcional: Revertir el cambio en la UI si falla el guardado
     }
   }
   
-  // --- INICIO DE LA MODIFICACIÓN: NUEVA FUNCIÓN PARA EL DESPLEGABLE ---
-  /**
-   * Configura el listener para el desplegable de configuración.
-   */
   function setupSettingsDropdown() {
     if (uiElements.settings.toggleHeader) {
         uiElements.settings.toggleHeader.addEventListener('click', () => {
@@ -356,16 +330,11 @@ window.addEventListener('DOMContentLoaded', () => {
         });
     }
   }
-  // --- FIN DE LA MODIFICACIÓN ---
 
-  /**
-   * Configura los listeners para los controles de la UI de configuración.
-   */
   function setupSettingsListeners() {
     uiElements.settings.soundsEnabled.addEventListener('change', (e) => {
         const isEnabled = e.target.checked;
         updateUserSetting('enable_sounds', isEnabled);
-        // Actualiza la UI del slider de volumen inmediatamente
         if (isEnabled) {
             uiElements.settings.volumeControlWrapper.classList.remove('disabled');
         } else {
@@ -385,7 +354,6 @@ window.addEventListener('DOMContentLoaded', () => {
         updateUserSetting('enable_feedback_animation', e.target.checked);
     });
   }
-  // ======== FIN: NUEVAS FUNCIONES DE CONFIGURACIÓN ========
 
   function initGame() {
     let initialCoords = [38.88, -6.97];
@@ -445,9 +413,7 @@ window.addEventListener('DOMContentLoaded', () => {
     setupStartButton(uiElements.startBtn);
     setupMenu();
     setupSettingsListeners(); 
-    // --- INICIO DE LA MODIFICACIÓN: LLAMADA A LA FUNCIÓN DEL DESPLEGABLE ---
     setupSettingsDropdown();
-    // --- FIN DE LA MODIFICACIÓN ---
 
     document.addEventListener('keyup', (event) => {
         if (event.code === 'Space' && !uiElements.nextBtn.disabled) {
@@ -634,9 +600,6 @@ window.addEventListener('DOMContentLoaded', () => {
     if (userMk) gameMap.removeLayer(userMk);
     userMk = L.marker(e.latlng).addTo(gameMap);
     
-    // --- INICIO DE LA MODIFICACIÓN: SE OBTIENE isCorrect ANTES DE DIBUJAR ---
-    // Primero calculamos si la respuesta es correcta o no. 
-    // Creamos una capa temporal solo para esta comprobación.
     let tempStreetGrp = L.layerGroup();
     if (target && Array.isArray(target) && target.length > 0) {
         target.forEach(geom => {
@@ -646,11 +609,8 @@ window.addEventListener('DOMContentLoaded', () => {
     }
     const streetCheck = getDistanceToStreet(userMk.getLatLng(), tempStreetGrp);
     let isCorrect = streetCheck.distance <= 30;
-    // --- FIN DE LA MODIFICACIÓN ---
 
-    // --- INICIO DE LA MODIFICACIÓN: SE PASA isCorrect A drawStreet ---
-    streetGrp = drawStreet(isCorrect);
-    // --- FIN DE LA MODIFICACIÓN ---
+    streetGrp = drawStreet(isCorrect); 
 
     if(streetGrp){
       
@@ -664,7 +624,7 @@ window.addEventListener('DOMContentLoaded', () => {
           });
       }
       
-      let feedbackClass = '';
+      const feedbackClass = isCorrect ? 'panel-pulse-correct' : 'panel-pulse-incorrect';
 
       if (isCorrect) {
         if (currentGameMode === 'revancha') {
@@ -683,7 +643,7 @@ window.addEventListener('DOMContentLoaded', () => {
                 sound.play().catch(e => {});
             }
         }
-        feedbackClass = 'panel-pulse-correct';
+        
         if (currentStreak >= 3) {
             uiElements.streakDisplay.textContent = `¡Racha de ${currentStreak}!`;
             uiElements.streakDisplay.classList.add('visible');
@@ -709,22 +669,14 @@ window.addEventListener('DOMContentLoaded', () => {
                 sound.play().catch(e => {});
             }
         }
-        feedbackClass = 'panel-pulse-incorrect';
       }
       
-      // --- INICIO DE LA MODIFICACIÓN: LÓGICA DEL INTERRUPTOR DE ANIMACIÓN DEL PANEL ---
+      // --- INICIO DE LA MODIFICACIÓN: LÓGICA CORREGIDA DEL INTERRUPTOR ---
       if (userProfile.settings.enable_feedback_animation) {
           uiElements.gameUiContainer.classList.add(feedbackClass);
           uiElements.gameUiContainer.addEventListener('animationend', () => {
               uiElements.gameUiContainer.classList.remove(feedbackClass);
           }, { once: true });
-      } else {
-          // El fallback si la animación está desactivada
-          const feedbackColor = isCorrect ? 'rgba(57, 255, 20, 0.6)' : 'rgba(230, 81, 95, 0.7)';
-          uiElements.gameUiContainer.style.boxShadow = `0 0 20px 5px ${feedbackColor}`;
-          setTimeout(() => {
-              uiElements.gameUiContainer.style.boxShadow = '0 10px 30px rgba(0,0,0,0.3)';
-          }, 800);
       }
       // --- FIN DE LA MODIFICACIÓN ---
 
@@ -781,12 +733,10 @@ window.addEventListener('DOMContentLoaded', () => {
       }
   }
   
-  // --- INICIO DE LA MODIFICACIÓN: LA FUNCIÓN AHORA ACEPTA isCorrect ---
   function drawStreet(isCorrect){
     const g = L.layerGroup().addTo(gameMap);
     if (!target || !Array.isArray(target) || target.length === 0) return null;
     
-    // La lógica de decisión del color ahora es mucho más simple y correcta.
     const traceColor = isCorrect ? COL_TRACE : COL_FAIL_TRACE;
 
     target.forEach(geom => {
@@ -795,7 +745,6 @@ window.addEventListener('DOMContentLoaded', () => {
     });
     return g;
   }
-  // --- FIN DE LA MODIFICACIÓN ---
 
   function getDistanceToStreet(userPoint, streetLayer) {
       let minDistance = Infinity, closestPointOnStreet = null;

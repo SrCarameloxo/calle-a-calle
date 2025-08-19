@@ -441,10 +441,10 @@ button.game-control-btn:disabled { opacity: .4; cursor: default; }
     100% { box-shadow: 0 10px 30px rgba(0,0,0,0.3); }
 }
 
-/* --- INICIO DE LA MODIFICACIÓN: CAMBIO DE COLOR ROJO --- */
+/* --- INICIO DE LA MODIFICACIÓN: NUEVO ROJO MÁS POTENTE --- */
 @keyframes panel-pulse-incorrect-anim {
     0% { box-shadow: 0 10px 30px rgba(0,0,0,0.3); }
-    50% { box-shadow: 0 0 20px 5px rgba(230, 57, 70, 0.7); } /* Nuevo rojo #E63946 con opacidad */
+    50% { box-shadow: 0 0 20px 5px rgba(255, 0, 51, 0.7); } /* Nuevo rojo #FF0033 con opacidad */
     100% { box-shadow: 0 10px 30px rgba(0,0,0,0.3); }
 }
 /* --- FIN DE LA MODIFICACIÓN --- */
@@ -523,11 +523,11 @@ button.game-control-btn:disabled { opacity: .4; cursor: default; }
 /* ======== INICIO: NUEVOS ESTILOS PARA CONFIGURACIÓN ======== */
 
 /* --- Animación de Calle Incorrecta --- */
-/* --- INICIO DE LA MODIFICACIÓN: CAMBIO DE COLOR ROJO --- */
+/* --- INICIO DE LA MODIFICACIÓN: NUEVO ROJO MÁS POTENTE --- */
 @keyframes pulseAndFlashIncorrect {
-    0% { stroke-width: 8; stroke: #E63946; opacity: 0.8; } /* Nuevo rojo #E63946 */
+    0% { stroke-width: 8; stroke: #FF0033; opacity: 0.8; } /* Nuevo rojo */
     50% { stroke-width: 14; stroke: #ff8a8a; opacity: 1; }
-    100% { stroke-width: 8; stroke: #E63946; opacity: 0.8; } /* Nuevo rojo #E63946 */
+    100% { stroke-width: 8; stroke: #FF0033; opacity: 0.8; } /* Nuevo rojo */
 }
 /* --- FIN DE LA MODIFICACIÓN --- */
 

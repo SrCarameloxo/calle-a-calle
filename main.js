@@ -51,7 +51,7 @@ window.addEventListener('DOMContentLoaded', () => {
     backToMenuBtn: document.getElementById('back-to-menu-btn'),
     backFromReviewBtn: document.getElementById('back-from-review-btn'),
     instintoOptionsContainer: document.getElementById('instinto-options-container'),
-    // ======== INICIO: CORRECCIÓN DE SELECTORES ========
+    // ======== INICIO: CORRECCIÓN FINAL DE SELECTORES ========
     settings: {
         soundsEnabled: document.getElementById('setting-sounds-enabled'),
         soundVolume: document.getElementById('setting-sound-volume'),
@@ -61,7 +61,7 @@ window.addEventListener('DOMContentLoaded', () => {
     },
     settingsToggle: document.getElementById('settings-toggle'),
     settingsSection: document.getElementById('user-settings-section')
-    // ======== FIN: CORRECCIÓN DE SELECTORES ========
+    // ======== FIN: CORRECCIÓN FINAL DE SELECTORES ========
   };
 
   let backgroundMap, gameMap = null;

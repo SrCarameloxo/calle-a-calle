@@ -58,10 +58,10 @@ window.addEventListener('DOMContentLoaded', () => {
         feedbackAnimation: document.getElementById('setting-feedback-animation'),
         volumeControlWrapper: document.getElementById('volume-control-wrapper')
     },
-    // ======== INICIO: NUEVOS SELECTORES PARA EL DESPLEGABLE ========
+    // ======== INICIO: AÑADIDO DE SELECTORES PARA EL DESPLEGABLE ========
     settingsToggle: document.getElementById('settings-toggle'),
     settingsSection: document.getElementById('user-settings-section')
-    // ======== FIN: NUEVOS SELECTORES PARA EL DESPLEGABLE ========
+    // ======== FIN: AÑADIDO DE SELECTORES PARA EL DESPLEGABLE ========
   };
 
   let backgroundMap, gameMap = null;
@@ -287,9 +287,7 @@ window.addEventListener('DOMContentLoaded', () => {
                     }
                 });
             } else if (selectedMode === 'instinto') {
-                // ======== INICIO: PASAR userProfile A MODO INSTINTO ========
                 activeModeControls = startInstintoGame({ ui: uiElements, gameMap: gameMap, updatePanelUI: updatePanelUI, userProfile: userProfile });
-                // ======== FIN: PASAR userProfile A MODO INSTINTO ========
             }
         });
     });
@@ -601,16 +599,6 @@ window.addEventListener('DOMContentLoaded', () => {
     if(streetGrp){
       const streetCheck = getDistanceToStreet(userMk.getLatLng(), streetGrp);
       let isCorrect = streetCheck.distance <= 30;
-
-      if (userProfile.settings.enable_street_animation) {
-          streetGrp.eachLayer(layer => {
-              const element = layer.getElement();
-              if (element) {
-                  const animationClass = isCorrect ? 'street-reveal-animation' : 'street-reveal-animation-fail';
-                  element.classList.add(animationClass);
-              }
-          });
-      }
       
       let feedbackClass = '';
 
@@ -638,11 +626,9 @@ window.addEventListener('DOMContentLoaded', () => {
         }
 
       } else {
-        // ======== INICIO: CORRECCIÓN DE COLOR DE CALLE AL FALLAR ========
         if (streetGrp) {
             streetGrp.eachLayer(layer => layer.setStyle({ color: COL_FAIL_TRACE }));
         }
-        // ======== FIN: CORRECCIÓN DE COLOR DE CALLE AL FALLAR ========
           
         if (currentGameMode === 'classic' && target && streetList[qIdx - 1]) {
             const failedStreetData = {
@@ -672,12 +658,30 @@ window.addEventListener('DOMContentLoaded', () => {
               uiElements.gameUiContainer.classList.remove(feedbackClass);
           }, { once: true });
       } else {
-          const feedbackColor = isCorrect ? 'rgba(57, 255, 20, 0.6)' : 'rgba(255, 20, 40, 0.7)'; // Rojo más intenso
+          const feedbackColor = isCorrect ? 'rgba(57, 255, 20, 0.6)' : 'rgba(255, 20, 40, 0.7)';
           uiElements.gameUiContainer.style.boxShadow = `0 0 25px 8px ${feedbackColor}`;
           setTimeout(() => {
               uiElements.gameUiContainer.style.boxShadow = '0 10px 30px rgba(0,0,0,0.3)';
           }, 800);
       }
+      
+      // ======== INICIO: APLICACIÓN DE ANIMACIÓN DE CALLE (CORREGIDO) ========
+      // Se aplica después de determinar si es correcto o no para poder usar el color adecuado
+      if (userProfile.settings.enable_street_animation) {
+          streetGrp.eachLayer(layer => {
+              const element = layer.getElement();
+              if (element) {
+                  // Se quitan clases previas para reiniciar la animación si fuera necesario
+                  element.classList.remove('street-reveal-animation', 'street-reveal-animation-fail');
+                  // Se usa un pequeño delay para que el navegador registre el cambio de clase
+                  setTimeout(() => {
+                      const animationClass = isCorrect ? 'street-reveal-animation' : 'street-reveal-animation-fail';
+                      element.classList.add(animationClass);
+                  }, 10);
+              }
+          });
+      }
+      // ======== FIN: APLICACIÓN DE ANIMACIÓN DE CALLE (CORREGIDO) ========
 
       const progress = totalQuestions > 0 ? ((qIdx) / totalQuestions) * 100 : 0;
       uiElements.progressBar.style.width = `${progress}%`;
@@ -736,7 +740,6 @@ window.addEventListener('DOMContentLoaded', () => {
     const g = L.layerGroup().addTo(gameMap);
     if (!target || !Array.isArray(target) || target.length === 0) return null;
     
-    // El color inicial siempre es el de acierto, se cambiará en onMapClick si se falla.
     const traceColor = COL_TRACE;
 
     target.forEach(geom => {

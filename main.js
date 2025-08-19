@@ -51,24 +51,25 @@ window.addEventListener('DOMContentLoaded', () => {
     backToMenuBtn: document.getElementById('back-to-menu-btn'),
     backFromReviewBtn: document.getElementById('back-from-review-btn'),
     instintoOptionsContainer: document.getElementById('instinto-options-container'),
-    // ======== INICIO: NUEVOS ELEMENTOS DE CONFIGURACIÓN ========
     settings: {
         soundsEnabled: document.getElementById('setting-sounds-enabled'),
         soundVolume: document.getElementById('setting-sound-volume'),
         streetAnimation: document.getElementById('setting-street-animation'),
         feedbackAnimation: document.getElementById('setting-feedback-animation'),
         volumeControlWrapper: document.getElementById('volume-control-wrapper')
-    }
-    // ======== FIN: NUEVOS ELEMENTOS DE CONFIGURACIÓN ========
+    },
+    // ======== INICIO: NUEVOS SELECTORES PARA EL DESPLEGABLE ========
+    settingsToggle: document.getElementById('settings-toggle'),
+    settingsSection: document.getElementById('user-settings-section')
+    // ======== FIN: NUEVOS SELECTORES PARA EL DESPLEGABLE ========
   };
 
   let backgroundMap, gameMap = null;
-  const COL_ZONE = '#663399', COL_TRACE = '#007a2f', COL_FAIL_TRACE = '#c82333', COL_DASH = '#1976d2';
+  const COL_ZONE = '#663399', COL_TRACE = '#007a2f', COL_FAIL_TRACE = '#dc2626', COL_DASH = '#1976d2';
   let drawing=false, zonePoly=null, tempMarkers=[], zonePoints=[], oldZonePoly=null, reviewLayer=null;
   let playing=false, qIdx=0, target=null, userMk, guide, streetGrp;
   let streetList = [], totalQuestions = 0, streetsGuessedCorrectly = 0, lastGameZonePoints = [];
   let lastGameStreetList = [];
-  // ======== INICIO: MODIFICACIÓN DE userProfile PARA INCLUIR AJUSTES ========
   let userProfile = { 
     id: null, 
     cityData: null, 
@@ -82,7 +83,6 @@ window.addEventListener('DOMContentLoaded', () => {
         enable_feedback_animation: true
     }
   };
-  // ======== FIN: MODIFICACIÓN DE userProfile ========
   let currentStreak = 0;
   let showScoreAsPercentage = false;
 
@@ -155,27 +155,23 @@ window.addEventListener('DOMContentLoaded', () => {
   async function fetchUserProfile(user) {
     if (!user) return;
     try {
-        // ======== INICIO: MODIFICACIÓN PARA CARGAR AJUSTES ========
         const { data: profile, error } = await supabaseClient.from('profiles')
           .select('role, subscribed_city, mostrar_ayuda_dibujo, enable_sounds, sound_volume, enable_street_animation, enable_feedback_animation')
           .eq('id', user.id)
           .single();
-        // ======== FIN: MODIFICACIÓN PARA CARGAR AJUSTES ========
         if (error) { throw error; }
 
         userProfile.id = user.id;
         userProfile.role = profile.role;
         userProfile.subscribedCity = profile.subscribed_city;
         userProfile.showDrawHelp = profile.mostrar_ayuda_dibujo;
-        // ======== INICIO: GUARDAR AJUSTES CARGADOS ========
         userProfile.settings = {
             enable_sounds: profile.enable_sounds,
             sound_volume: profile.sound_volume,
             enable_street_animation: profile.enable_street_animation,
             enable_feedback_animation: profile.enable_feedback_animation
         };
-        updateSettingsUI(); // Actualiza la UI con los valores cargados
-        // ======== FIN: GUARDAR AJUSTES CARGADOS ========
+        updateSettingsUI();
         
         if (profile.role === 'admin') {
             uiElements.adminPanelBtn.classList.remove('hidden');
@@ -291,23 +287,20 @@ window.addEventListener('DOMContentLoaded', () => {
                     }
                 });
             } else if (selectedMode === 'instinto') {
-                activeModeControls = startInstintoGame({ ui: uiElements, gameMap: gameMap, updatePanelUI: updatePanelUI });
+                // ======== INICIO: PASAR userProfile A MODO INSTINTO ========
+                activeModeControls = startInstintoGame({ ui: uiElements, gameMap: gameMap, updatePanelUI: updatePanelUI, userProfile: userProfile });
+                // ======== FIN: PASAR userProfile A MODO INSTINTO ========
             }
         });
     });
   }
 
-  // ======== INICIO: NUEVAS FUNCIONES DE CONFIGURACIÓN ========
-  /**
-   * Actualiza la UI de configuración para que coincida con los valores guardados en userProfile.
-   */
   function updateSettingsUI() {
     uiElements.settings.soundsEnabled.checked = userProfile.settings.enable_sounds;
     uiElements.settings.soundVolume.value = userProfile.settings.sound_volume;
     uiElements.settings.streetAnimation.checked = userProfile.settings.enable_street_animation;
     uiElements.settings.feedbackAnimation.checked = userProfile.settings.enable_feedback_animation;
 
-    // Activa/desactiva el slider de volumen
     if (userProfile.settings.enable_sounds) {
         uiElements.settings.volumeControlWrapper.classList.remove('disabled');
     } else {
@@ -315,36 +308,32 @@ window.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  /**
-   * Guarda un ajuste específico en Supabase.
-   * @param {string} key - El nombre de la columna en la tabla 'profiles'.
-   * @param {*} value - El nuevo valor a guardar.
-   */
   async function updateUserSetting(key, value) {
     if (!userProfile.id) return;
     
-    // Actualiza el estado local primero para una respuesta instantánea
     userProfile.settings[key] = value;
 
     const { error } = await supabaseClient
         .from('profiles')
-        .update({ [key]: value }) // [key] permite usar una variable como nombre de columna
+        .update({ [key]: value })
         .eq('id', userProfile.id);
 
     if (error) {
         console.error(`Error al guardar el ajuste '${key}':`, error);
-        // Opcional: Revertir el cambio en la UI si falla el guardado
     }
   }
 
-  /**
-   * Configura los listeners para los controles de la UI de configuración.
-   */
   function setupSettingsListeners() {
+    // ======== INICIO: LÓGICA DEL DESPLEGABLE ========
+    uiElements.settingsToggle.addEventListener('click', () => {
+        uiElements.settingsToggle.classList.toggle('open');
+        uiElements.settingsSection.classList.toggle('open');
+    });
+    // ======== FIN: LÓGICA DEL DESPLEGABLE ========
+
     uiElements.settings.soundsEnabled.addEventListener('change', (e) => {
         const isEnabled = e.target.checked;
         updateUserSetting('enable_sounds', isEnabled);
-        // Actualiza la UI del slider de volumen inmediatamente
         if (isEnabled) {
             uiElements.settings.volumeControlWrapper.classList.remove('disabled');
         } else {
@@ -364,7 +353,6 @@ window.addEventListener('DOMContentLoaded', () => {
         updateUserSetting('enable_feedback_animation', e.target.checked);
     });
   }
-  // ======== FIN: NUEVAS FUNCIONES DE CONFIGURACIÓN ========
 
   function initGame() {
     let initialCoords = [38.88, -6.97];
@@ -423,7 +411,7 @@ window.addEventListener('DOMContentLoaded', () => {
     
     setupStartButton(uiElements.startBtn);
     setupMenu();
-    setupSettingsListeners(); // ======== LLAMADA A LA NUEVA FUNCIÓN ========
+    setupSettingsListeners();
 
     document.addEventListener('keyup', (event) => {
         if (event.code === 'Space' && !uiElements.nextBtn.disabled) {
@@ -614,7 +602,6 @@ window.addEventListener('DOMContentLoaded', () => {
       const streetCheck = getDistanceToStreet(userMk.getLatLng(), streetGrp);
       let isCorrect = streetCheck.distance <= 30;
 
-      // ======== INICIO: APLICACIÓN DE AJUSTES DE ANIMACIÓN DE CALLE ========
       if (userProfile.settings.enable_street_animation) {
           streetGrp.eachLayer(layer => {
               const element = layer.getElement();
@@ -624,7 +611,6 @@ window.addEventListener('DOMContentLoaded', () => {
               }
           });
       }
-      // ======== FIN: APLICACIÓN DE AJUSTES DE ANIMACIÓN DE CALLE ========
       
       let feedbackClass = '';
 
@@ -638,7 +624,6 @@ window.addEventListener('DOMContentLoaded', () => {
         streetsGuessedCorrectly++;
         currentStreak++;
         updateScoreDisplay('¡Correcto!', '#28a745');
-        // ======== INICIO: APLICACIÓN DE AJUSTES DE SONIDO ========
         if (userProfile.settings.enable_sounds) {
             const sound = document.getElementById('correct-sound');
             if(sound) {
@@ -646,7 +631,6 @@ window.addEventListener('DOMContentLoaded', () => {
                 sound.play().catch(e => {});
             }
         }
-        // ======== FIN: APLICACIÓN DE AJUSTES DE SONIDO ========
         feedbackClass = 'panel-pulse-correct';
         if (currentStreak >= 3) {
             uiElements.streakDisplay.textContent = `¡Racha de ${currentStreak}!`;
@@ -654,6 +638,12 @@ window.addEventListener('DOMContentLoaded', () => {
         }
 
       } else {
+        // ======== INICIO: CORRECCIÓN DE COLOR DE CALLE AL FALLAR ========
+        if (streetGrp) {
+            streetGrp.eachLayer(layer => layer.setStyle({ color: COL_FAIL_TRACE }));
+        }
+        // ======== FIN: CORRECCIÓN DE COLOR DE CALLE AL FALLAR ========
+          
         if (currentGameMode === 'classic' && target && streetList[qIdx - 1]) {
             const failedStreetData = {
                 googleName: streetList[qIdx - 1].googleName,
@@ -666,7 +656,6 @@ window.addEventListener('DOMContentLoaded', () => {
         currentStreak = 0;
         uiElements.streakDisplay.classList.remove('visible');
         updateScoreDisplay(`Casi... a ${Math.round(streetCheck.distance)} metros.`, '#c82333');
-        // ======== INICIO: APLICACIÓN DE AJUSTES DE SONIDO ========
         if (userProfile.settings.enable_sounds) {
             const sound = document.getElementById('incorrect-sound');
             if (sound) {
@@ -674,24 +663,21 @@ window.addEventListener('DOMContentLoaded', () => {
                 sound.play().catch(e => {});
             }
         }
-        // ======== FIN: APLICACIÓN DE AJUSTES DE SONIDO ========
         feedbackClass = 'panel-pulse-incorrect';
       }
       
-      // ======== INICIO: APLICACIÓN DE AJUSTES DE ANIMACIÓN DE FEEDBACK ========
       if (userProfile.settings.enable_feedback_animation) {
           uiElements.gameUiContainer.classList.add(feedbackClass);
           uiElements.gameUiContainer.addEventListener('animationend', () => {
               uiElements.gameUiContainer.classList.remove(feedbackClass);
           }, { once: true });
       } else {
-          const feedbackColor = isCorrect ? 'rgba(57, 255, 20, 0.6)' : 'rgba(255, 31, 79, 0.6)';
-          uiElements.gameUiContainer.style.boxShadow = `0 0 20px 5px ${feedbackColor}`;
+          const feedbackColor = isCorrect ? 'rgba(57, 255, 20, 0.6)' : 'rgba(255, 20, 40, 0.7)'; // Rojo más intenso
+          uiElements.gameUiContainer.style.boxShadow = `0 0 25px 8px ${feedbackColor}`;
           setTimeout(() => {
               uiElements.gameUiContainer.style.boxShadow = '0 10px 30px rgba(0,0,0,0.3)';
           }, 800);
       }
-      // ======== FIN: APLICACIÓN DE AJUSTES DE ANIMACIÓN DE FEEDBACK ========
 
       const progress = totalQuestions > 0 ? ((qIdx) / totalQuestions) * 100 : 0;
       uiElements.progressBar.style.width = `${progress}%`;
@@ -750,14 +736,8 @@ window.addEventListener('DOMContentLoaded', () => {
     const g = L.layerGroup().addTo(gameMap);
     if (!target || !Array.isArray(target) || target.length === 0) return null;
     
-    // ======== INICIO: MODIFICACIÓN PARA COLOR DE FALLO ESTÁTICO ========
-    // Determina el color de la calle basado en el último resultado y la configuración
-    const isLastAnswerCorrect = getDistanceToStreet(userMk.getLatLng(), g).distance <= 30; // Hacemos una comprobación rápida
-    let traceColor = COL_TRACE;
-    if (!isLastAnswerCorrect && !userProfile.settings.enable_street_animation) {
-        traceColor = COL_FAIL_TRACE;
-    }
-    // ======== FIN: MODIFICACIÓN PARA COLOR DE FALLO ESTÁTICO ========
+    // El color inicial siempre es el de acierto, se cambiará en onMapClick si se falla.
+    const traceColor = COL_TRACE;
 
     target.forEach(geom => {
         if (geom.isClosed) L.polygon(geom.points, { color: traceColor, weight: 4, fillOpacity: 0.2 }).addTo(g);

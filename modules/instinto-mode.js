@@ -15,9 +15,9 @@ export function startInstintoGame({ ui, gameMap, updatePanelUI, userProfile }) {
   // --- Estado y constantes locales del MODO INSTINTO ---
   const COL_ZONE = '#663399';
   const COL_TRACE = '#007a2f';
-  // ======== INICIO: NUEVA CONSTANTE AÑADIDA ========
-  const COL_FAIL_TRACE = '#c82333';
-  // ======== FIN: NUEVA CONSTANTE AÑADIDA ========
+  // ======== INICIO: CONSTANTE MODIFICADA ========
+  const COL_FAIL_TRACE = '#dc2626'; // Rojo dopamínico
+  // ======== FIN: CONSTANTE MODIFICADA ========
   let drawing = false;
   let zonePoly = null;
   let tempMarkers = [];
@@ -198,17 +198,14 @@ export function startInstintoGame({ ui, gameMap, updatePanelUI, userProfile }) {
         layer.addTo(streetLayerGroup);
     });
     
-    // ======== INICIO: APLICACIÓN DE AJUSTES DE ANIMACIÓN DE CALLE ========
     if (userProfile.settings.enable_street_animation) {
         streetLayerGroup.eachLayer(layer => {
             const element = layer.getElement();
             if (element) {
-                // En modo instinto, la primera aparición siempre es en verde/neutro
                 element.classList.add('street-reveal-animation');
             }
         });
     }
-    // ======== FIN: APLICACIÓN DE AJUSTES DE ANIMACIÓN DE CALLE ========
 
     updatePanelUI(() => {
         ui.gameQuestion.textContent = `¿Cómo se llama esta calle?`;
@@ -237,7 +234,6 @@ export function startInstintoGame({ ui, gameMap, updatePanelUI, userProfile }) {
     if (isCorrect) {
         score++;
         clickedButton.style.backgroundColor = '#28a745';
-        // ======== INICIO: APLICACIÓN DE AJUSTES DE SONIDO ========
         if (userProfile.settings.enable_sounds) {
             const sound = document.getElementById('correct-sound');
             if(sound) {
@@ -245,7 +241,6 @@ export function startInstintoGame({ ui, gameMap, updatePanelUI, userProfile }) {
                 sound.play().catch(e => {});
             }
         }
-        // ======== FIN: APLICACIÓN DE AJUSTES DE SONIDO ========
     } else {
         clickedButton.style.backgroundColor = '#c82333';
         allOptionBtns.forEach(btn => {
@@ -254,7 +249,6 @@ export function startInstintoGame({ ui, gameMap, updatePanelUI, userProfile }) {
                 btn.style.transform = 'scale(1.03)';
             }
         });
-        // ======== INICIO: APLICACIÓN DE AJUSTES DE SONIDO ========
         if (userProfile.settings.enable_sounds) {
             const sound = document.getElementById('incorrect-sound');
             if (sound) {
@@ -262,23 +256,22 @@ export function startInstintoGame({ ui, gameMap, updatePanelUI, userProfile }) {
                 sound.play().catch(e => {});
             }
         }
-        // ======== FIN: APLICACIÓN DE AJUSTES DE SONIDO ========
     }
 
-    // ======== INICIO: APLICACIÓN DE AJUSTES DE ANIMACIÓN DE FEEDBACK ========
+    // ======== INICIO: BUG DE ANIMACIÓN DE PANEL ARREGLADO ========
     if (userProfile.settings.enable_feedback_animation) {
         ui.gameUiContainer.classList.add(pulseClass);
         ui.gameUiContainer.addEventListener('animationend', () => {
             ui.gameUiContainer.classList.remove(pulseClass);
         }, { once: true });
     } else {
-        const feedbackColor = isCorrect ? 'rgba(57, 255, 20, 0.6)' : 'rgba(255, 31, 79, 0.6)';
-        ui.gameUiContainer.style.boxShadow = `0 0 20px 5px ${feedbackColor}`;
+        const feedbackColor = isCorrect ? 'rgba(57, 255, 20, 0.6)' : 'rgba(255, 20, 40, 0.7)'; // Rojo dopamínico
+        ui.gameUiContainer.style.boxShadow = `0 0 25px 8px ${feedbackColor}`;
         setTimeout(() => {
             ui.gameUiContainer.style.boxShadow = '0 10px 30px rgba(0,0,0,0.3)';
         }, 800);
     }
-    // ======== FIN: APLICACIÓN DE AJUSTES DE ANIMACIÓN DE FEEDBACK ========
+    // ======== FIN: BUG DE ANIMACIÓN DE PANEL ARREGLADO ========
 
     ui.scoreDisplayToggle.textContent = `Puntuación: ${score} / ${currentQuestionIndex}`;
     ui.nextBtn.disabled = false;

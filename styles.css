@@ -262,7 +262,10 @@ button.game-control-btn:disabled { opacity: .4; cursor: default; }
   overflow-x: auto;
   scrollbar-width: none;
   -ms-overflow-style: none;
+  /* --- INICIO: CAMBIO PARA DISTRIBUCIÓN --- */
+  /* Esta propiedad distribuye los botones de forma equitativa en el espacio disponible. */
   justify-content: space-around;
+  /* --- FIN: CAMBIO PARA DISTRIBUCIÓN --- */
 }
 
 .menu-tabs::-webkit-scrollbar {
@@ -270,9 +273,13 @@ button.game-control-btn:disabled { opacity: .4; cursor: default; }
 }
 
 .menu-tab-btn {
+  /* --- INICIO: CAMBIO PARA DISTRIBUCIÓN --- */
+  /* flex: 1; hace que cada botón crezca para ocupar el mismo espacio. */
+  /* display: flex y justify-content: center; centran el icono SVG dentro del botón. */
   flex: 1;
   display: flex;
   justify-content: center;
+  /* --- FIN: CAMBIO PARA DISTRIBUCIÓN --- */
   padding: 1rem;
   background: none;
   border: none;
@@ -511,23 +518,16 @@ button.game-control-btn:disabled { opacity: .4; cursor: default; }
 /* --- FIN: ESTILOS MODO INSTINTO --- */
 
 
-/* ======== INICIO: NUEVOS ESTILOS PARA CONFIGURACIÓN (Y CORRECCIONES) ======== */
+/* ======== INICIO: NUEVOS ESTILOS PARA CONFIGURACIÓN ======== */
 
-/* --- Animación de Calle Incorrecta (Rojo Dopamínico) --- */
+/* --- Animación de Calle Incorrecta --- */
 @keyframes pulseAndFlashIncorrect {
-    0% { stroke-width: 8; stroke: #dc2626; opacity: 0.8; } /* Rojo más intenso */
-    50% { stroke-width: 14; stroke: #fb7185; opacity: 1; } /* Rojo-rosa brillante */
-    100% { stroke-width: 8; stroke: #dc2626; opacity: 0.8; }
+    0% { stroke-width: 8; stroke: #c82333; opacity: 0.8; }
+    50% { stroke-width: 14; stroke: #ff8a8a; opacity: 1; }
+    100% { stroke-width: 8; stroke: #c82333; opacity: 0.8; }
 }
 .street-reveal-animation-fail {
     animation: pulseAndFlashIncorrect 0.8s ease-out;
-}
-
-/* --- Animación del Panel Incorrecto (Rojo Dopamínico) --- */
-@keyframes panel-pulse-incorrect-anim {
-    0% { box-shadow: 0 10px 30px rgba(0,0,0,0.3); }
-    50% { box-shadow: 0 0 25px 8px rgba(255, 20, 40, 0.7); } /* Sombra Roja más potente */
-    100% { box-shadow: 0 10px 30px rgba(0,0,0,0.3); }
 }
 
 /* --- Estilos para los Interruptores (Toggle) --- */
@@ -621,4 +621,4 @@ input[type="range"]::-moz-range-thumb {
     border: 2px solid #3b82f6;
 }
 
-/* ======== FIN: NUEVOS ESTILOS PARA CONFIGURACIÓN (Y CORRECCIONES) ======== */
+/* ======== FIN: NUEVOS ESTILOS PARA CONFIGURACIÓN ======== */

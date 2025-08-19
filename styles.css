@@ -516,3 +516,109 @@ button.game-control-btn:disabled { opacity: .4; cursor: default; }
     background-color: #e5e7eb;
 }
 /* --- FIN: ESTILOS MODO INSTINTO --- */
+
+
+/* ======== INICIO: NUEVOS ESTILOS PARA CONFIGURACIÓN ======== */
+
+/* --- Animación de Calle Incorrecta --- */
+@keyframes pulseAndFlashIncorrect {
+    0% { stroke-width: 8; stroke: #c82333; opacity: 0.8; }
+    50% { stroke-width: 14; stroke: #ff8a8a; opacity: 1; }
+    100% { stroke-width: 8; stroke: #c82333; opacity: 0.8; }
+}
+.street-reveal-animation-fail {
+    animation: pulseAndFlashIncorrect 0.8s ease-out;
+}
+
+/* --- Estilos para los Interruptores (Toggle) --- */
+.toggle-checkbox {
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    width: 48px;
+    height: 26px;
+    display: inline-block;
+    position: relative;
+    border-radius: 50px;
+    overflow: hidden;
+    outline: none;
+    border: none;
+    cursor: pointer;
+    background-color: #4b5563; /* Gris oscuro para estado apagado */
+    transition: background-color 0.3s ease;
+}
+
+.toggle-checkbox:before {
+    content: "";
+    display: block;
+    position: absolute;
+    width: 20px;
+    height: 20px;
+    background: #fff;
+    left: 3px;
+    top: 3px;
+    border-radius: 50%;
+    transition: left 0.3s ease;
+}
+
+.toggle-checkbox:checked {
+    background-color: #3b82f6; /* Azul de tu tema para estado encendido */
+}
+
+.toggle-checkbox:checked:before {
+    left: 25px;
+}
+
+/* --- Estilos para el Slider de Volumen --- */
+#volume-control-wrapper {
+    transition: opacity 0.3s ease;
+}
+
+#volume-control-wrapper.disabled {
+    opacity: 0.4;
+    pointer-events: none;
+}
+
+input[type="range"] {
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    background: transparent;
+    cursor: pointer;
+}
+
+/* Estilos para el raíl del slider en Chrome/Safari */
+input[type="range"]::-webkit-slider-runnable-track {
+    background: #4b5563;
+    height: 6px;
+    border-radius: 3px;
+}
+/* Estilos para el raíl del slider en Firefox */
+input[type="range"]::-moz-range-track {
+    background: #4b5563;
+    height: 6px;
+    border-radius: 3px;
+}
+
+/* Estilos para el "pulgar" o manejador del slider en Chrome/Safari */
+input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    margin-top: -6px; /* Centrar verticalmente */
+    background-color: #fff;
+    height: 18px;
+    width: 18px;
+    border-radius: 50%;
+    border: 2px solid #3b82f6;
+}
+/* Estilos para el "pulgar" o manejador del slider en Firefox */
+input[type="range"]::-moz-range-thumb {
+    border: none;
+    border-radius: 50%;
+    background-color: #fff;
+    height: 18px;
+    width: 18px;
+    border: 2px solid #3b82f6;
+}
+
+/* ======== FIN: NUEVOS ESTILOS PARA CONFIGURACIÓN ======== */

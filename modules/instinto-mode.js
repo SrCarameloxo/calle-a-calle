@@ -9,12 +9,15 @@
  * @param {function} context.updatePanelUI - La función para animar el panel de UI.
  * @returns {object} Un objeto con funciones para controlar el modo desde fuera.
  */
-export function startInstintoGame({ ui, gameMap, updatePanelUI }) {
+export function startInstintoGame({ ui, gameMap, updatePanelUI, userProfile }) { // <-- Se añade userProfile
   console.log("¡El Modo Instinto ha sido activado! La lógica está ahora en instinto-mode.js");
 
   // --- Estado y constantes locales del MODO INSTINTO ---
   const COL_ZONE = '#663399';
   const COL_TRACE = '#007a2f';
+  // ======== INICIO: NUEVA CONSTANTE AÑADIDA ========
+  const COL_FAIL_TRACE = '#c82333';
+  // ======== FIN: NUEVA CONSTANTE AÑADIDA ========
   let drawing = false;
   let zonePoly = null;
   let tempMarkers = [];
@@ -194,7 +197,19 @@ export function startInstintoGame({ ui, gameMap, updatePanelUI }) {
             : L.polyline(geom.points, { color: COL_TRACE, weight: 8 });
         layer.addTo(streetLayerGroup);
     });
-    streetLayerGroup.eachLayer(layer => layer.getElement()?.classList.add('street-reveal-animation'));
+    
+    // ======== INICIO: APLICACIÓN DE AJUSTES DE ANIMACIÓN DE CALLE ========
+    if (userProfile.settings.enable_street_animation) {
+        streetLayerGroup.eachLayer(layer => {
+            const element = layer.getElement();
+            if (element) {
+                // En modo instinto, la primera aparición siempre es en verde/neutro
+                element.classList.add('street-reveal-animation');
+            }
+        });
+    }
+    // ======== FIN: APLICACIÓN DE AJUSTES DE ANIMACIÓN DE CALLE ========
+
     updatePanelUI(() => {
         ui.gameQuestion.textContent = `¿Cómo se llama esta calle?`;
         ui.instintoOptionsContainer.innerHTML = '';
@@ -217,11 +232,20 @@ export function startInstintoGame({ ui, gameMap, updatePanelUI }) {
     clearAllListeners();
     const allOptionBtns = ui.instintoOptionsContainer.querySelectorAll('button');
     const isCorrect = selectedOption.googleName === correctAnswer.googleName;
-    const soundToPlay = isCorrect ? 'correct-sound' : 'incorrect-sound';
     const pulseClass = isCorrect ? 'panel-pulse-correct' : 'panel-pulse-incorrect';
+
     if (isCorrect) {
         score++;
         clickedButton.style.backgroundColor = '#28a745';
+        // ======== INICIO: APLICACIÓN DE AJUSTES DE SONIDO ========
+        if (userProfile.settings.enable_sounds) {
+            const sound = document.getElementById('correct-sound');
+            if(sound) {
+                sound.volume = userProfile.settings.sound_volume;
+                sound.play().catch(e => {});
+            }
+        }
+        // ======== FIN: APLICACIÓN DE AJUSTES DE SONIDO ========
     } else {
         clickedButton.style.backgroundColor = '#c82333';
         allOptionBtns.forEach(btn => {
@@ -230,12 +254,32 @@ export function startInstintoGame({ ui, gameMap, updatePanelUI }) {
                 btn.style.transform = 'scale(1.03)';
             }
         });
+        // ======== INICIO: APLICACIÓN DE AJUSTES DE SONIDO ========
+        if (userProfile.settings.enable_sounds) {
+            const sound = document.getElementById('incorrect-sound');
+            if (sound) {
+                sound.volume = userProfile.settings.sound_volume;
+                sound.play().catch(e => {});
+            }
+        }
+        // ======== FIN: APLICACIÓN DE AJUSTES DE SONIDO ========
     }
-    document.getElementById(soundToPlay)?.play().catch(e => {});
-    ui.gameUiContainer.classList.add(pulseClass);
-    ui.gameUiContainer.addEventListener('animationend', () => {
-        ui.gameUiContainer.classList.remove(pulseClass);
-    }, { once: true });
+
+    // ======== INICIO: APLICACIÓN DE AJUSTES DE ANIMACIÓN DE FEEDBACK ========
+    if (userProfile.settings.enable_feedback_animation) {
+        ui.gameUiContainer.classList.add(pulseClass);
+        ui.gameUiContainer.addEventListener('animationend', () => {
+            ui.gameUiContainer.classList.remove(pulseClass);
+        }, { once: true });
+    } else {
+        const feedbackColor = isCorrect ? 'rgba(57, 255, 20, 0.6)' : 'rgba(255, 31, 79, 0.6)';
+        ui.gameUiContainer.style.boxShadow = `0 0 20px 5px ${feedbackColor}`;
+        setTimeout(() => {
+            ui.gameUiContainer.style.boxShadow = '0 10px 30px rgba(0,0,0,0.3)';
+        }, 800);
+    }
+    // ======== FIN: APLICACIÓN DE AJUSTES DE ANIMACIÓN DE FEEDBACK ========
+
     ui.scoreDisplayToggle.textContent = `Puntuación: ${score} / ${currentQuestionIndex}`;
     ui.nextBtn.disabled = false;
   }

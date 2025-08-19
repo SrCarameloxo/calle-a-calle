@@ -50,37 +50,54 @@ window.addEventListener('DOMContentLoaded', () => {
     saveZoneBtn: document.getElementById('saveZoneBtn'),
     backToMenuBtn: document.getElementById('back-to-menu-btn'),
     backFromReviewBtn: document.getElementById('back-from-review-btn'),
-    // Añadimos el nuevo contenedor de opciones para que sea accesible
     instintoOptionsContainer: document.getElementById('instinto-options-container'),
+    // ======== INICIO: NUEVOS ELEMENTOS DE CONFIGURACIÓN ========
+    settings: {
+        soundsEnabled: document.getElementById('setting-sounds-enabled'),
+        soundVolume: document.getElementById('setting-sound-volume'),
+        streetAnimation: document.getElementById('setting-street-animation'),
+        feedbackAnimation: document.getElementById('setting-feedback-animation'),
+        volumeControlWrapper: document.getElementById('volume-control-wrapper')
+    }
+    // ======== FIN: NUEVOS ELEMENTOS DE CONFIGURACIÓN ========
   };
 
   let backgroundMap, gameMap = null;
-  const COL_ZONE = '#663399', COL_TRACE = '#007a2f', COL_DASH = '#1976d2';
+  const COL_ZONE = '#663399', COL_TRACE = '#007a2f', COL_FAIL_TRACE = '#c82333', COL_DASH = '#1976d2';
   let drawing=false, zonePoly=null, tempMarkers=[], zonePoints=[], oldZonePoly=null, reviewLayer=null;
   let playing=false, qIdx=0, target=null, userMk, guide, streetGrp;
   let streetList = [], totalQuestions = 0, streetsGuessedCorrectly = 0, lastGameZonePoints = [];
   let lastGameStreetList = [];
-  let userProfile = { id: null, cityData: null, subscribedCity: null, role: null, showDrawHelp: true };
+  // ======== INICIO: MODIFICACIÓN DE userProfile PARA INCLUIR AJUSTES ========
+  let userProfile = { 
+    id: null, 
+    cityData: null, 
+    subscribedCity: null, 
+    role: null, 
+    showDrawHelp: true,
+    settings: {
+        enable_sounds: true,
+        sound_volume: 0.5,
+        enable_street_animation: true,
+        enable_feedback_animation: true
+    }
+  };
+  // ======== FIN: MODIFICACIÓN DE userProfile ========
   let currentStreak = 0;
   let showScoreAsPercentage = false;
 
   let currentGameMode = 'classic'; 
   let acertadasEnSesionRevancha = new Set();
-  let activeModeControls = null; // Variable para guardar los controles del modo activo
+  let activeModeControls = null;
 
-  // --- INICIO: CÓDIGO CORREGIDO (Regla #2) ---
-  // Esta función ahora es la única responsable de la apariencia del modo
   function setGameMode(mode) {
     if (!mode) return;
     currentGameMode = mode;
     console.log(`Modo de juego cambiado a: ${currentGameMode}`);
     
-    // 1. Lógica del color del título
     const title = uiElements.gameUiContainer.querySelector('.gradient-text');
     if (title) {
-        // Primero, limpiamos todas las clases de color
         title.classList.remove('revancha-gradient', 'instinto-gradient');
-        // Luego, añadimos solo la que corresponde
         if (mode === 'revancha') {
             title.classList.add('revancha-gradient');
         } else if (mode === 'instinto') {
@@ -88,17 +105,13 @@ window.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // 2. Lógica del "tick" de selección
     document.querySelectorAll('.mode-select-btn').forEach(btn => {
-        // Primero, limpiamos el tick de todos los botones
         btn.classList.remove('active-mode');
-        // Luego, lo añadimos solo al botón del modo actual
         if (btn.dataset.mode === mode) {
             btn.classList.add('active-mode');
         }
     });
   }
-  // --- FIN: CÓDIGO CORREGIDO (Regla #2) ---
 
   function updatePanelUI(updateFunction) {
       const heightBefore = uiElements.gameUiContainer.offsetHeight;
@@ -142,12 +155,27 @@ window.addEventListener('DOMContentLoaded', () => {
   async function fetchUserProfile(user) {
     if (!user) return;
     try {
-        const { data: profile, error } = await supabaseClient.from('profiles').select('role, subscribed_city, mostrar_ayuda_dibujo').eq('id', user.id).single();
+        // ======== INICIO: MODIFICACIÓN PARA CARGAR AJUSTES ========
+        const { data: profile, error } = await supabaseClient.from('profiles')
+          .select('role, subscribed_city, mostrar_ayuda_dibujo, enable_sounds, sound_volume, enable_street_animation, enable_feedback_animation')
+          .eq('id', user.id)
+          .single();
+        // ======== FIN: MODIFICACIÓN PARA CARGAR AJUSTES ========
         if (error) { throw error; }
+
         userProfile.id = user.id;
         userProfile.role = profile.role;
         userProfile.subscribedCity = profile.subscribed_city;
         userProfile.showDrawHelp = profile.mostrar_ayuda_dibujo;
+        // ======== INICIO: GUARDAR AJUSTES CARGADOS ========
+        userProfile.settings = {
+            enable_sounds: profile.enable_sounds,
+            sound_volume: profile.sound_volume,
+            enable_street_animation: profile.enable_street_animation,
+            enable_feedback_animation: profile.enable_feedback_animation
+        };
+        updateSettingsUI(); // Actualiza la UI con los valores cargados
+        // ======== FIN: GUARDAR AJUSTES CARGADOS ========
         
         if (profile.role === 'admin') {
             uiElements.adminPanelBtn.classList.remove('hidden');
@@ -245,24 +273,14 @@ window.addEventListener('DOMContentLoaded', () => {
         button.addEventListener('click', () => {
             const selectedMode = button.dataset.mode;
             if (button.disabled) return;
-
-            // --- INICIO: CAMBIO CLAVE 1 ---
-            // Se llama a la función de reseteo "Maestra" justo al principio,
-            // garantizando una limpieza total antes de hacer cualquier otra cosa.
             resetToInitialView();
-            // --- FIN: CAMBIO CLAVE 1 ---
-
-            // Limpiar el estado del modo anterior antes de cambiar
             if (activeModeControls && typeof activeModeControls.clear === 'function') {
                 activeModeControls.clear();
             }
             activeModeControls = null;
-
             setGameMode(selectedMode);
             uiElements.menuContentPanel.classList.add('hidden');
-
             if (selectedMode === 'classic') {
-                // No se necesita hacer nada especial, el reset ya dejó la UI lista para el modo clásico.
             } else if (selectedMode === 'revancha') {
                 uiElements.drawZoneBtn.classList.add('hidden');
                 startRevanchaGame({
@@ -278,6 +296,75 @@ window.addEventListener('DOMContentLoaded', () => {
         });
     });
   }
+
+  // ======== INICIO: NUEVAS FUNCIONES DE CONFIGURACIÓN ========
+  /**
+   * Actualiza la UI de configuración para que coincida con los valores guardados en userProfile.
+   */
+  function updateSettingsUI() {
+    uiElements.settings.soundsEnabled.checked = userProfile.settings.enable_sounds;
+    uiElements.settings.soundVolume.value = userProfile.settings.sound_volume;
+    uiElements.settings.streetAnimation.checked = userProfile.settings.enable_street_animation;
+    uiElements.settings.feedbackAnimation.checked = userProfile.settings.enable_feedback_animation;
+
+    // Activa/desactiva el slider de volumen
+    if (userProfile.settings.enable_sounds) {
+        uiElements.settings.volumeControlWrapper.classList.remove('disabled');
+    } else {
+        uiElements.settings.volumeControlWrapper.classList.add('disabled');
+    }
+  }
+
+  /**
+   * Guarda un ajuste específico en Supabase.
+   * @param {string} key - El nombre de la columna en la tabla 'profiles'.
+   * @param {*} value - El nuevo valor a guardar.
+   */
+  async function updateUserSetting(key, value) {
+    if (!userProfile.id) return;
+    
+    // Actualiza el estado local primero para una respuesta instantánea
+    userProfile.settings[key] = value;
+
+    const { error } = await supabaseClient
+        .from('profiles')
+        .update({ [key]: value }) // [key] permite usar una variable como nombre de columna
+        .eq('id', userProfile.id);
+
+    if (error) {
+        console.error(`Error al guardar el ajuste '${key}':`, error);
+        // Opcional: Revertir el cambio en la UI si falla el guardado
+    }
+  }
+
+  /**
+   * Configura los listeners para los controles de la UI de configuración.
+   */
+  function setupSettingsListeners() {
+    uiElements.settings.soundsEnabled.addEventListener('change', (e) => {
+        const isEnabled = e.target.checked;
+        updateUserSetting('enable_sounds', isEnabled);
+        // Actualiza la UI del slider de volumen inmediatamente
+        if (isEnabled) {
+            uiElements.settings.volumeControlWrapper.classList.remove('disabled');
+        } else {
+            uiElements.settings.volumeControlWrapper.classList.add('disabled');
+        }
+    });
+
+    uiElements.settings.soundVolume.addEventListener('input', (e) => {
+        updateUserSetting('sound_volume', parseFloat(e.target.value));
+    });
+
+    uiElements.settings.streetAnimation.addEventListener('change', (e) => {
+        updateUserSetting('enable_street_animation', e.target.checked);
+    });
+
+    uiElements.settings.feedbackAnimation.addEventListener('change', (e) => {
+        updateUserSetting('enable_feedback_animation', e.target.checked);
+    });
+  }
+  // ======== FIN: NUEVAS FUNCIONES DE CONFIGURACIÓN ========
 
   function initGame() {
     let initialCoords = [38.88, -6.97];
@@ -336,6 +423,7 @@ window.addEventListener('DOMContentLoaded', () => {
     
     setupStartButton(uiElements.startBtn);
     setupMenu();
+    setupSettingsListeners(); // ======== LLAMADA A LA NUEVA FUNCIÓN ========
 
     document.addEventListener('keyup', (event) => {
         if (event.code === 'Space' && !uiElements.nextBtn.disabled) {
@@ -436,7 +524,7 @@ window.addEventListener('DOMContentLoaded', () => {
   }
 
   function startDrawing(){
-    if (currentGameMode !== 'classic') return; // <-- Guardia para no ejecutar en otros modos
+    if (currentGameMode !== 'classic') return;
 
     updatePanelUI(() => {
         ['end-game-options', 'drawZone', 'loaded-zone-options', 'game-interface', 'back-from-review-btn'].forEach(id => {
@@ -523,15 +611,24 @@ window.addEventListener('DOMContentLoaded', () => {
     userMk = L.marker(e.latlng).addTo(gameMap);
     streetGrp = drawStreet(); 
     if(streetGrp){
-      streetGrp.eachLayer(layer => {
-          const element = layer.getElement();
-          if (element) element.classList.add('street-reveal-animation');
-      });
       const streetCheck = getDistanceToStreet(userMk.getLatLng(), streetGrp);
+      let isCorrect = streetCheck.distance <= 30;
+
+      // ======== INICIO: APLICACIÓN DE AJUSTES DE ANIMACIÓN DE CALLE ========
+      if (userProfile.settings.enable_street_animation) {
+          streetGrp.eachLayer(layer => {
+              const element = layer.getElement();
+              if (element) {
+                  const animationClass = isCorrect ? 'street-reveal-animation' : 'street-reveal-animation-fail';
+                  element.classList.add(animationClass);
+              }
+          });
+      }
+      // ======== FIN: APLICACIÓN DE AJUSTES DE ANIMACIÓN DE CALLE ========
       
       let feedbackClass = '';
 
-      if (streetCheck.distance <= 30) {
+      if (isCorrect) {
         if (currentGameMode === 'revancha') {
             const acertada = streetList[qIdx - 1];
             acertadasEnSesionRevancha.add(acertada.googleName);
@@ -541,7 +638,15 @@ window.addEventListener('DOMContentLoaded', () => {
         streetsGuessedCorrectly++;
         currentStreak++;
         updateScoreDisplay('¡Correcto!', '#28a745');
-        document.getElementById('correct-sound')?.play().catch(e => {});
+        // ======== INICIO: APLICACIÓN DE AJUSTES DE SONIDO ========
+        if (userProfile.settings.enable_sounds) {
+            const sound = document.getElementById('correct-sound');
+            if(sound) {
+                sound.volume = userProfile.settings.sound_volume;
+                sound.play().catch(e => {});
+            }
+        }
+        // ======== FIN: APLICACIÓN DE AJUSTES DE SONIDO ========
         feedbackClass = 'panel-pulse-correct';
         if (currentStreak >= 3) {
             uiElements.streakDisplay.textContent = `¡Racha de ${currentStreak}!`;
@@ -561,14 +666,32 @@ window.addEventListener('DOMContentLoaded', () => {
         currentStreak = 0;
         uiElements.streakDisplay.classList.remove('visible');
         updateScoreDisplay(`Casi... a ${Math.round(streetCheck.distance)} metros.`, '#c82333');
-        document.getElementById('incorrect-sound')?.play().catch(e => {});
+        // ======== INICIO: APLICACIÓN DE AJUSTES DE SONIDO ========
+        if (userProfile.settings.enable_sounds) {
+            const sound = document.getElementById('incorrect-sound');
+            if (sound) {
+                sound.volume = userProfile.settings.sound_volume;
+                sound.play().catch(e => {});
+            }
+        }
+        // ======== FIN: APLICACIÓN DE AJUSTES DE SONIDO ========
         feedbackClass = 'panel-pulse-incorrect';
       }
       
-      uiElements.gameUiContainer.classList.add(feedbackClass);
-      uiElements.gameUiContainer.addEventListener('animationend', () => {
-          uiElements.gameUiContainer.classList.remove(feedbackClass);
-      }, { once: true });
+      // ======== INICIO: APLICACIÓN DE AJUSTES DE ANIMACIÓN DE FEEDBACK ========
+      if (userProfile.settings.enable_feedback_animation) {
+          uiElements.gameUiContainer.classList.add(feedbackClass);
+          uiElements.gameUiContainer.addEventListener('animationend', () => {
+              uiElements.gameUiContainer.classList.remove(feedbackClass);
+          }, { once: true });
+      } else {
+          const feedbackColor = isCorrect ? 'rgba(57, 255, 20, 0.6)' : 'rgba(255, 31, 79, 0.6)';
+          uiElements.gameUiContainer.style.boxShadow = `0 0 20px 5px ${feedbackColor}`;
+          setTimeout(() => {
+              uiElements.gameUiContainer.style.boxShadow = '0 10px 30px rgba(0,0,0,0.3)';
+          }, 800);
+      }
+      // ======== FIN: APLICACIÓN DE AJUSTES DE ANIMACIÓN DE FEEDBACK ========
 
       const progress = totalQuestions > 0 ? ((qIdx) / totalQuestions) * 100 : 0;
       uiElements.progressBar.style.width = `${progress}%`;
@@ -626,9 +749,19 @@ window.addEventListener('DOMContentLoaded', () => {
   function drawStreet(){
     const g = L.layerGroup().addTo(gameMap);
     if (!target || !Array.isArray(target) || target.length === 0) return null;
+    
+    // ======== INICIO: MODIFICACIÓN PARA COLOR DE FALLO ESTÁTICO ========
+    // Determina el color de la calle basado en el último resultado y la configuración
+    const isLastAnswerCorrect = getDistanceToStreet(userMk.getLatLng(), g).distance <= 30; // Hacemos una comprobación rápida
+    let traceColor = COL_TRACE;
+    if (!isLastAnswerCorrect && !userProfile.settings.enable_street_animation) {
+        traceColor = COL_FAIL_TRACE;
+    }
+    // ======== FIN: MODIFICACIÓN PARA COLOR DE FALLO ESTÁTICO ========
+
     target.forEach(geom => {
-        if (geom.isClosed) L.polygon(geom.points, { color: COL_TRACE, weight: 4, fillOpacity: 0.2 }).addTo(g);
-        else L.polyline(geom.points, { color: COL_TRACE, weight: 8 }).addTo(g);
+        if (geom.isClosed) L.polygon(geom.points, { color: traceColor, weight: 4, fillOpacity: 0.2 }).addTo(g);
+        else L.polyline(geom.points, { color: traceColor, weight: 8 }).addTo(g);
     });
     return g;
   }
@@ -650,16 +783,10 @@ window.addEventListener('DOMContentLoaded', () => {
   }
 
   function endGame() {
-    // --- INICIO DE LA CORRECCIÓN DEFINITIVA ---
-    // Esta cláusula de guarda es la solución. Si esta función es llamada
-    // por error mientras el juego está en modo 'instinto', simplemente
-    // se detiene y no hace nada, evitando mostrar los botones incorrectos.
     if (currentGameMode === 'instinto') {
         console.warn("Llamada a endGame() genérico prevenida durante el modo Instinto.");
         return;
     }
-    // --- FIN DE LA CORRECCIÓN DEFINITIVA ---
-
     updatePanelUI(() => {
         lastGameZonePoints = [...zonePoints];
         lastGameStreetList = [...streetList];
@@ -795,20 +922,12 @@ window.addEventListener('DOMContentLoaded', () => {
     uiElements.nextBtn.disabled = true;
   }
   
-  // --- INICIO: FUNCIÓN DE RESETEO "MAESTRA" MODIFICADA ---
-  // Esta función ahora es la responsable de hacer una limpieza COMPLETA
-  // tanto de la interfaz como del estado de la partida anterior.
   function resetToInitialView() {
-      // 1. Limpiar estado del modo anterior si existe (para modos complejos como Instinto)
       if (activeModeControls && typeof activeModeControls.clear === 'function') {
         activeModeControls.clear();
       }
       activeModeControls = null;
-
-      // 2. Limpiar todas las capas del mapa
       clear(true);
-
-      // 3. Resetear TODAS las variables de estado de la partida
       streetList = [];
       totalQuestions = 0;
       streetsGuessedCorrectly = 0;
@@ -818,26 +937,16 @@ window.addEventListener('DOMContentLoaded', () => {
       zonePoints = [];
       zonePoly = null;
       oldZonePoly = null;
-
       uiElements.repeatZoneBtn.onclick = null;
       uiElements.reviewGameBtn.onclick = null;
       uiElements.saveZoneBtn.onclick = null;
-
-      // 4. Resetear la interfaz de usuario a su estado inicial
       updatePanelUI(() => {
-          // Ocultar TODOS los contenedores de juego
           ['start-options', 'loaded-zone-options', 'checkbox-wrapper', 'game-interface', 'end-game-options', 'back-from-review-btn'].forEach(id => {
               const el = document.getElementById(id);
               if (el) el.classList.add('hidden');
           });
-          
-          // Ocultar botones flotantes
           uiElements.reportBtnFAB.classList.add('hidden');
-
-          // Mostrar solo el botón inicial
           uiElements.drawZoneBtn.classList.remove('hidden');
-          
-          // Limpiar cualquier contenido dinámico
           uiElements.progressBar.style.width = '0%';
           uiElements.instintoOptionsContainer.innerHTML = '';
           uiElements.gameQuestion.textContent = '';
@@ -846,15 +955,9 @@ window.addEventListener('DOMContentLoaded', () => {
           uiElements.streakDisplay.classList.remove('visible');
       });
   }
-  // --- FIN: FUNCIÓN DE RESETEO "MAESTRA" ---
 
   function playFromHistory(zoneString) {
-    // --- INICIO: CAMBIO CLAVE 2 ---
-    // Se llama a la función de reseteo MAESTRA al principio para asegurar
-    // que cualquier estado anterior (como estar en modo revisión) se limpie por completo.
     resetToInitialView();
-    // --- FIN: CAMBIO CLAVE 2 ---
-    
     gameMap.off('click', addVertex);
     const points = zoneString.split(';').map(pair => {
       const [lat, lng] = pair.split(',');

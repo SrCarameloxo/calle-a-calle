@@ -53,6 +53,11 @@ window.addEventListener('DOMContentLoaded', () => {
     instintoOptionsContainer: document.getElementById('instinto-options-container'),
     // ======== INICIO: NUEVOS ELEMENTOS DE CONFIGURACIÓN ========
     settings: {
+        // --- INICIO DE LA MODIFICACIÓN: AÑADIDOS SELECTORES PARA EL DESPLEGABLE ---
+        toggleHeader: document.getElementById('settings-toggle-header'),
+        arrow: document.querySelector('.settings-arrow'),
+        content: document.getElementById('user-settings-section'),
+        // --- FIN DE LA MODIFICACIÓN ---
         soundsEnabled: document.getElementById('setting-sounds-enabled'),
         soundVolume: document.getElementById('setting-sound-volume'),
         streetAnimation: document.getElementById('setting-street-animation'),
@@ -63,7 +68,9 @@ window.addEventListener('DOMContentLoaded', () => {
   };
 
   let backgroundMap, gameMap = null;
-  const COL_ZONE = '#663399', COL_TRACE = '#007a2f', COL_FAIL_TRACE = '#c82333', COL_DASH = '#1976d2';
+  // --- INICIO DE LA MODIFICACIÓN: NUEVO COLOR DE FALLO ---
+  const COL_ZONE = '#663399', COL_TRACE = '#007a2f', COL_FAIL_TRACE = '#E63946', COL_DASH = '#1976d2';
+  // --- FIN DE LA MODIFICACIÓN ---
   let drawing=false, zonePoly=null, tempMarkers=[], zonePoints=[], oldZonePoly=null, reviewLayer=null;
   let playing=false, qIdx=0, target=null, userMk, guide, streetGrp;
   let streetList = [], totalQuestions = 0, streetsGuessedCorrectly = 0, lastGameZonePoints = [];
@@ -291,7 +298,7 @@ window.addEventListener('DOMContentLoaded', () => {
                     }
                 });
             } else if (selectedMode === 'instinto') {
-                activeModeControls = startInstintoGame({ ui: uiElements, gameMap: gameMap, updatePanelUI: updatePanelUI });
+                activeModeControls = startInstintoGame({ ui: uiElements, gameMap: gameMap, updatePanelUI: updatePanelUI, userProfile: userProfile });
             }
         });
     });
@@ -336,6 +343,20 @@ window.addEventListener('DOMContentLoaded', () => {
         // Opcional: Revertir el cambio en la UI si falla el guardado
     }
   }
+  
+  // --- INICIO DE LA MODIFICACIÓN: NUEVA FUNCIÓN PARA EL DESPLEGABLE ---
+  /**
+   * Configura el listener para el desplegable de configuración.
+   */
+  function setupSettingsDropdown() {
+    if (uiElements.settings.toggleHeader) {
+        uiElements.settings.toggleHeader.addEventListener('click', () => {
+            uiElements.settings.content.classList.toggle('open');
+            uiElements.settings.arrow.classList.toggle('open');
+        });
+    }
+  }
+  // --- FIN DE LA MODIFICACIÓN ---
 
   /**
    * Configura los listeners para los controles de la UI de configuración.
@@ -423,7 +444,10 @@ window.addEventListener('DOMContentLoaded', () => {
     
     setupStartButton(uiElements.startBtn);
     setupMenu();
-    setupSettingsListeners(); // ======== LLAMADA A LA NUEVA FUNCIÓN ========
+    setupSettingsListeners(); 
+    // --- INICIO DE LA MODIFICACIÓN: LLAMADA A LA FUNCIÓN DEL DESPLEGABLE ---
+    setupSettingsDropdown();
+    // --- FIN DE LA MODIFICACIÓN ---
 
     document.addEventListener('keyup', (event) => {
         if (event.code === 'Space' && !uiElements.nextBtn.disabled) {
@@ -609,12 +633,27 @@ window.addEventListener('DOMContentLoaded', () => {
     gameMap.off('click', onMapClick);
     if (userMk) gameMap.removeLayer(userMk);
     userMk = L.marker(e.latlng).addTo(gameMap);
-    streetGrp = drawStreet(); 
-    if(streetGrp){
-      const streetCheck = getDistanceToStreet(userMk.getLatLng(), streetGrp);
-      let isCorrect = streetCheck.distance <= 30;
+    
+    // --- INICIO DE LA MODIFICACIÓN: SE OBTIENE isCorrect ANTES DE DIBUJAR ---
+    // Primero calculamos si la respuesta es correcta o no. 
+    // Creamos una capa temporal solo para esta comprobación.
+    let tempStreetGrp = L.layerGroup();
+    if (target && Array.isArray(target) && target.length > 0) {
+        target.forEach(geom => {
+            if (geom.isClosed) L.polygon(geom.points).addTo(tempStreetGrp);
+            else L.polyline(geom.points).addTo(tempStreetGrp);
+        });
+    }
+    const streetCheck = getDistanceToStreet(userMk.getLatLng(), tempStreetGrp);
+    let isCorrect = streetCheck.distance <= 30;
+    // --- FIN DE LA MODIFICACIÓN ---
 
-      // ======== INICIO: APLICACIÓN DE AJUSTES DE ANIMACIÓN DE CALLE ========
+    // --- INICIO DE LA MODIFICACIÓN: SE PASA isCorrect A drawStreet ---
+    streetGrp = drawStreet(isCorrect);
+    // --- FIN DE LA MODIFICACIÓN ---
+
+    if(streetGrp){
+      
       if (userProfile.settings.enable_street_animation) {
           streetGrp.eachLayer(layer => {
               const element = layer.getElement();
@@ -624,7 +663,6 @@ window.addEventListener('DOMContentLoaded', () => {
               }
           });
       }
-      // ======== FIN: APLICACIÓN DE AJUSTES DE ANIMACIÓN DE CALLE ========
       
       let feedbackClass = '';
 
@@ -638,7 +676,6 @@ window.addEventListener('DOMContentLoaded', () => {
         streetsGuessedCorrectly++;
         currentStreak++;
         updateScoreDisplay('¡Correcto!', '#28a745');
-        // ======== INICIO: APLICACIÓN DE AJUSTES DE SONIDO ========
         if (userProfile.settings.enable_sounds) {
             const sound = document.getElementById('correct-sound');
             if(sound) {
@@ -646,7 +683,6 @@ window.addEventListener('DOMContentLoaded', () => {
                 sound.play().catch(e => {});
             }
         }
-        // ======== FIN: APLICACIÓN DE AJUSTES DE SONIDO ========
         feedbackClass = 'panel-pulse-correct';
         if (currentStreak >= 3) {
             uiElements.streakDisplay.textContent = `¡Racha de ${currentStreak}!`;
@@ -665,8 +701,7 @@ window.addEventListener('DOMContentLoaded', () => {
         
         currentStreak = 0;
         uiElements.streakDisplay.classList.remove('visible');
-        updateScoreDisplay(`Casi... a ${Math.round(streetCheck.distance)} metros.`, '#c82333');
-        // ======== INICIO: APLICACIÓN DE AJUSTES DE SONIDO ========
+        updateScoreDisplay(`Casi... a ${Math.round(streetCheck.distance)} metros.`, COL_FAIL_TRACE);
         if (userProfile.settings.enable_sounds) {
             const sound = document.getElementById('incorrect-sound');
             if (sound) {
@@ -674,31 +709,31 @@ window.addEventListener('DOMContentLoaded', () => {
                 sound.play().catch(e => {});
             }
         }
-        // ======== FIN: APLICACIÓN DE AJUSTES DE SONIDO ========
         feedbackClass = 'panel-pulse-incorrect';
       }
       
-      // ======== INICIO: APLICACIÓN DE AJUSTES DE ANIMACIÓN DE FEEDBACK ========
+      // --- INICIO DE LA MODIFICACIÓN: LÓGICA DEL INTERRUPTOR DE ANIMACIÓN DEL PANEL ---
       if (userProfile.settings.enable_feedback_animation) {
           uiElements.gameUiContainer.classList.add(feedbackClass);
           uiElements.gameUiContainer.addEventListener('animationend', () => {
               uiElements.gameUiContainer.classList.remove(feedbackClass);
           }, { once: true });
       } else {
-          const feedbackColor = isCorrect ? 'rgba(57, 255, 20, 0.6)' : 'rgba(255, 31, 79, 0.6)';
+          // El fallback si la animación está desactivada
+          const feedbackColor = isCorrect ? 'rgba(57, 255, 20, 0.6)' : 'rgba(230, 81, 95, 0.7)';
           uiElements.gameUiContainer.style.boxShadow = `0 0 20px 5px ${feedbackColor}`;
           setTimeout(() => {
               uiElements.gameUiContainer.style.boxShadow = '0 10px 30px rgba(0,0,0,0.3)';
           }, 800);
       }
-      // ======== FIN: APLICACIÓN DE AJUSTES DE ANIMACIÓN DE FEEDBACK ========
+      // --- FIN DE LA MODIFICACIÓN ---
 
       const progress = totalQuestions > 0 ? ((qIdx) / totalQuestions) * 100 : 0;
       uiElements.progressBar.style.width = `${progress}%`;
       
       if (streetCheck.point) guide = L.polyline([userMk.getLatLng(), streetCheck.point], { dashArray:'6 4', color:COL_DASH }).addTo(gameMap);
     } else {
-      updateScoreDisplay('Error: No se pudo dibujar el lugar.', '#c82333');
+      updateScoreDisplay('Error: No se pudo dibujar el lugar.', COL_FAIL_TRACE);
     }
 
     uiElements.nextBtn.disabled=false;
@@ -746,18 +781,13 @@ window.addEventListener('DOMContentLoaded', () => {
       }
   }
   
-  function drawStreet(){
+  // --- INICIO DE LA MODIFICACIÓN: LA FUNCIÓN AHORA ACEPTA isCorrect ---
+  function drawStreet(isCorrect){
     const g = L.layerGroup().addTo(gameMap);
     if (!target || !Array.isArray(target) || target.length === 0) return null;
     
-    // ======== INICIO: MODIFICACIÓN PARA COLOR DE FALLO ESTÁTICO ========
-    // Determina el color de la calle basado en el último resultado y la configuración
-    const isLastAnswerCorrect = getDistanceToStreet(userMk.getLatLng(), g).distance <= 30; // Hacemos una comprobación rápida
-    let traceColor = COL_TRACE;
-    if (!isLastAnswerCorrect && !userProfile.settings.enable_street_animation) {
-        traceColor = COL_FAIL_TRACE;
-    }
-    // ======== FIN: MODIFICACIÓN PARA COLOR DE FALLO ESTÁTICO ========
+    // La lógica de decisión del color ahora es mucho más simple y correcta.
+    const traceColor = isCorrect ? COL_TRACE : COL_FAIL_TRACE;
 
     target.forEach(geom => {
         if (geom.isClosed) L.polygon(geom.points, { color: traceColor, weight: 4, fillOpacity: 0.2 }).addTo(g);
@@ -765,6 +795,7 @@ window.addEventListener('DOMContentLoaded', () => {
     });
     return g;
   }
+  // --- FIN DE LA MODIFICACIÓN ---
 
   function getDistanceToStreet(userPoint, streetLayer) {
       let minDistance = Infinity, closestPointOnStreet = null;

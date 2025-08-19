@@ -441,11 +441,13 @@ button.game-control-btn:disabled { opacity: .4; cursor: default; }
     100% { box-shadow: 0 10px 30px rgba(0,0,0,0.3); }
 }
 
+/* --- INICIO DE LA MODIFICACIÓN: CAMBIO DE COLOR ROJO --- */
 @keyframes panel-pulse-incorrect-anim {
     0% { box-shadow: 0 10px 30px rgba(0,0,0,0.3); }
-    50% { box-shadow: 0 0 20px 5px rgba(255, 31, 79, 0.6); } /* Sombra Roja Neón Sutil */
+    50% { box-shadow: 0 0 20px 5px rgba(230, 57, 70, 0.7); } /* Nuevo rojo #E63946 con opacidad */
     100% { box-shadow: 0 10px 30px rgba(0,0,0,0.3); }
 }
+/* --- FIN DE LA MODIFICACIÓN --- */
 
 .panel-pulse-correct {
     animation: panel-pulse-correct-anim 0.8s ease-in-out;
@@ -521,11 +523,14 @@ button.game-control-btn:disabled { opacity: .4; cursor: default; }
 /* ======== INICIO: NUEVOS ESTILOS PARA CONFIGURACIÓN ======== */
 
 /* --- Animación de Calle Incorrecta --- */
+/* --- INICIO DE LA MODIFICACIÓN: CAMBIO DE COLOR ROJO --- */
 @keyframes pulseAndFlashIncorrect {
-    0% { stroke-width: 8; stroke: #c82333; opacity: 0.8; }
+    0% { stroke-width: 8; stroke: #E63946; opacity: 0.8; } /* Nuevo rojo #E63946 */
     50% { stroke-width: 14; stroke: #ff8a8a; opacity: 1; }
-    100% { stroke-width: 8; stroke: #c82333; opacity: 0.8; }
+    100% { stroke-width: 8; stroke: #E63946; opacity: 0.8; } /* Nuevo rojo #E63946 */
 }
+/* --- FIN DE LA MODIFICACIÓN --- */
+
 .street-reveal-animation-fail {
     animation: pulseAndFlashIncorrect 0.8s ease-out;
 }
@@ -622,3 +627,40 @@ input[type="range"]::-moz-range-thumb {
 }
 
 /* ======== FIN: NUEVOS ESTILOS PARA CONFIGURACIÓN ======== */
+
+/* --- INICIO DE LA MODIFICACIÓN: ESTILOS PARA EL DESPLEGABLE DE CONFIGURACIÓN --- */
+.settings-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    cursor: pointer;
+    user-select: none;
+}
+
+.settings-arrow {
+    font-size: 1.5rem;
+    line-height: 1;
+    color: #a0aec0;
+    transition: transform 0.3s ease;
+}
+
+.settings-arrow.open {
+    transform: rotate(90deg);
+}
+
+.settings-content {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.4s ease-out, margin-top 0.4s ease-out, padding-bottom 0.4s ease-out;
+    /* Los valores iniciales para la transición de cierre */
+    margin-top: 0;
+    padding-bottom: 0;
+}
+
+.settings-content.open {
+    /* Los valores finales para la transición de apertura */
+    max-height: 300px; /* Suficiente para mostrar todo el contenido */
+    margin-top: 1rem; /* Restaura el espacio superior */
+    padding-bottom: 0.5rem; /* Añade un pequeño espacio inferior */
+}
+/* --- FIN DE LA MODIFICACIÓN --- */

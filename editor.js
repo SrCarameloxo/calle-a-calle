@@ -1,3 +1,4 @@
+
 // --- editor.js (VERSIÓN 17 - VOLVIENDO A LA API ORIGINAL) ---
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -322,25 +323,23 @@ document.addEventListener('DOMContentLoaded', () => {
             saveChangesBtn.disabled = true;
 
             if (osm_id) {
-                // --- INICIO DEL CÓDIGO CORREGIDO ---
+                // --- INICIO DE LA MODIFICACIÓN ---
+                // Volvemos a llamar a la API dedicada /api/updateStreetName
                 const response = await fetch('/api/updateStreetName', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
+                    // El cuerpo ahora es simple, sin 'action' ni 'payload'
                     body: JSON.stringify({ 
-                        osm_id: osm_id,
-                        // Añadimos el nombre original que tenía la calle antes de editarla
-                        osm_name: selectedLayer.feature.properties.tags.name_original || selectedLayer.feature.properties.tags.name,
+                        osm_id: osm_id, 
                         display_name: newName, 
                         city: selectedCity.name 
                     }),
                 });
-                // --- FIN DEL CÓDIGO CORREGIDO ---
+                // --- FIN DE LA MODIFICACIÓN ---
                 const result = await response.json();
-                if (!response.ok) throw new Error(result.details || result.error || 'Error del servidor.');
+                if (!response.ok) throw new Error(result.error || 'Error del servidor.');
                 
                 selectedLayer.feature.properties.tags.name = newName;
-                // Actualizamos también el nombre original por si se quiere volver a editar sin recargar
-                selectedLayer.feature.properties.tags.name_original = newName;
                 selectedLayer.bindPopup(`<b>${newName}</b><br>ID: ${osm_id}`);
             } else {
                 // La creación de calles nuevas sigue usando streetActions, lo cual es correcto
@@ -425,11 +424,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 return { color: hasName ? "#3388ff" : "#999999", weight: hasName ? 3 : 2, opacity: hasName ? 1.0 : 0.6 };
             },
             onEachFeature: function(feature, layer) {
-                // --- AÑADIDO: Guardar el nombre original ---
-                if (feature.properties.tags && feature.properties.tags.name) {
-                    feature.properties.tags.name_original = feature.properties.tags.name;
-                }
-                // --- FIN DEL AÑADIDO ---
                 const tags = feature.properties.tags;
                 const invisibleHitbox = L.polyline(layer.getLatLngs(), {
                     color: 'transparent',

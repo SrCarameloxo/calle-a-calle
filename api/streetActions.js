@@ -1,7 +1,6 @@
-// Ruta: /api/streetActions.js (VERSIÓN CON DELETE Y CREATE)
+// Ruta: /api/streetActions.js
 
 const { createClient } = require('@supabase/supabase-js');
-// INICIO: Herramientas añadidas para la caché
 const { createClient: createKvClient } = require('@vercel/kv');
 const { extractNameParts } = require('../_lib/helpers.js');
 
@@ -9,7 +8,6 @@ const kv = createKvClient({
   url: process.env.KV_REST_API_URL,
   token: process.env.KV_REST_API_TOKEN,
 });
-// FIN: Herramientas añadidas para la caché
 
 module.exports = async (request, response) => {
     if (request.method !== 'POST') {
@@ -20,7 +18,6 @@ module.exports = async (request, response) => {
         const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
         const token = request.headers.authorization?.split('Bearer ')[1];
 
-        // 1. Seguridad (común para todas las acciones)
         if (!token) return response.status(401).json({ error: 'Token no proporcionado.' });
         const { data: { user }, error: userError } = await supabase.auth.getUser(token);
         if (userError || !user) return response.status(401).json({ error: 'Token inválido.' });
@@ -29,22 +26,13 @@ module.exports = async (request, response) => {
             return response.status(403).json({ error: 'Acceso denegado.' });
         }
 
-        // 2. Lógica de enrutamiento basada en la acción
         const { action, payload } = request.body;
 
         if (action === 'split') {
-            // --- LÓGICA DE SPLITSTREET ---
             const { osm_id, cut_point, city } = payload;
-            if (!osm_id || !cut_point || !city) return response.status(400).json({ error: 'Faltan datos para la acción de dividir.' });
-
-            // INICIO: Invalidación de Caché (Paso 1: Obtener datos antes de modificar)
-            const { data: wayData, error: wayError } = await supabase
-                .from('osm_ways')
-                .select('tags, city')
-                .eq('id', osm_id)
-                .single();
-            if (wayError) console.error(`Cache Invalidation: No se encontró la calle ${osm_id} para obtener su nombre.`);
-            // FIN: Invalidación de Caché (Paso 1)
+            if (!osm_id || !cut_point || !city) return response.status(400).json({ error: 'Faltan datos para dividir.' });
+            
+            const { data: wayData } = await supabase.from('osm_ways').select('tags, city').eq('id', osm_id).single();
             
             const cut_point_wkt = `SRID=4326;POINT(${cut_point.lng} ${cut_point.lat})`;
             const { data, error } = await supabase.rpc('split_way_and_hide_original', {
@@ -53,117 +41,100 @@ module.exports = async (request, response) => {
                 city_name: city
             });
             
-            if (error) throw error;
-
-            // INICIO: Invalidación de Caché (Paso 2: Borrar después de operar)
-            if (!error && wayData && wayData.tags && wayData.tags.name) {
-                const parts = extractNameParts(wayData.tags.name);
-                if (parts.baseName) {
-                    const cacheKey = `street_v18:${wayData.city}:${parts.baseName.replace(/\s/g, '_')}`;
-                    console.log(`Borrando clave de caché por acción 'split': ${cacheKey}`);
-                    await kv.del(cacheKey);
-                }
+            if (error) {
+                console.error('Error de Supabase al dividir calle (RPC):', error);
+                return response.status(500).json({ error: 'Error de base de datos al dividir.', details: error.message });
             }
-            // FIN: Invalidación de Caché (Paso 2)
             
+            try {
+                if (wayData && wayData.tags && wayData.tags.name) {
+                    const parts = extractNameParts(wayData.tags.name);
+                    if (parts.baseName) {
+                        const cacheKey = `street_v18:${wayData.city}:${parts.baseName.replace(/\s/g, '_')}`;
+                        await kv.del(cacheKey);
+                    }
+                }
+            } catch(e) { console.error("Fallo de invalidación de caché en split (no crítico)", e.message); }
+
             return response.status(200).json(data);
 
         } else if (action === 'merge') {
-            // --- LÓGICA DE MERGESTREETS ---
             const { ids } = payload;
-            if (!ids || !Array.isArray(ids) || ids.length < 2) return response.status(400).json({ error: 'Faltan datos para la acción de unir.' });
+            if (!ids || !Array.isArray(ids) || ids.length < 2) return response.status(400).json({ error: 'Faltan datos para unir.' });
 
-            // INICIO: Invalidación de Caché (Paso 1: Obtener datos antes de modificar)
-            const { data: waysData, error: waysError } = await supabase
-                .from('osm_ways')
-                .select('tags, city')
-                .in('id', ids);
-            if (waysError) console.error(`Cache Invalidation: No se pudieron encontrar las calles originales para unir.`);
-            // FIN: Invalidación de Caché (Paso 1)
+            const { data: waysData } = await supabase.from('osm_ways').select('tags, city').in('id', ids);
             
-            const { data, error } = await supabase.rpc('union_ways_and_hide_originals', {
-                original_way_ids: ids
-            });
+            const { data, error } = await supabase.rpc('union_ways_and_hide_originals', { original_way_ids: ids });
 
-            if (error) throw error;
+            if (error) {
+                console.error('Error de Supabase al unir calles (RPC):', error);
+                return response.status(500).json({ error: 'Error de base de datos al unir.', details: error.message });
+            }
 
-            // INICIO: Invalidación de Caché (Paso 2: Borrar después de operar)
-            if (!error && waysData && waysData.length > 0) {
-                for (const way of waysData) {
-                    if (way.tags && way.tags.name) {
-                        const parts = extractNameParts(way.tags.name);
-                        if (parts.baseName) {
-                            const cacheKey = `street_v18:${way.city}:${parts.baseName.replace(/\s/g, '_')}`;
-                            console.log(`Borrando clave de caché por acción 'merge': ${cacheKey}`);
-                            await kv.del(cacheKey);
+            try {
+                if (waysData && waysData.length > 0) {
+                    for (const way of waysData) {
+                        if (way.tags && way.tags.name) {
+                            const parts = extractNameParts(way.tags.name);
+                            if (parts.baseName) {
+                                const cacheKey = `street_v18:${way.city}:${parts.baseName.replace(/\s/g, '_')}`;
+                                await kv.del(cacheKey);
+                            }
                         }
                     }
                 }
-            }
-            // FIN: Invalidación de Caché (Paso 2)
+            } catch(e) { console.error("Fallo de invalidación de caché en merge (no crítico)", e.message); }
 
             return response.status(200).json(data[0]);
 
         } else if (action === 'delete') {
-            // --- NUEVA LÓGICA PARA BORRAR ---
             const { id } = payload;
-            if (!id) return response.status(400).json({ error: 'Falta el ID para la acción de borrar.' });
+            if (!id) return response.status(400).json({ error: 'Falta el ID para borrar.' });
             
-            // INICIO: Invalidación de Caché (Paso 1: Obtener datos antes de modificar)
-            const { data: wayData, error: wayError } = await supabase
-                .from('osm_ways')
-                .select('tags, city')
-                .eq('id', id)
-                .single();
-            if (wayError) console.error(`Cache Invalidation: No se encontró la calle ${id} para obtener su nombre.`);
-            // FIN: Invalidación de Caché (Paso 1)
+            const { data: wayData } = await supabase.from('osm_ways').select('tags, city').eq('id', id).single();
+            
+            const { error } = await supabase.from('osm_ways').update({ is_hidden: true }).eq('id', id);
 
-            const { error } = await supabase
-                .from('osm_ways')
-                .update({ is_hidden: true })
-                .eq('id', id);
-
-            if (error) throw error;
-
-            // INICIO: Invalidación de Caché (Paso 2: Borrar después de operar)
-            if (!error && wayData && wayData.tags && wayData.tags.name) {
-                const parts = extractNameParts(wayData.tags.name);
-                if (parts.baseName) {
-                    const cacheKey = `street_v18:${wayData.city}:${parts.baseName.replace(/\s/g, '_')}`;
-                    console.log(`Borrando clave de caché por acción 'delete': ${cacheKey}`);
-                    await kv.del(cacheKey);
-                }
+            if (error) {
+                console.error('Error de Supabase al ocultar calle:', error);
+                return response.status(500).json({ error: 'Error de base de datos al ocultar.', details: error.message });
             }
-            // FIN: Invalidación de Caché (Paso 2)
+
+            try {
+                if (wayData && wayData.tags && wayData.tags.name) {
+                    const parts = extractNameParts(wayData.tags.name);
+                    if (parts.baseName) {
+                        const cacheKey = `street_v18:${wayData.city}:${parts.baseName.replace(/\s/g, '_')}`;
+                        await kv.del(cacheKey);
+                    }
+                }
+            } catch(e) { console.error("Fallo de invalidación de caché en delete (no crítico)", e.message); }
             
-            return response.status(200).json({ message: `Way ${id} ocultado con éxito.` });
+            return response.status(200).json({ message: `Way ${id} ocultado.` });
 
         } else if (action === 'create') {
-            // --- LÓGICA DE CREACIÓN CORREGIDA ---
             const { geometry, tags, city } = payload;
-            if (!geometry || !tags || !city) return response.status(400).json({ error: 'Faltan datos para la acción de crear.' });
+            if (!geometry || !tags || !city) return response.status(400).json({ error: 'Faltan datos para crear.' });
 
-            // --- CÓDIGO PROBLEMÁTICO ELIMINADO ---
-            // Se ha borrado el intento de inserción manual con id: -1
-
-            // --- ESTA ES AHORA LA ÚNICA FORMA DE CREAR ---
-            // Usamos directamente la función RPC, que es la forma robusta y segura.
-            const { data: rpcData, error: rpcError } = await supabase.rpc('create_new_way', {
+            const { data, error } = await supabase.rpc('create_new_way', {
                  geom_geojson: geometry,
                  tags_json: tags,
                  city_name: city
             }).single();
 
-            if (rpcError) throw rpcError;
+            if (error) {
+                console.error('Error de Supabase al crear calle (RPC):', error);
+                return response.status(500).json({ error: 'Error de base de datos al crear.', details: error.message });
+            }
             
-            return response.status(201).json(rpcData);
-
+            return response.status(201).json(data);
+            
         } else {
             return response.status(400).json({ error: 'Acción no válida o no especificada.' });
         }
 
     } catch (error) {
-        console.error(`Error en /api/streetActions para la acción "${request.body.action}":`, error.message);
-        return response.status(500).json({ error: 'Error interno del servidor', details: error.message });
+        console.error(`Error catastrófico en streetActions (acción: ${request.body.action}):`, error.message);
+        return response.status(500).json({ error: 'Error interno del servidor.', details: error.message });
     }
 };

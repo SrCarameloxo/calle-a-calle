@@ -20,20 +20,23 @@ module.exports = async (request, response) => {
             process.env.SUPABASE_SERVICE_ROLE_KEY
         );
         
-        const token = request.headers.authorization.split('Bearer ')[1];
-        const { data: { user } } = await supabase.auth.getUser(token);
-        if (!user) throw new Error('Invalid token');
+        const token = request.headers.authorization?.split('Bearer ')[1];
+        if (!token) return response.status(401).json({ error: 'Token no proporcionado.' });
 
-        const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single();
-        if (!profile || profile.role !== 'admin') throw new Error('Admin access required');
+        const { data: { user }, error: userError } = await supabase.auth.getUser(token);
+        if (userError || !user) return response.status(401).json({ error: 'Token inválido.' });
+
+        const { data: profile, error: profileError } = await supabase.from('profiles').select('role').eq('id', user.id).single();
+        if (profileError || !profile || profile.role !== 'admin') {
+            return response.status(403).json({ error: 'Acceso denegado. Se requiere rol de administrador.' });
+        }
 
         const { osm_id, display_name, city } = request.body;
         if (!osm_id || !display_name || !city) {
             return response.status(400).json({ error: 'Faltan datos (osm_id, display_name, city)' });
         }
 
-        // CORRECTO: Escribimos en la tabla del editor 'street_overrides'
-        const { error } = await supabase
+        const { error: upsertError } = await supabase
             .from('street_overrides')
             .upsert({ 
                 osm_id: osm_id, 
@@ -41,16 +44,19 @@ module.exports = async (request, response) => {
                 city: city 
             }, { onConflict: 'osm_id' });
 
-        if (error) throw error;
+        if (upsertError) {
+            // Si hay un error aquí (ej. RLS), lo devolvemos como JSON
+            console.error('Error de Supabase al hacer upsert en street_overrides:', upsertError);
+            return response.status(500).json({ error: 'Error de base de datos.', details: upsertError.message });
+        }
 
-        // La lógica de invalidación de caché sigue siendo correcta
         try {
-            const { data: wayData, error: wayError } = await supabase
+            const { data: wayData } = await supabase
                 .from('osm_ways')
                 .select('tags')
                 .eq('id', osm_id)
                 .single();
-            if (wayError) throw new Error(`No se encontró la calle original para invalidar caché: ${wayError.message}`);
+            
             if (wayData && wayData.tags && wayData.tags.name) {
                 const osmName = wayData.tags.name;
                 const parts = extractNameParts(osmName);
@@ -61,12 +67,13 @@ module.exports = async (request, response) => {
                 }
             }
         } catch (cacheError) {
-            console.error('Error al invalidar la caché en updateStreetName:', cacheError.message);
+            console.error('Error al invalidar la caché en updateStreetName (no crítico):', cacheError.message);
         }
 
         return response.status(200).json({ message: 'Nombre de calle actualizado con éxito.' });
+        
     } catch (error) {
-        console.error('Error en updateStreetName:', error.message);
+        console.error('Error catastrófico en updateStreetName:', error.message);
         return response.status(500).json({ error: 'Error interno del servidor.', details: error.message });
     }
 };

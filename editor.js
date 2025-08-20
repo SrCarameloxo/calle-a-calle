@@ -1,4 +1,3 @@
-
 // --- editor.js (VERSIÓN 17 - VOLVIENDO A LA API ORIGINAL) ---
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -98,6 +97,9 @@ document.addEventListener('DOMContentLoaded', () => {
     let isMergingMode = false;
     let streetsToMerge = [];
     let selectedCity = null;
+    // --- INICIO DE LA MODIFICACIÓN ---
+    let originalStreetNameForEdit = null; // Variable para guardar el nombre original al editar
+    // --- FIN DE LA MODIFICACIÓN ---
 
     function updateStatusPanel(text, active = true) {
         if (active && text) {
@@ -147,6 +149,11 @@ document.addEventListener('DOMContentLoaded', () => {
         streetNameInput.value = currentName;
         streetIdDisplay.textContent = properties.id || " (Nueva calle)";
         editPanel.style.display = 'block';
+        
+        // --- INICIO DE LA MODIFICACIÓN ---
+        // Guardamos el nombre original cuando abrimos el panel
+        originalStreetNameForEdit = currentName;
+        // --- FIN DE LA MODIFICACIÓN ---
     }
 
     function closeEditPanel() {
@@ -159,6 +166,10 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         selectedLayer = null;
         editPanel.style.display = 'none';
+        // --- INICIO DE LA MODIFICACIÓN ---
+        // Limpiamos la variable por si acaso
+        originalStreetNameForEdit = null;
+        // --- FIN DE LA MODIFICACIÓN ---
     }
 
     async function handleCutStreet(layer, cutLatLng) {
@@ -324,15 +335,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (osm_id) {
                 // --- INICIO DE LA MODIFICACIÓN ---
-                // Volvemos a llamar a la API dedicada /api/updateStreetName
                 const response = await fetch('/api/updateStreetName', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
-                    // El cuerpo ahora es simple, sin 'action' ni 'payload'
                     body: JSON.stringify({ 
                         osm_id: osm_id, 
                         display_name: newName, 
-                        city: selectedCity.name 
+                        city: selectedCity.name,
+                        // Añadimos el nombre original para la invalidación de caché
+                        original_osm_name: originalStreetNameForEdit
                     }),
                 });
                 // --- FIN DE LA MODIFICACIÓN ---
@@ -341,6 +352,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 
                 selectedLayer.feature.properties.tags.name = newName;
                 selectedLayer.bindPopup(`<b>${newName}</b><br>ID: ${osm_id}`);
+                
+                // --- INICIO DE LA MODIFICACIÓN ---
+                // Usamos el mensaje de la API como "chivato"
+                alert(result.message);
+                // --- FIN DE LA MODIFICACIÓN ---
+
             } else {
                 // La creación de calles nuevas sigue usando streetActions, lo cual es correcto
                 const response = await fetch('/api/streetActions', {

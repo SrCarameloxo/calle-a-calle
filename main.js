@@ -5,7 +5,7 @@ import { startInstintoGame } from './modules/instinto-mode.js';
 window.addEventListener('DOMContentLoaded', () => {
 
   const SUPABASE_URL = 'https://hppzwfwtedghpsxfonoh.supabase.co';
-  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhwcHp3Znd0ZWRnaHBzeGZvbm9oIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQxMjQzNDMsImV4cCI6MjA2OTcwMDM0M30.BAh6i5iJ5YkDBoydfkC9azAD4eMdYBkEBdxws9kj5Hg';
+  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhwcHp3Znd0ZWRnaHBzeGZvbm9oIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQxMjQzNDMsImV4cCI6MjA2OTcwMDM0M30.BAh6iJ5YkDBoydfkC9azAD4eMdYBkEBdxws9kj5Hg';
   // Hacemos que supabaseClient sea accesible globalmente para que los módulos puedan usarlo.
   window.supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
@@ -199,12 +199,20 @@ window.addEventListener('DOMContentLoaded', () => {
       uiElements.loginScreen.style.opacity = '0';
       uiElements.gameScreen.classList.remove('hidden');
       uiElements.logoutBtn.addEventListener('click', signOut);
-      setTimeout(async () => {
+
+      // --- INICIO DEL BLOQUE CORREGIDO ---
+      // 1. Cargamos todo inmediatamente (mapa, perfil, etc.)
+      await fetchUserProfile(user);
+      if (!gameMap) initGame();
+      setTimeout(() => gameMap.invalidateSize(), 100); // Le damos 100ms al mapa para que se redibuje
+
+      // 2. Y de forma paralela, le damos 500ms a la animación de fade-out para que termine
+      //    antes de ocultar por completo la pantalla de login.
+      setTimeout(() => {
           uiElements.loginScreen.classList.add('hidden');
-          await fetchUserProfile(user);
-          if (!gameMap) initGame();
-          setTimeout(() => gameMap.invalidateSize(), 100);
       }, 500);
+      // --- FIN DEL BLOQUE CORREGIDO ---
+
     } else {
       uiElements.loginScreen.classList.remove('hidden');
       uiElements.loginScreen.style.opacity = '1';

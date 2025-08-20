@@ -204,7 +204,7 @@ window.addEventListener('DOMContentLoaded', () => {
           await fetchUserProfile(user);
           if (!gameMap) initGame();
           setTimeout(() => gameMap.invalidateSize(), 100);
-      }, 500);
+      }, 100);
     } else {
       uiElements.loginScreen.classList.remove('hidden');
       uiElements.loginScreen.style.opacity = '1';

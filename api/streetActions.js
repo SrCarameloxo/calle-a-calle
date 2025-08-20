@@ -139,37 +139,24 @@ module.exports = async (request, response) => {
             return response.status(200).json({ message: `Way ${id} ocultado con éxito.` });
 
         } else if (action === 'create') {
-            // --- NUEVA LÓGICA PARA CREAR ---
+            // --- LÓGICA DE CREACIÓN CORREGIDA ---
             const { geometry, tags, city } = payload;
             if (!geometry || !tags || !city) return response.status(400).json({ error: 'Faltan datos para la acción de crear.' });
 
-            // PostGIS necesita la geometría en formato WKT y con el SRID correcto.
-            // ST_GeomFromGeoJSON lo convierte por nosotros.
-            const { data, error } = await supabase
-                .from('osm_ways')
-                .insert({
-                    id: -1, // ID temporal, será reemplazado por la base de datos
-                    geom: `SRID=4326;${geometry.type.toUpperCase()}(${geometry.coordinates.map(p => p.join(' ')).join(',')})`,
-                    tags: tags,
-                    city: city
-                })
-                .select('id') // Pedimos que nos devuelva el ID de la nueva fila
-                .single();
+            // --- CÓDIGO PROBLEMÁTICO ELIMINADO ---
+            // Se ha borrado el intento de inserción manual con id: -1
 
-            if (error) {
-                 // Un error común es que el id temporal -1 viole la unicidad si se intenta crear muy rápido.
-                 // Vamos a usar la secuencia directamente en un RPC para mayor robustez.
-                 const { data: rpcData, error: rpcError } = await supabase.rpc('create_new_way', {
-                     geom_geojson: geometry,
-                     tags_json: tags,
-                     city_name: city
-                 }).single();
+            // --- ESTA ES AHORA LA ÚNICA FORMA DE CREAR ---
+            // Usamos directamente la función RPC, que es la forma robusta y segura.
+            const { data: rpcData, error: rpcError } = await supabase.rpc('create_new_way', {
+                 geom_geojson: geometry,
+                 tags_json: tags,
+                 city_name: city
+            }).single();
 
-                 if (rpcError) throw rpcError;
-                 return response.status(201).json(rpcData);
-            }
+            if (rpcError) throw rpcError;
             
-            return response.status(201).json(data);
+            return response.status(201).json(rpcData);
 
         } else {
             return response.status(400).json({ error: 'Acción no válida o no especificada.' });

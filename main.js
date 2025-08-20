@@ -199,12 +199,12 @@ window.addEventListener('DOMContentLoaded', () => {
       uiElements.loginScreen.style.opacity = '0';
       uiElements.gameScreen.classList.remove('hidden');
       uiElements.logoutBtn.addEventListener('click', signOut);
-      
+      setTimeout(async () => {
           uiElements.loginScreen.classList.add('hidden');
           await fetchUserProfile(user);
           if (!gameMap) initGame();
           setTimeout(() => gameMap.invalidateSize(), 100);
-     
+      }, 500);
     } else {
       uiElements.loginScreen.classList.remove('hidden');
       uiElements.loginScreen.style.opacity = '1';

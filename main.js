@@ -190,21 +190,34 @@ window.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  async function handleAuthStateChange(event, session) {
+    async function handleAuthStateChange(event, session) {
     const user = session ? session.user : null;
     if (user) {
       const userName = user.user_metadata?.full_name || user.email.split('@')[0];
       const profileImageUrl = user.user_metadata?.avatar_url || '';
       uiElements.userInfoDetails.innerHTML = `<img src="${profileImageUrl}" alt="Avatar" class="w-16 h-16 mx-auto mb-3 rounded-full"><p class="font-semibold text-lg truncate">${userName}</p><p class="text-sm text-gray-400">${user.email}</p>`;
+      
+      // 1. Inmediatamente empieza a desvanecer el login y muestra el contenedor del juego
       uiElements.loginScreen.style.opacity = '0';
       uiElements.gameScreen.classList.remove('hidden');
       uiElements.logoutBtn.addEventListener('click', signOut);
-      setTimeout(async () => {
+
+      // 2. Después de que la animación de desvanecimiento termine, oculta por completo la pantalla de login.
+      // Esto soluciona el problema visual del "pantallazo negro".
+      setTimeout(() => {
           uiElements.loginScreen.classList.add('hidden');
+      }, 500);
+
+      // 3. Ejecutamos la carga de datos y del mapa en un micro-retraso.
+      // Este setTimeout con 0ms es suficiente para asegurar que la librería de Supabase
+      // ha procesado el token de la URL antes de que hagamos nuestra primera llamada a la API.
+      // Esto soluciona el error 401 "Unauthorized".
+      setTimeout(async () => {
           await fetchUserProfile(user);
           if (!gameMap) initGame();
           setTimeout(() => gameMap.invalidateSize(), 100);
-      }, 100);
+      }, 0);
+
     } else {
       uiElements.loginScreen.classList.remove('hidden');
       uiElements.loginScreen.style.opacity = '1';

@@ -15,8 +15,7 @@ export function startInstintoGame({ ui, gameMap, updatePanelUI, userProfile, set
   // --- Estado y constantes locales del MODO INSTINTO ---
   const COL_ZONE = '#663399';
   // --- INICIO DE LA MODIFICACIÓN ---
-  // Se añade un color neutro para la presentación inicial de la calle
-  const COL_NEUTRAL = '#007BFF'; 
+  const COL_NEUTRAL = '#0496FF'; // Azul eléctrico
   const COL_CORRECT = '#007a2f';
   const COL_INCORRECT = '#FF0033';
   // --- FIN DE LA MODIFICACIÓN ---
@@ -174,12 +173,7 @@ export function startInstintoGame({ ui, gameMap, updatePanelUI, userProfile, set
     updatePanelUI(() => {
       ui.gameInterface.classList.remove('hidden');
       ui.progressBar.style.width = '0%';
-      if(zonePoly) {
-          gameMap.fitBounds(zonePoly.getBounds(), {
-              paddingTopLeft: [ui.gameUiContainer.offsetWidth + 20, 20],
-              paddingBottomRight: [20, 20]
-          });
-      }
+      // La lógica de zoom inicial se moverá a showNextQuestion para que se ajuste por pregunta
       ui.reportBtnFAB.classList.remove('hidden');
     });
     showNextQuestion();
@@ -195,26 +189,28 @@ export function startInstintoGame({ ui, gameMap, updatePanelUI, userProfile, set
     const { correctAnswer, options } = currentQuestion;
     streetLayerGroup = L.layerGroup().addTo(gameMap);
     correctAnswer.geometries.forEach(geom => {
-        // --- INICIO DE LA MODIFICACIÓN ---
-        // La calle aparece con un color neutro y un grosor estándar.
         const layer = geom.isClosed 
             ? L.polygon(geom.points, { color: COL_NEUTRAL, weight: 4, fillOpacity: 0.2 })
             : L.polyline(geom.points, { color: COL_NEUTRAL, weight: 8 });
-        // --- FIN DE LA MODIFICACIÓN ---
         layer.addTo(streetLayerGroup);
     });
     
-    // Ya no usamos la animación de pulso inicial para el modo instinto
-    /*
-    if (userProfile.settings.enable_street_animation) {
-        streetLayerGroup.eachLayer(layer => {
-            const element = layer.getElement();
-            if (element) {
-                element.classList.add('street-reveal-animation');
-            }
+    // --- INICIO DE LA MODIFICACIÓN ---
+    // Lógica de Zoom Inteligente
+    if (zonePoly && streetLayerGroup) {
+        const streetBounds = streetLayerGroup.getBounds();
+        const zoneBounds = zonePoly.getBounds();
+        // Extendemos los límites de la zona para que siempre incluyan la calle completa
+        const finalBounds = zoneBounds.extend(streetBounds);
+        
+        // Ajustamos la cámara a estos nuevos límites
+        gameMap.fitBounds(finalBounds, { 
+            paddingTopLeft: [ui.gameUiContainer.offsetWidth + 20, 20],
+            paddingBottomRight: [20, 20],
+            maxZoom: gameMap.getZoom() // Evita un zoom excesivo en calles muy pequeñas
         });
     }
-    */
+    // --- FIN DE LA MODIFICACIÓN ---
 
     setReportContext({
         geometries: correctAnswer.geometries,
@@ -242,7 +238,9 @@ export function startInstintoGame({ ui, gameMap, updatePanelUI, userProfile, set
   function handleAnswer(selectedOption, correctAnswer, clickedButton) {
     clearAllListeners();
     const allOptionBtns = ui.instintoOptionsContainer.querySelectorAll('button');
-    allOptionBtns.forEach(btn => btn.disabled = true); // Desactivamos los botones
+    allOptionBtns.forEach(btn => {
+        btn.disabled = true;
+    });
 
     const isCorrect = selectedOption.googleName === correctAnswer.googleName;
     const pulseClass = isCorrect ? 'panel-pulse-correct' : 'panel-pulse-incorrect';
@@ -257,17 +255,15 @@ export function startInstintoGame({ ui, gameMap, updatePanelUI, userProfile, set
                 sound.play().catch(e => {});
             }
         }
-
+        
         // --- INICIO DE LA MODIFICACIÓN ---
-        // Aplicamos la animación de trazado al acertar
+        // Usamos la animación de pulso del modo clásico
         streetLayerGroup.eachLayer(layer => {
-            layer.setStyle({ color: COL_CORRECT }); // Cambiamos el color base
             const element = layer.getElement();
             if (element) {
-                const totalLength = element.getTotalLength();
-                element.style.strokeDasharray = totalLength;
-                element.style.strokeDashoffset = totalLength;
-                element.classList.add('instinto-street-correct-animation');
+                element.classList.add('street-reveal-animation');
+            } else {
+                layer.setStyle({ color: COL_CORRECT });
             }
         });
         // --- FIN DE LA MODIFICACIÓN ---
@@ -289,18 +285,26 @@ export function startInstintoGame({ ui, gameMap, updatePanelUI, userProfile, set
         }
 
         // --- INICIO DE LA MODIFICACIÓN ---
-        // Aplicamos la animación de desvanecimiento al fallar
+        // Usamos la animación de pulso de fallo del modo clásico
         streetLayerGroup.eachLayer(layer => {
             const element = layer.getElement();
             if (element) {
-                element.classList.add('instinto-street-incorrect-animation');
+                element.classList.add('street-reveal-animation-fail');
             } else {
-                // Fallback para polígonos que no tienen elemento SVG directo
                 layer.setStyle({ color: COL_INCORRECT });
             }
         });
         // --- FIN DE LA MODIFICACIÓN ---
     }
+    
+    // --- INICIO DE LA MODIFICACIÓN ---
+    // Añadimos la clase para atenuar sutilmente los botones no seleccionados
+    allOptionBtns.forEach(btn => {
+        if (btn.textContent !== correctAnswer.googleName && btn !== clickedButton) {
+            btn.classList.add('option-disabled');
+        }
+    });
+    // --- FIN DE LA MODIFICACIÓN ---
 
     if (userProfile.settings.enable_feedback_animation) {
         ui.gameUiContainer.classList.add(pulseClass);

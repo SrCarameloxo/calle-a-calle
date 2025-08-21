@@ -441,13 +441,11 @@ button.game-control-btn:disabled { opacity: .4; cursor: default; }
     100% { box-shadow: 0 10px 30px rgba(0,0,0,0.3); }
 }
 
-/* --- INICIO DE LA MODIFICACIÓN: NUEVO ROJO MÁS POTENTE --- */
 @keyframes panel-pulse-incorrect-anim {
     0% { box-shadow: 0 10px 30px rgba(0,0,0,0.3); }
     50% { box-shadow: 0 0 20px 5px rgba(255, 0, 51, 0.7); } /* Nuevo rojo #FF0033 con opacidad */
     100% { box-shadow: 0 10px 30px rgba(0,0,0,0.3); }
 }
-/* --- FIN DE LA MODIFICACIÓN --- */
 
 .panel-pulse-correct {
     animation: panel-pulse-correct-anim 0.8s ease-in-out;
@@ -523,13 +521,11 @@ button.game-control-btn:disabled { opacity: .4; cursor: default; }
 /* ======== INICIO: NUEVOS ESTILOS PARA CONFIGURACIÓN ======== */
 
 /* --- Animación de Calle Incorrecta --- */
-/* --- INICIO DE LA MODIFICACIÓN: NUEVO ROJO MÁS POTENTE --- */
 @keyframes pulseAndFlashIncorrect {
     0% { stroke-width: 8; stroke: #FF0033; opacity: 0.8; } /* Nuevo rojo */
     50% { stroke-width: 14; stroke: #ff8a8a; opacity: 1; }
     100% { stroke-width: 8; stroke: #FF0033; opacity: 0.8; } /* Nuevo rojo */
 }
-/* --- FIN DE LA MODIFICACIÓN --- */
 
 .street-reveal-animation-fail {
     animation: pulseAndFlashIncorrect 0.8s ease-out;
@@ -665,38 +661,12 @@ input[type="range"]::-moz-range-thumb {
 }
 /* --- FIN DE LA MODIFICACIÓN --- */
 
-/* --- INICIO DE LA MODIFICACIÓN: ANIMACIONES MODO INSTINTO (IDEA 2) --- */
-
-/* 1. Animación de trazado para la respuesta correcta */
-@keyframes trace-animation {
-    to {
-        stroke-dashoffset: 0;
-    }
+/* --- INICIO DE LA MODIFICACIÓN --- */
+/* Estilo para los botones de opción desactivados en modo instinto */
+#instinto-options-container .game-control-btn.option-disabled {
+    background-color: #f8f9fa; /* Fondo blanco roto, casi igual que el original */
+    color: #adb5bd; /* Texto en gris claro para indicar inactividad */
+    cursor: not-allowed;
+    border-color: #e9ecef; /* Borde ligeramente más claro */
 }
-
-.instinto-street-correct-animation {
-    /* La animación se llama 'trace-animation', dura 1.2 segundos, es lineal y se ejecuta una vez */
-    animation: trace-animation 1.2s linear forwards;
-}
-
-/* 2. Animación de desvanecimiento para la respuesta incorrecta */
-@keyframes fade-out-and-back-animation {
-    0% {
-        opacity: 1;
-        stroke: #FF0033; /* El color de fallo que ya usas */
-    }
-    50% {
-        opacity: 0.2;
-        stroke: #696969; /* Un gris oscuro para el desvanecimiento */
-    }
-    100% {
-        opacity: 1;
-        stroke: #FF0033; /* Vuelve al color de fallo final */
-    }
-}
-
-.instinto-street-incorrect-animation {
-    animation: fade-out-and-back-animation 1s ease-in-out forwards;
-}
-
 /* --- FIN DE LA MODIFICACIÓN --- */

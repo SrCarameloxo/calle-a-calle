@@ -210,27 +210,30 @@ module.exports = async (request, response) => {
         }
 
         // 2. Cargar las reglas del editor nuevo (alta prioridad, sobreescribirán las anteriores)
+        //    Para esto, primero necesitamos mapear los IDs de las calles a sus nombres originales.
+        const idToNameMap = new Map();
+        initialData.elements.forEach(el => {
+            if (el.tags && el.tags.name) {
+                idToNameMap.set(el.id, el.tags.name);
+            }
+        });
+        
         const { data: newOverrides, error: newError } = await supabaseAdmin
             .from('street_overrides')
             .select('osm_id, display_name')
             .eq('city', currentCity);
+
         if (!newError && newOverrides) {
-            // Para aplicar estas reglas, necesitamos un mapa de id -> nombre
-            const newOverridesMap = new Map();
-            newOverrides.forEach(rule => newOverridesMap.set(rule.osm_id, rule.display_name));
-            
-            // Aplicamos las reglas del editor directamente a los datos iniciales
-            initialData.elements.forEach(el => {
-                if (newOverridesMap.has(el.id)) {
-                    if (el.tags) {
-                        el.tags.name = newOverridesMap.get(el.id);
-                    } else {
-                        el.tags = { name: newOverridesMap.get(el.id) };
-                    }
+            newOverrides.forEach(rule => {
+                const originalName = idToNameMap.get(rule.osm_id);
+                if (originalName) {
+                    // La clave del mapa de reglas es el nombre original, el valor es el objeto de la regla.
+                    overrideRules.set(originalName, { osm_name: originalName, display_name: rule.display_name });
                 }
             });
         }
         
+        // 3. Cargar la lista de bloqueo como antes
         const { data: blocked, error: blockedError } = await supabaseAdmin.from('street_blocklist').select('osm_name').eq('city', currentCity);
         if (!blockedError) blocked.forEach(rule => blockedNames.add(rule.osm_name));
     }

@@ -97,9 +97,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let isMergingMode = false;
     let streetsToMerge = [];
     let selectedCity = null;
-    // --- INICIO DE LA MODIFICACIÓN ---
-    let originalStreetNameForEdit = null; // Variable para guardar el nombre original al editar
-    // --- FIN DE LA MODIFICACIÓN ---
+    let originalStreetNameForEdit = null; 
 
     function updateStatusPanel(text, active = true) {
         if (active && text) {
@@ -150,10 +148,7 @@ document.addEventListener('DOMContentLoaded', () => {
         streetIdDisplay.textContent = properties.id || " (Nueva calle)";
         editPanel.style.display = 'block';
         
-        // --- INICIO DE LA MODIFICACIÓN ---
-        // Guardamos el nombre original cuando abrimos el panel
         originalStreetNameForEdit = currentName;
-        // --- FIN DE LA MODIFICACIÓN ---
     }
 
     function closeEditPanel() {
@@ -166,10 +161,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         selectedLayer = null;
         editPanel.style.display = 'none';
-        // --- INICIO DE LA MODIFICACIÓN ---
-        // Limpiamos la variable por si acaso
         originalStreetNameForEdit = null;
-        // --- FIN DE LA MODIFICACIÓN ---
     }
 
     async function handleCutStreet(layer, cutLatLng) {
@@ -179,6 +171,12 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const { data: { session } } = await supabase.auth.getSession();
             if (!session) throw new Error('No hay sesión activa.');
+            
+            // --- INICIO DE LA MODIFICACIÓN ---
+            // Añadimos el osm_name de la calle original para que el backend pueda invalidar la caché
+            const originalOsmName = layer.feature.properties.tags.name;
+            // --- FIN DE LA MODIFICACIÓN ---
+
             const response = await fetch('/api/streetActions', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
@@ -188,24 +186,37 @@ document.addEventListener('DOMContentLoaded', () => {
                         osm_id: layer.feature.properties.id,
                         cut_point: cutLatLng,
                         city: selectedCity.name,
+                        // --- INICIO DE LA MODIFICACIÓN ---
+                        osm_name: originalOsmName // Lo enviamos en el payload
+                        // --- FIN DE LA MODIFICACIÓN ---
                     }
                 }),
             });
             const result = await response.json();
             if (!response.ok) throw new Error(result.details || result.error || 'Error del servidor.');
+            
+            // --- INICIO DE LA MODIFICACIÓN ---
+            // Usamos el mensaje de la API como chivato
+            if (result.message) {
+                loadingText.textContent = result.message;
+            } else {
+                loadingText.textContent = '¡Calle dividida!';
+            }
+            // --- FIN DE LA MODIFICACIÓN ---
+
             geojsonLayer.removeLayer(layer);
             const newWaysGeoJSON = {
                 type: "FeatureCollection",
-                features: result.map(way => ({
+                features: result.new_ways.map(way => ({ // Suponiendo que la API devuelve un objeto con la propiedad new_ways
                     type: "Feature", geometry: way.geom, properties: { id: way.id, tags: way.tags }
                 }))
             };
             geojsonLayer.addData(newWaysGeoJSON);
-            loadingText.textContent = '¡Calle dividida!';
+            
         } catch (error) {
             alert(`No se pudo dividir: ${error.message}`);
         } finally {
-            setTimeout(() => { loadingOverlay.style.display = 'none'; }, 1500);
+            setTimeout(() => { loadingOverlay.style.display = 'none'; }, 2000);
             toggleMode('none');
         }
     }
@@ -290,29 +301,46 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const { data: { session } } = await supabase.auth.getSession();
             if (!session) throw new Error('No hay sesión activa.');
+
+            // --- INICIO DE LA MODIFICACIÓN ---
+            // En lugar de una lista de IDs, enviamos una lista de objetos con toda la info necesaria
+            const streetsPayload = streetsToMerge.map(l => ({
+                id: l.feature.properties.id,
+                osm_name: l.feature.properties.tags.name,
+                city: selectedCity.name
+            }));
+            // --- FIN DE LA MODIFICACIÓN ---
+
             const response = await fetch('/api/streetActions', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
                 body: JSON.stringify({
                     action: 'merge',
+                    // --- INICIO DE LA MODIFICACIÓN ---
                     payload: {
-                        ids: streetsToMerge.map(l => l.feature.properties.id)
+                        streets_to_merge: streetsPayload
                     }
+                    // --- FIN DE LA MODIFICACIÓN ---
                 }),
             });
-            const newWay = await response.json();
+            const result = await response.json();
             if (!response.ok) {
-                throw new Error(newWay.details || newWay.error || 'Error del servidor.');
+                throw new Error(result.details || result.error || 'Error del servidor.');
             }
             streetsToMerge.forEach(layer => geojsonLayer.removeLayer(layer));
             geojsonLayer.addData({
-                type: "Feature", geometry: newWay.geom, properties: { id: newWay.id, tags: newWay.tags }
+                type: "Feature", geometry: result.new_way.geom, properties: { id: result.new_way.id, tags: result.new_way.tags }
             });
-            loadingText.textContent = '¡Calles unidas!';
+            
+            // --- INICIO DE LA MODIFICACIÓN ---
+            // Usamos el mensaje de la API como chivato
+            loadingText.textContent = result.message || '¡Calles unidas!';
+            // --- FIN DE LA MODIFICACIÓN ---
+
         } catch (error) {
             alert(`No se pudieron unir: ${error.message}`);
         } finally {
-            setTimeout(() => { loadingOverlay.style.display = 'none'; }, 1500);
+            setTimeout(() => { loadingOverlay.style.display = 'none'; }, 2000);
             resetMergeSelection(true);
         }
     }
@@ -334,32 +362,24 @@ document.addEventListener('DOMContentLoaded', () => {
             saveChangesBtn.disabled = true;
 
             if (osm_id) {
-                // --- INICIO DE LA MODIFICACIÓN ---
                 const response = await fetch('/api/updateStreetName', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
                     body: JSON.stringify({ 
                         osm_id: osm_id, 
                         display_name: newName, 
-                        city: selectedCity.name,
-                        // Añadimos el nombre original para la invalidación de caché
+                        city: selectedCity.name, 
                         original_osm_name: originalStreetNameForEdit
                     }),
                 });
-                // --- FIN DE LA MODIFICACIÓN ---
                 const result = await response.json();
                 if (!response.ok) throw new Error(result.error || 'Error del servidor.');
                 
                 selectedLayer.feature.properties.tags.name = newName;
                 selectedLayer.bindPopup(`<b>${newName}</b><br>ID: ${osm_id}`);
-                
-                // --- INICIO DE LA MODIFICACIÓN ---
-                // Usamos el mensaje de la API como "chivato"
                 alert(result.message);
-                // --- FIN DE LA MODIFICACIÓN ---
 
             } else {
-                // La creación de calles nuevas sigue usando streetActions, lo cual es correcto
                 const response = await fetch('/api/streetActions', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
@@ -394,24 +414,38 @@ document.addEventListener('DOMContentLoaded', () => {
         const id = e.layer.feature?.properties?.id;
         if (id) {
             if (!confirm(`¿Seguro que quieres borrar la calle con ID: ${id}?`)) {
-                e.layer.addTo(geojsonLayer);
+                e.layer.addTo(geojsonLayer); // Vuelve a añadir la capa si el usuario cancela
                 return;
             }
             try {
                 const { data: { session } } = await supabase.auth.getSession();
                 if (!session) throw new Error('No hay sesión activa.');
                 
-                await fetch('/api/streetActions', {
+                // --- INICIO DE LA MODIFICACIÓN ---
+                // Obtenemos los datos necesarios para la invalidación de caché
+                const osmName = e.layer.feature.properties.tags.name;
+                const city = selectedCity.name;
+                // --- FIN DE LA MODIFICACIÓN ---
+
+                const response = await fetch('/api/streetActions', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
                     body: JSON.stringify({
                         action: 'delete',
-                        payload: { id }
+                        // --- INICIO DE LA MODIFICACIÓN ---
+                        payload: { id, osm_name: osmName, city }
+                        // --- FIN DE LA MODIFICACIÓN ---
                     }),
                 });
+
+                const result = await response.json();
+                if (!response.ok) throw new Error(result.details || 'Error del servidor.');
+                // Usamos la respuesta de la API como chivato
+                alert(result.message);
+
             } catch (error) {
                 alert(`No se pudo borrar la calle en la base de datos: ${error.message}`);
-                e.layer.addTo(geojsonLayer);
+                e.layer.addTo(geojsonLayer); // Si falla, la volvemos a añadir al mapa
             }
         }
     });

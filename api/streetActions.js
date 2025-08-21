@@ -1,6 +1,16 @@
 // Ruta: /api/streetActions.js (VERSIÓN CON DELETE Y CREATE)
 
 const { createClient } = require('@supabase/supabase-js');
+// --- INICIO DE LA MODIFICACIÓN ---
+const { createClient: createKvClient } = require('@vercel/kv');
+const { extractNameParts } = require('./_lib/helpers.js');
+
+// Cliente para la caché
+const kv = createKvClient({
+  url: process.env.KV_REST_API_URL,
+  token: process.env.KV_REST_API_TOKEN,
+});
+// --- FIN DE LA MODIFICACIÓN ---
 
 module.exports = async (request, response) => {
     if (request.method !== 'POST') {
@@ -25,8 +35,10 @@ module.exports = async (request, response) => {
 
         if (action === 'split') {
             // --- LÓGICA DE SPLITSTREET ---
-            const { osm_id, cut_point, city } = payload;
-            if (!osm_id || !cut_point || !city) return response.status(400).json({ error: 'Faltan datos para la acción de dividir.' });
+            // --- INICIO DE LA MODIFICACIÓN ---
+            const { osm_id, cut_point, city, osm_name } = payload;
+            if (!osm_id || !cut_point || !city || !osm_name) return response.status(400).json({ error: 'Faltan datos para la acción de dividir (osm_id, cut_point, city, osm_name).' });
+            // --- FIN DE LA MODIFICACIÓN ---
             
             const cut_point_wkt = `SRID=4326;POINT(${cut_point.lng} ${cut_point.lat})`;
             const { data, error } = await supabase.rpc('split_way_and_hide_original', {
@@ -36,27 +48,52 @@ module.exports = async (request, response) => {
             });
             
             if (error) throw error;
-            return response.status(200).json(data);
+            
+            // --- INICIO DE LA MODIFICACIÓN ---
+            // Invalidar la caché de la calle original que se ha ocultado
+            const parts = extractNameParts(osm_name);
+            if (parts.baseName) {
+                const cacheKey = `street_v18:${city}:${parts.baseName.replace(/\s/g, '_')}`;
+                await kv.del(cacheKey);
+                console.log(`Caché limpiada para calle dividida (original): ${cacheKey}`);
+            }
+            return response.status(200).json({ new_ways: data, message: 'Calle dividida y caché limpiada.' });
+            // --- FIN DE LA MODIFICACIÓN ---
 
         } else if (action === 'merge') {
             // --- LÓGICA DE MERGESTREETS ---
-            const { ids } = payload;
-            if (!ids || !Array.isArray(ids) || ids.length < 2) return response.status(400).json({ error: 'Faltan datos para la acción de unir.' });
+            // --- INICIO DE LA MODIFICACIÓN ---
+            const { streets_to_merge } = payload;
+            if (!streets_to_merge || !Array.isArray(streets_to_merge) || streets_to_merge.length < 2) return response.status(400).json({ error: 'Faltan datos para la acción de unir (se requiere un array streets_to_merge).' });
             
-            // ======== INICIO: CAMBIO REALIZADO ========
-            // Se llama a la nueva función de la base de datos que usa ST_Union y es más robusta.
+            const ids = streets_to_merge.map(s => s.id);
+            // --- FIN DE LA MODIFICACIÓN ---
+
             const { data, error } = await supabase.rpc('union_ways_and_hide_originals', {
                 original_way_ids: ids
             });
-            // ======== FIN: CAMBIO REALIZADO ========
 
             if (error) throw error;
-            return response.status(200).json(data[0]);
+            
+            // --- INICIO DE LA MODIFICACIÓN ---
+            // Invalidar la caché para CADA una de las calles originales que se han unido y ocultado
+            for (const street of streets_to_merge) {
+                const parts = extractNameParts(street.osm_name);
+                if (parts.baseName) {
+                    const cacheKey = `street_v18:${street.city}:${parts.baseName.replace(/\s/g, '_')}`;
+                    await kv.del(cacheKey);
+                    console.log(`Caché limpiada para calle unida (original): ${cacheKey}`);
+                }
+            }
+            return response.status(200).json({ new_way: data[0], message: 'Calles unidas y cachés limpiadas.' });
+            // --- FIN DE LA MODIFICACIÓN ---
 
         } else if (action === 'delete') {
             // --- NUEVA LÓGICA PARA BORRAR ---
-            const { id } = payload;
-            if (!id) return response.status(400).json({ error: 'Falta el ID para la acción de borrar.' });
+            // --- INICIO DE LA MODIFICACIÓN ---
+            const { id, osm_name, city } = payload;
+            if (!id || !osm_name || !city) return response.status(400).json({ error: 'Falta el ID, osm_name o city para la acción de borrar.' });
+            // --- FIN DE LA MODIFICACIÓN ---
             
             const { error } = await supabase
                 .from('osm_ways')
@@ -64,40 +101,31 @@ module.exports = async (request, response) => {
                 .eq('id', id);
 
             if (error) throw error;
-            return response.status(200).json({ message: `Way ${id} ocultado con éxito.` });
+            
+            // --- INICIO DE LA MODIFICACIÓN ---
+            // Invalidar la caché de la calle que se ha ocultado
+            const parts = extractNameParts(osm_name);
+            if (parts.baseName) {
+                const cacheKey = `street_v18:${city}:${parts.baseName.replace(/\s/g, '_')}`;
+                await kv.del(cacheKey);
+                console.log(`Caché limpiada para calle borrada: ${cacheKey}`);
+            }
+            return response.status(200).json({ message: `Way ${id} ocultado y caché limpiada con éxito.` });
+            // --- FIN DE LA MODIFICACIÓN ---
 
         } else if (action === 'create') {
             // --- NUEVA LÓGICA PARA CREAR ---
             const { geometry, tags, city } = payload;
             if (!geometry || !tags || !city) return response.status(400).json({ error: 'Faltan datos para la acción de crear.' });
 
-            // PostGIS necesita la geometría en formato WKT y con el SRID correcto.
-            // ST_GeomFromGeoJSON lo convierte por nosotros.
-            const { data, error } = await supabase
-                .from('osm_ways')
-                .insert({
-                    id: -1, // ID temporal, será reemplazado por la base de datos
-                    geom: `SRID=4326;${geometry.type.toUpperCase()}(${geometry.coordinates.map(p => p.join(' ')).join(',')})`,
-                    tags: tags,
-                    city: city
-                })
-                .select('id') // Pedimos que nos devuelva el ID de la nueva fila
-                .single();
+            const { data: rpcData, error: rpcError } = await supabase.rpc('create_new_way', {
+                 geom_geojson: geometry,
+                 tags_json: tags,
+                 city_name: city
+             }).single();
 
-            if (error) {
-                 // Un error común es que el id temporal -1 viole la unicidad si se intenta crear muy rápido.
-                 // Vamos a usar la secuencia directamente en un RPC para mayor robustez.
-                 const { data: rpcData, error: rpcError } = await supabase.rpc('create_new_way', {
-                     geom_geojson: geometry,
-                     tags_json: tags,
-                     city_name: city
-                 }).single();
-
-                 if (rpcError) throw rpcError;
-                 return response.status(201).json(rpcData);
-            }
-            
-            return response.status(201).json(data);
+             if (rpcError) throw rpcError;
+             return response.status(201).json(rpcData);
 
         } else {
             return response.status(400).json({ error: 'Acción no válida o no especificada.' });

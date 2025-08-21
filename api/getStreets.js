@@ -174,7 +174,42 @@ module.exports = async (request, response) => {
 
         if (streetsFromDb && streetsFromDb.length > 0) {
             console.log(`¡Éxito! Se encontraron ${streetsFromDb.length} calles en Supabase DB.`);
-            // 3. Transformar los datos al formato que el resto del código espera.
+
+            // --- INICIO DE LA MODIFICACIÓN ---
+            // APLICAR REGLAS DEL EDITOR (`street_overrides`) ANTES DE CONTINUAR
+            if (currentCity) {
+                // 1. Obtener las reglas de renombrado de la tabla del editor.
+                const { data: editorOverrides, error: editorError } = await supabaseAdmin
+                    .from('street_overrides')
+                    .select('osm_id, display_name')
+                    .eq('city', currentCity);
+
+                if (editorError) {
+                    console.error('Error al cargar los overrides del editor, se usarán nombres originales:', editorError.message);
+                } else if (editorOverrides && editorOverrides.length > 0) {
+                    // 2. Crear un Mapa para búsqueda rápida.
+                    const editorOverrideMap = new Map();
+                    for (const rule of editorOverrides) {
+                        editorOverrideMap.set(rule.osm_id, rule.display_name);
+                    }
+
+                    // 3. Aplicar las reglas a los datos que hemos obtenido de la base de datos.
+                    for (const street of streetsFromDb) {
+                        if (editorOverrideMap.has(street.id)) {
+                            const newName = editorOverrideMap.get(street.id);
+                            if (street.tags) {
+                                street.tags.name = newName;
+                            } else {
+                                street.tags = { name: newName };
+                            }
+                        }
+                    }
+                    console.log(`Se aplicaron ${editorOverrideMap.size} reglas del editor a los datos de Supabase.`);
+                }
+            }
+            // --- FIN DE LA MODIFICACIÓN ---
+
+            // 3. Transformar los datos (ya con los nombres corregidos) al formato que el resto del código espera.
             initialData.elements = streetsFromDb.map(street => ({
                 id: street.id,
                 tags: street.tags,

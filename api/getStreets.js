@@ -231,6 +231,7 @@ module.exports = async (request, response) => {
                     overrideRules.set(originalName, { osm_name: originalName, display_name: rule.display_name });
                 }
             });
+            console.log(`Reglas del editor unificadas. Total de reglas en memoria: ${overrideRules.size}`);
         }
         
         // 3. Cargar la lista de bloqueo como antes

@@ -14,11 +14,9 @@ export function startInstintoGame({ ui, gameMap, updatePanelUI, userProfile, set
 
   // --- Estado y constantes locales del MODO INSTINTO ---
   const COL_ZONE = '#663399';
-  // --- INICIO DE LA MODIFICACIÓN ---
   const COL_NEUTRAL = '#0496FF'; // Azul eléctrico
   const COL_CORRECT = '#007a2f';
   const COL_INCORRECT = '#FF0033';
-  // --- FIN DE LA MODIFICACIÓN ---
   let drawing = false;
   let zonePoly = null;
   let tempMarkers = [];
@@ -44,6 +42,16 @@ export function startInstintoGame({ ui, gameMap, updatePanelUI, userProfile, set
     listeners = [];
     gameMap.off('click', addVertex); // Limpiar listener del mapa explícitamente
   }
+
+  // --- INICIO DE LA MODIFICACIÓN ---
+  // Nueva función de limpieza que solo afecta a la capa de la calle
+  function clearStreetLayer() {
+    if (streetLayerGroup) {
+      gameMap.removeLayer(streetLayerGroup);
+      streetLayerGroup = null;
+    }
+  }
+  // --- FIN DE LA MODIFICACIÓN ---
 
   function clearMapLayers(clearFull = false) {
     if (streetLayerGroup) gameMap.removeLayer(streetLayerGroup);
@@ -174,12 +182,27 @@ export function startInstintoGame({ ui, gameMap, updatePanelUI, userProfile, set
       ui.gameInterface.classList.remove('hidden');
       ui.progressBar.style.width = '0%';
       ui.reportBtnFAB.classList.remove('hidden');
+      // --- INICIO DE LA MODIFICACIÓN ---
+      // Cambiamos el estilo del polígono para que sirva de referencia visual
+      if (zonePoly) {
+          zonePoly.setStyle({
+              color: '#696969',      // Un gris oscuro
+              weight: 2,
+              dashArray: '5, 5',    // Línea discontinua
+              fillOpacity: 0.0      // Sin relleno
+          });
+      }
+      // --- FIN DE LA MODIFICACIÓN ---
     });
     showNextQuestion();
   }
 
   function showNextQuestion() {
-    clearMapLayers();
+    // --- INICIO DE LA MODIFICACIÓN ---
+    // Usamos la nueva función que solo limpia la calle anterior
+    clearStreetLayer();
+    // --- FIN DE LA MODIFICACIÓN ---
+
     if (currentQuestionIndex >= gameQuestions.length) {
         endGame();
         return;
@@ -195,7 +218,7 @@ export function startInstintoGame({ ui, gameMap, updatePanelUI, userProfile, set
     });
 
     // --- INICIO DE LA MODIFICACIÓN ---
-    // Lógica de Zoom Inteligente
+    // Lógica de Zoom Inteligente (ahora funcionará en cada pregunta)
     if (zonePoly && streetLayerGroup.getLayers().length > 0) {
         const streetBounds = streetLayerGroup.getBounds();
         const zoneBounds = zonePoly.getBounds();
@@ -293,14 +316,11 @@ export function startInstintoGame({ ui, gameMap, updatePanelUI, userProfile, set
         });
     }
     
-    // --- INICIO DE LA MODIFICACIÓN ---
-    // Añadimos la clase para atenuar sutilmente los botones no seleccionados
     allOptionBtns.forEach(btn => {
         if (btn !== clickedButton && btn.textContent !== correctAnswer.googleName) {
             btn.classList.add('option-disabled');
         }
     });
-    // --- FIN DE LA MODIFICACIÓN ---
 
     if (userProfile.settings.enable_feedback_animation) {
         ui.gameUiContainer.classList.add(pulseClass);
@@ -323,6 +343,13 @@ export function startInstintoGame({ ui, gameMap, updatePanelUI, userProfile, set
     clearAllListeners();
     setReportContext(null);
     ui.reportBtnFAB.classList.add('hidden');
+    // --- INICIO DE LA MODIFICACIÓN ---
+    // Nos aseguramos de limpiar el polígono del mapa al terminar el juego
+    if (zonePoly) {
+        gameMap.removeLayer(zonePoly);
+        zonePoly = null;
+    }
+    // --- FIN DE LA MODIFICACIÓN ---
     updatePanelUI(() => {
         ui.gameInterface.classList.add('hidden');
         ui.endGameOptions.classList.remove('hidden');
@@ -368,7 +395,10 @@ export function startInstintoGame({ ui, gameMap, updatePanelUI, userProfile, set
       next: showNextQuestion,
       clear: () => {
         clearAllListeners();
+        // --- INICIO DE LA MODIFICACIÓN ---
+        // La función clear ahora llama a la limpieza completa, que ya se encarga de zonePoly
         clearMapLayers(true);
+        // --- FIN DE LA MODIFICACIÓN ---
         setReportContext(null);
         ui.reportBtnFAB.classList.add('hidden');
       }

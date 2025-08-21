@@ -174,42 +174,7 @@ module.exports = async (request, response) => {
 
         if (streetsFromDb && streetsFromDb.length > 0) {
             console.log(`¡Éxito! Se encontraron ${streetsFromDb.length} calles en Supabase DB.`);
-
-            // --- INICIO DE LA MODIFICACIÓN ---
-            // APLICAR REGLAS DEL EDITOR (`street_overrides`) ANTES DE CONTINUAR
-            if (currentCity) {
-                // 1. Obtener las reglas de renombrado de la tabla del editor.
-                const { data: editorOverrides, error: editorError } = await supabaseAdmin
-                    .from('street_overrides')
-                    .select('osm_id, display_name')
-                    .eq('city', currentCity);
-
-                if (editorError) {
-                    console.error('Error al cargar los overrides del editor, se usarán nombres originales:', editorError.message);
-                } else if (editorOverrides && editorOverrides.length > 0) {
-                    // 2. Crear un Mapa para búsqueda rápida.
-                    const editorOverrideMap = new Map();
-                    for (const rule of editorOverrides) {
-                        editorOverrideMap.set(rule.osm_id, rule.display_name);
-                    }
-
-                    // 3. Aplicar las reglas a los datos que hemos obtenido de la base de datos.
-                    for (const street of streetsFromDb) {
-                        if (editorOverrideMap.has(street.id)) {
-                            const newName = editorOverrideMap.get(street.id);
-                            if (street.tags) {
-                                street.tags.name = newName;
-                            } else {
-                                street.tags = { name: newName };
-                            }
-                        }
-                    }
-                    console.log(`Se aplicaron ${editorOverrideMap.size} reglas del editor a los datos de Supabase.`);
-                }
-            }
-            // --- FIN DE LA MODIFICACIÓN ---
-
-            // 3. Transformar los datos (ya con los nombres corregidos) al formato que el resto del código espera.
+            // 3. Transformar los datos al formato que el resto del código espera.
             initialData.elements = streetsFromDb.map(street => ({
                 id: street.id,
                 tags: street.tags,
@@ -233,13 +198,43 @@ module.exports = async (request, response) => {
     const overrideRules = new Map();
     const blockedNames = new Set();
 
+    // --- INICIO DE LA MODIFICACIÓN ---
     if (currentCity) {
-        const { data: overrides, error } = await supabaseAdmin.from('street_overrides_old').select('osm_name, display_name').eq('city', currentCity);
-        if (!error) overrides.forEach(rule => overrideRules.set(rule.osm_name, rule));
+        // 1. Cargar primero las reglas del panel de admin antiguo (baja prioridad)
+        const { data: oldOverrides, error: oldError } = await supabaseAdmin
+            .from('street_overrides_old')
+            .select('osm_name, display_name')
+            .eq('city', currentCity);
+        if (!oldError && oldOverrides) {
+            oldOverrides.forEach(rule => overrideRules.set(rule.osm_name, rule));
+        }
+
+        // 2. Cargar las reglas del editor nuevo (alta prioridad, sobreescribirán las anteriores)
+        const { data: newOverrides, error: newError } = await supabaseAdmin
+            .from('street_overrides')
+            .select('osm_id, display_name')
+            .eq('city', currentCity);
+        if (!newError && newOverrides) {
+            // Para aplicar estas reglas, necesitamos un mapa de id -> nombre
+            const newOverridesMap = new Map();
+            newOverrides.forEach(rule => newOverridesMap.set(rule.osm_id, rule.display_name));
+            
+            // Aplicamos las reglas del editor directamente a los datos iniciales
+            initialData.elements.forEach(el => {
+                if (newOverridesMap.has(el.id)) {
+                    if (el.tags) {
+                        el.tags.name = newOverridesMap.get(el.id);
+                    } else {
+                        el.tags = { name: newOverridesMap.get(el.id) };
+                    }
+                }
+            });
+        }
         
         const { data: blocked, error: blockedError } = await supabaseAdmin.from('street_blocklist').select('osm_name').eq('city', currentCity);
         if (!blockedError) blocked.forEach(rule => blockedNames.add(rule.osm_name));
     }
+    // --- FIN DE LA MODIFICACIÓN ---
 
     // LÍNEA CRÍTICA CORREGIDA: Nos aseguramos de que cualquier calle que procesemos tenga un nombre.
     const initialOsmNames = new Set(initialData.elements.filter(el => el.tags && el.tags.name).map(el => el.tags.name));

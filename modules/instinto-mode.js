@@ -173,7 +173,6 @@ export function startInstintoGame({ ui, gameMap, updatePanelUI, userProfile, set
     updatePanelUI(() => {
       ui.gameInterface.classList.remove('hidden');
       ui.progressBar.style.width = '0%';
-      // La lógica de zoom inicial se moverá a showNextQuestion para que se ajuste por pregunta
       ui.reportBtnFAB.classList.remove('hidden');
     });
     showNextQuestion();
@@ -194,20 +193,23 @@ export function startInstintoGame({ ui, gameMap, updatePanelUI, userProfile, set
             : L.polyline(geom.points, { color: COL_NEUTRAL, weight: 8 });
         layer.addTo(streetLayerGroup);
     });
-    
+
     // --- INICIO DE LA MODIFICACIÓN ---
     // Lógica de Zoom Inteligente
-    if (zonePoly && streetLayerGroup) {
+    if (zonePoly && streetLayerGroup.getLayers().length > 0) {
         const streetBounds = streetLayerGroup.getBounds();
         const zoneBounds = zonePoly.getBounds();
-        // Extendemos los límites de la zona para que siempre incluyan la calle completa
-        const finalBounds = zoneBounds.extend(streetBounds);
+        
+        // Creamos una copia de los límites de la zona para no modificar el original
+        const finalBounds = L.latLngBounds(zoneBounds.getSouthWest(), zoneBounds.getNorthEast());
+        
+        // Extendemos los límites para que siempre incluyan la calle completa
+        finalBounds.extend(streetBounds);
         
         // Ajustamos la cámara a estos nuevos límites
         gameMap.fitBounds(finalBounds, { 
             paddingTopLeft: [ui.gameUiContainer.offsetWidth + 20, 20],
-            paddingBottomRight: [20, 20],
-            maxZoom: gameMap.getZoom() // Evita un zoom excesivo en calles muy pequeñas
+            paddingBottomRight: [20, 20]
         });
     }
     // --- FIN DE LA MODIFICACIÓN ---
@@ -256,8 +258,6 @@ export function startInstintoGame({ ui, gameMap, updatePanelUI, userProfile, set
             }
         }
         
-        // --- INICIO DE LA MODIFICACIÓN ---
-        // Usamos la animación de pulso del modo clásico
         streetLayerGroup.eachLayer(layer => {
             const element = layer.getElement();
             if (element) {
@@ -266,7 +266,6 @@ export function startInstintoGame({ ui, gameMap, updatePanelUI, userProfile, set
                 layer.setStyle({ color: COL_CORRECT });
             }
         });
-        // --- FIN DE LA MODIFICACIÓN ---
 
     } else {
         clickedButton.style.backgroundColor = '#c82333';
@@ -284,8 +283,6 @@ export function startInstintoGame({ ui, gameMap, updatePanelUI, userProfile, set
             }
         }
 
-        // --- INICIO DE LA MODIFICACIÓN ---
-        // Usamos la animación de pulso de fallo del modo clásico
         streetLayerGroup.eachLayer(layer => {
             const element = layer.getElement();
             if (element) {
@@ -294,13 +291,12 @@ export function startInstintoGame({ ui, gameMap, updatePanelUI, userProfile, set
                 layer.setStyle({ color: COL_INCORRECT });
             }
         });
-        // --- FIN DE LA MODIFICACIÓN ---
     }
     
     // --- INICIO DE LA MODIFICACIÓN ---
     // Añadimos la clase para atenuar sutilmente los botones no seleccionados
     allOptionBtns.forEach(btn => {
-        if (btn.textContent !== correctAnswer.googleName && btn !== clickedButton) {
+        if (btn !== clickedButton && btn.textContent !== correctAnswer.googleName) {
             btn.classList.add('option-disabled');
         }
     });

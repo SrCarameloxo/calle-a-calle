@@ -262,10 +262,7 @@ button.game-control-btn:disabled { opacity: .4; cursor: default; }
   overflow-x: auto;
   scrollbar-width: none;
   -ms-overflow-style: none;
-  /* --- INICIO: CAMBIO PARA DISTRIBUCIÓN --- */
-  /* Esta propiedad distribuye los botones de forma equitativa en el espacio disponible. */
   justify-content: space-around;
-  /* --- FIN: CAMBIO PARA DISTRIBUCIÓN --- */
 }
 
 .menu-tabs::-webkit-scrollbar {
@@ -273,13 +270,9 @@ button.game-control-btn:disabled { opacity: .4; cursor: default; }
 }
 
 .menu-tab-btn {
-  /* --- INICIO: CAMBIO PARA DISTRIBUCIÓN --- */
-  /* flex: 1; hace que cada botón crezca para ocupar el mismo espacio. */
-  /* display: flex y justify-content: center; centran el icono SVG dentro del botón. */
   flex: 1;
   display: flex;
   justify-content: center;
-  /* --- FIN: CAMBIO PARA DISTRIBUCIÓN --- */
   padding: 1rem;
   background: none;
   border: none;
@@ -456,9 +449,6 @@ button.game-control-btn:disabled { opacity: .4; cursor: default; }
 }
 /* --- FIN: ESTILOS --- */
 
-
-/* --- INICIO: CÓDIGO MODIFICADO --- */
-
 .mode-select-content {
     display: flex;
     justify-content: space-between;
@@ -501,7 +491,6 @@ button.game-control-btn:disabled { opacity: .4; cursor: default; }
     background: linear-gradient(to right, #22c55e, #a855f7); /* Verde a Lila */
     -webkit-background-clip: text; background-clip: text; color: transparent;
 }
-/* --- FIN: CÓDIGO MODIFICADO --- */
 
 /* --- INICIO: ESTILOS MODO INSTINTO --- */
 #instinto-options-container {
@@ -515,6 +504,34 @@ button.game-control-btn:disabled { opacity: .4; cursor: default; }
 #instinto-options-container .game-control-btn:not(:disabled):hover {
     background-color: #e5e7eb;
 }
+
+/* --- INICIO DE LA MODIFICACIÓN --- */
+
+/* Gestiona el espaciado simétrico entre los botones de opción */
+#instinto-options-container {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem; /* Ajusta este valor si quieres más o menos espacio */
+}
+
+/* Anula el margen inferior individual para los botones dentro del modo instinto */
+#instinto-options-container .game-control-btn {
+    margin-bottom: 0;
+}
+
+/* Anula la opacidad por defecto de los botones desactivados para un control más sutil */
+#instinto-options-container .game-control-btn:disabled {
+    opacity: 1 !important;
+}
+
+/* Estilo para los botones de opción desactivados en modo instinto */
+#instinto-options-container .game-control-btn.option-disabled {
+    background-color: #f8f9fa; /* Fondo blanco roto, casi igual que el original */
+    color: #adb5bd; /* Texto en gris claro para indicar inactividad */
+    cursor: not-allowed;
+    border-color: #e9ecef; /* Borde ligeramente más claro */
+}
+/* --- FIN DE LA MODIFICACIÓN --- */
 /* --- FIN: ESTILOS MODO INSTINTO --- */
 
 
@@ -658,15 +675,5 @@ input[type="range"]::-moz-range-thumb {
     max-height: 300px; /* Suficiente para mostrar todo el contenido */
     margin-top: 1rem; /* Restaura el espacio superior */
     padding-bottom: 0.5rem; /* Añade un pequeño espacio inferior */
-}
-/* --- FIN DE LA MODIFICACIÓN --- */
-
-/* --- INICIO DE LA MODIFICACIÓN --- */
-/* Estilo para los botones de opción desactivados en modo instinto */
-#instinto-options-container .game-control-btn.option-disabled {
-    background-color: #f8f9fa; /* Fondo blanco roto, casi igual que el original */
-    color: #adb5bd; /* Texto en gris claro para indicar inactividad */
-    cursor: not-allowed;
-    border-color: #e9ecef; /* Borde ligeramente más claro */
 }
 /* --- FIN DE LA MODIFICACIÓN --- */

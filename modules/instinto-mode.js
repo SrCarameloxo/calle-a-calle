@@ -9,16 +9,17 @@
  * @param {function} context.updatePanelUI - La función para animar el panel de UI.
  * @returns {object} Un objeto con funciones para controlar el modo desde fuera.
  */
-// --- INICIO DE LA MODIFICACIÓN ---
-// Aceptamos el nuevo parámetro 'setReportContext'
 export function startInstintoGame({ ui, gameMap, updatePanelUI, userProfile, setReportContext }) {
-// --- FIN DE LA MODIFICACIÓN ---
   console.log("¡El Modo Instinto ha sido activado! La lógica está ahora en instinto-mode.js");
 
   // --- Estado y constantes locales del MODO INSTINTO ---
   const COL_ZONE = '#663399';
-  const COL_TRACE = '#007a2f';
-  const COL_FAIL_TRACE = '#c82333';
+  // --- INICIO DE LA MODIFICACIÓN ---
+  // Se añade un color neutro para la presentación inicial de la calle
+  const COL_NEUTRAL = '#007BFF'; 
+  const COL_CORRECT = '#007a2f';
+  const COL_INCORRECT = '#FF0033';
+  // --- FIN DE LA MODIFICACIÓN ---
   let drawing = false;
   let zonePoly = null;
   let tempMarkers = [];
@@ -179,10 +180,7 @@ export function startInstintoGame({ ui, gameMap, updatePanelUI, userProfile, set
               paddingBottomRight: [20, 20]
           });
       }
-      // --- INICIO DE LA MODIFICACIÓN ---
-      // Mostramos el botón de reporte al empezar la partida de instinto
       ui.reportBtnFAB.classList.remove('hidden');
-      // --- FIN DE LA MODIFICACIÓN ---
     });
     showNextQuestion();
   }
@@ -197,12 +195,17 @@ export function startInstintoGame({ ui, gameMap, updatePanelUI, userProfile, set
     const { correctAnswer, options } = currentQuestion;
     streetLayerGroup = L.layerGroup().addTo(gameMap);
     correctAnswer.geometries.forEach(geom => {
+        // --- INICIO DE LA MODIFICACIÓN ---
+        // La calle aparece con un color neutro y un grosor estándar.
         const layer = geom.isClosed 
-            ? L.polygon(geom.points, { color: COL_TRACE, weight: 4, fillOpacity: 0.2 })
-            : L.polyline(geom.points, { color: COL_TRACE, weight: 8 });
+            ? L.polygon(geom.points, { color: COL_NEUTRAL, weight: 4, fillOpacity: 0.2 })
+            : L.polyline(geom.points, { color: COL_NEUTRAL, weight: 8 });
+        // --- FIN DE LA MODIFICACIÓN ---
         layer.addTo(streetLayerGroup);
     });
     
+    // Ya no usamos la animación de pulso inicial para el modo instinto
+    /*
     if (userProfile.settings.enable_street_animation) {
         streetLayerGroup.eachLayer(layer => {
             const element = layer.getElement();
@@ -211,14 +214,12 @@ export function startInstintoGame({ ui, gameMap, updatePanelUI, userProfile, set
             }
         });
     }
+    */
 
-    // --- INICIO DE LA MODIFICACIÓN ---
-    // Actualizamos el contexto del reporte con la información de la calle actual
     setReportContext({
         geometries: correctAnswer.geometries,
         city: userProfile.subscribedCity
     });
-    // --- FIN DE LA MODIFICACIÓN ---
 
     updatePanelUI(() => {
         ui.gameQuestion.textContent = `¿Cómo se llama esta calle?`;
@@ -241,6 +242,8 @@ export function startInstintoGame({ ui, gameMap, updatePanelUI, userProfile, set
   function handleAnswer(selectedOption, correctAnswer, clickedButton) {
     clearAllListeners();
     const allOptionBtns = ui.instintoOptionsContainer.querySelectorAll('button');
+    allOptionBtns.forEach(btn => btn.disabled = true); // Desactivamos los botones
+
     const isCorrect = selectedOption.googleName === correctAnswer.googleName;
     const pulseClass = isCorrect ? 'panel-pulse-correct' : 'panel-pulse-incorrect';
 
@@ -254,6 +257,21 @@ export function startInstintoGame({ ui, gameMap, updatePanelUI, userProfile, set
                 sound.play().catch(e => {});
             }
         }
+
+        // --- INICIO DE LA MODIFICACIÓN ---
+        // Aplicamos la animación de trazado al acertar
+        streetLayerGroup.eachLayer(layer => {
+            layer.setStyle({ color: COL_CORRECT }); // Cambiamos el color base
+            const element = layer.getElement();
+            if (element) {
+                const totalLength = element.getTotalLength();
+                element.style.strokeDasharray = totalLength;
+                element.style.strokeDashoffset = totalLength;
+                element.classList.add('instinto-street-correct-animation');
+            }
+        });
+        // --- FIN DE LA MODIFICACIÓN ---
+
     } else {
         clickedButton.style.backgroundColor = '#c82333';
         allOptionBtns.forEach(btn => {
@@ -269,6 +287,19 @@ export function startInstintoGame({ ui, gameMap, updatePanelUI, userProfile, set
                 sound.play().catch(e => {});
             }
         }
+
+        // --- INICIO DE LA MODIFICACIÓN ---
+        // Aplicamos la animación de desvanecimiento al fallar
+        streetLayerGroup.eachLayer(layer => {
+            const element = layer.getElement();
+            if (element) {
+                element.classList.add('instinto-street-incorrect-animation');
+            } else {
+                // Fallback para polígonos que no tienen elemento SVG directo
+                layer.setStyle({ color: COL_INCORRECT });
+            }
+        });
+        // --- FIN DE LA MODIFICACIÓN ---
     }
 
     if (userProfile.settings.enable_feedback_animation) {
@@ -290,12 +321,8 @@ export function startInstintoGame({ ui, gameMap, updatePanelUI, userProfile, set
   
   function endGame() {
     clearAllListeners();
-    // --- INICIO DE LA MODIFICACIÓN ---
-    // Limpiamos el contexto de reporte al final de la partida
     setReportContext(null);
-    // Ocultamos el botón de reporte, ya que la partida ha terminado
     ui.reportBtnFAB.classList.add('hidden');
-    // --- FIN DE LA MODIFICACIÓN ---
     updatePanelUI(() => {
         ui.gameInterface.classList.add('hidden');
         ui.endGameOptions.classList.remove('hidden');
@@ -342,11 +369,8 @@ export function startInstintoGame({ ui, gameMap, updatePanelUI, userProfile, set
       clear: () => {
         clearAllListeners();
         clearMapLayers(true);
-        // --- INICIO DE LA MODIFICACIÓN ---
-        // Nos aseguramos de limpiar el contexto si el modo se cancela
         setReportContext(null);
         ui.reportBtnFAB.classList.add('hidden');
-        // --- FIN DE LA MODIFICACIÓN ---
       }
   };
 }

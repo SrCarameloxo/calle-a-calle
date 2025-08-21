@@ -664,3 +664,39 @@ input[type="range"]::-moz-range-thumb {
     padding-bottom: 0.5rem; /* Añade un pequeño espacio inferior */
 }
 /* --- FIN DE LA MODIFICACIÓN --- */
+
+/* --- INICIO DE LA MODIFICACIÓN: ANIMACIONES MODO INSTINTO (IDEA 2) --- */
+
+/* 1. Animación de trazado para la respuesta correcta */
+@keyframes trace-animation {
+    to {
+        stroke-dashoffset: 0;
+    }
+}
+
+.instinto-street-correct-animation {
+    /* La animación se llama 'trace-animation', dura 1.2 segundos, es lineal y se ejecuta una vez */
+    animation: trace-animation 1.2s linear forwards;
+}
+
+/* 2. Animación de desvanecimiento para la respuesta incorrecta */
+@keyframes fade-out-and-back-animation {
+    0% {
+        opacity: 1;
+        stroke: #FF0033; /* El color de fallo que ya usas */
+    }
+    50% {
+        opacity: 0.2;
+        stroke: #696969; /* Un gris oscuro para el desvanecimiento */
+    }
+    100% {
+        opacity: 1;
+        stroke: #FF0033; /* Vuelve al color de fallo final */
+    }
+}
+
+.instinto-street-incorrect-animation {
+    animation: fade-out-and-back-animation 1s ease-in-out forwards;
+}
+
+/* --- FIN DE LA MODIFICACIÓN --- */

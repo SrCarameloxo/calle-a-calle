@@ -1,78 +1,59 @@
-// Ruta: /api/getCityStreets.js
-
 const { createClient } = require('@supabase/supabase-js');
 
+// Esta API se encarga de obtener la lista de calles que un usuario ha fallado
+// para poder jugar en el "Modo Revancha".
 module.exports = async (request, response) => {
+    // Solo permitimos el método GET
+    if (request.method !== 'GET') {
+        response.setHeader('Allow', ['GET']);
+        return response.status(405).json({ error: `Method ${request.method} Not Allowed` });
+    }
+
     try {
-        const supabase = createClient(
-            process.env.SUPABASE_URL, 
+        // --- 1. Verificación de seguridad: Obtener el usuario a partir del token ---
+        const authHeader = request.headers.authorization;
+        if (!authHeader) {
+            return response.status(401).json({ error: 'Authorization header required' });
+        }
+        const token = authHeader.split('Bearer ')[1];
+        
+        const supabaseAdmin = createClient(
+            process.env.SUPABASE_URL,
             process.env.SUPABASE_SERVICE_ROLE_KEY
         );
 
-        const city = request.query.city;
-        if (!city) {
-            return response.status(400).json({ error: 'Falta el parámetro "city" en la petición.' });
+        const { data: { user }, error: userError } = await supabaseAdmin.auth.getUser(token);
+
+        if (userError || !user) {
+            return response.status(401).json({ error: 'Invalid or expired token' });
+        }
+        
+        // --- 2. Lógica de la API: Obtener las calles falladas ---
+        // La RLS que creaste para SELECT asegura que el usuario solo puede ver sus propias filas.
+        const { data, error } = await supabaseAdmin
+            .from('calles_falladas_por_usuario')
+            .select('osm_name, city, geometries') // Seleccionamos los campos que necesitamos
+            .eq('user_id', user.id);
+
+        if (error) {
+            throw error;
         }
 
-        const page = parseInt(request.query.page) || 1;
-        const pageSize = 1000;
+        // Mapeamos los datos al formato que el frontend espera (googleName, geometries)
+        const streets = data.map(calle => ({
+            googleName: calle.osm_name, // Renombramos la columna para que sea consistente con el juego
+            geometries: calle.geometries,
+            city: calle.city
+        }));
 
-        const { data, error } = await supabase.rpc('get_streets_by_city', {
-            city_name: city,
-            page_size: pageSize,
-            page_number: page
-        });
+        // Barajamos la lista para que la partida sea diferente cada vez
+        streets.sort(() => Math.random() - 0.5);
 
-        if (error) throw error;
-        
-        // --- INICIO: LÓGICA DE DOBLE OVERRIDE ---
-        const overrideMap = new Map();
-
-        // 1. Cargar primero las reglas del panel de admin (baja prioridad)
-        const { data: oldOverrides } = await supabase
-            .from('street_overrides_old')
-            .select('osm_id, display_name')
-            .eq('city', city);
-        if (oldOverrides) {
-            for (const rule of oldOverrides) {
-                overrideMap.set(rule.osm_id, rule.display_name);
-            }
-        }
-
-        // 2. Cargar las reglas del editor (alta prioridad, sobreescribirá las anteriores si hay duplicados)
-        const { data: newOverrides } = await supabase
-            .from('street_overrides')
-            .select('osm_id, display_name')
-            .eq('city', city);
-        if (newOverrides) {
-            for (const rule of newOverrides) {
-                overrideMap.set(rule.osm_id, rule.display_name);
-            }
-        }
-        // --- FIN: LÓGICA DE DOBLE OVERRIDE ---
-        
-        const geojsonData = {
-            type: "FeatureCollection",
-            features: data.map(row => {
-                if (overrideMap.has(row.id)) {
-                    if (row.tags) {
-                        row.tags.name = overrideMap.get(row.id);
-                    } else {
-                        row.tags = { name: overrideMap.get(row.id) };
-                    }
-                }
-                return {
-                    type: "Feature",
-                    geometry: row.geometry,
-                    properties: { id: row.id, tags: row.tags }
-                };
-            })
-        };
-        
-        response.status(200).json(geojsonData);
+        // Devolvemos la lista de calles
+        return response.status(200).json({ streets });
 
     } catch (error) {
-        console.error('Error en la API getCityStreets:', error.message);
-        response.status(500).json({ error: 'Error interno del servidor.', details: error.message });
+        console.error('Error en la API getRevanchaStreets:', error.message);
+        return response.status(500).json({ error: 'Error interno del servidor.', details: error.message });
     }
 };

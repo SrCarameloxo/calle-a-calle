@@ -64,9 +64,7 @@ window.addEventListener('DOMContentLoaded', () => {
   };
 
   let backgroundMap, gameMap = null;
-  // --- INICIO DE LA MODIFICACIÓN: NUEVO ROJO MÁS POTENTE ---
   const COL_ZONE = '#663399', COL_TRACE = '#007a2f', COL_FAIL_TRACE = '#FF0033', COL_DASH = '#1976d2';
-  // --- FIN DE LA MODIFICACIÓN ---
   let drawing=false, zonePoly=null, tempMarkers=[], zonePoints=[], oldZonePoly=null, reviewLayer=null;
   let playing=false, qIdx=0, target=null, userMk, guide, streetGrp;
   let streetList = [], totalQuestions = 0, streetsGuessedCorrectly = 0, lastGameZonePoints = [];
@@ -90,6 +88,16 @@ window.addEventListener('DOMContentLoaded', () => {
   let currentGameMode = 'classic'; 
   let acertadasEnSesionRevancha = new Set();
   let activeModeControls = null;
+  // --- INICIO DE LA MODIFICACIÓN ---
+  let currentReportContext = null; // Variable para el reporte contextual
+  // --- FIN DE LA MODIFICACIÓN ---
+
+  // --- INICIO DE LA MODIFICACIÓN ---
+  // Función para que los módulos puedan establecer el contexto del reporte
+  function setReportContext(context) {
+      currentReportContext = context;
+  }
+  // --- FIN DE LA MODIFICACIÓN ---
 
   function setGameMode(mode) {
     if (!mode) return;
@@ -288,7 +296,16 @@ window.addEventListener('DOMContentLoaded', () => {
                     }
                 });
             } else if (selectedMode === 'instinto') {
-                activeModeControls = startInstintoGame({ ui: uiElements, gameMap: gameMap, updatePanelUI: updatePanelUI, userProfile: userProfile });
+                // --- INICIO DE LA MODIFICACIÓN ---
+                // Pasamos la función setReportContext al módulo del modo instinto
+                activeModeControls = startInstintoGame({ 
+                    ui: uiElements, 
+                    gameMap: gameMap, 
+                    updatePanelUI: updatePanelUI, 
+                    userProfile: userProfile,
+                    setReportContext: setReportContext 
+                });
+                // --- FIN DE LA MODIFICACIÓN ---
             }
         });
     });
@@ -671,14 +688,12 @@ window.addEventListener('DOMContentLoaded', () => {
         }
       }
       
-      // --- INICIO DE LA MODIFICACIÓN: LÓGICA CORREGIDA DEL INTERRUPTOR ---
       if (userProfile.settings.enable_feedback_animation) {
           uiElements.gameUiContainer.classList.add(feedbackClass);
           uiElements.gameUiContainer.addEventListener('animationend', () => {
               uiElements.gameUiContainer.classList.remove(feedbackClass);
           }, { once: true });
       }
-      // --- FIN DE LA MODIFICACIÓN ---
 
       const progress = totalQuestions > 0 ? ((qIdx) / totalQuestions) * 100 : 0;
       uiElements.progressBar.style.width = `${progress}%`;
@@ -933,6 +948,10 @@ window.addEventListener('DOMContentLoaded', () => {
           uiElements.progressCounter.textContent = '';
           uiElements.scoreDisplayToggle.textContent = '';
           uiElements.streakDisplay.classList.remove('visible');
+          // --- INICIO DE LA MODIFICACIÓN ---
+          // Limpiamos el contexto de reporte al volver al menú principal
+          setReportContext(null);
+          // --- FIN DE LA MODIFICACIÓN ---
       });
   }
 
@@ -992,32 +1011,55 @@ window.addEventListener('DOMContentLoaded', () => {
       startGameFlow();
   }
 
+  // --- INICIO DE LA MODIFICACIÓN ---
+  // La función de reporte ahora es más inteligente y usa el contexto
   async function reportIncident() {
-    const pointsToReport = playing ? zonePoints : lastGameZonePoints;
+    let pointsToReport;
+    let cityToReport = userProfile.subscribedCity;
+    let contextDescription = "Incidencia en zona general.";
+
+    if (currentReportContext) {
+        // Estamos en un modo con contexto (Instinto)
+        pointsToReport = currentReportContext.geometries.flatMap(g => g.points.map(p => ({ lat: p[0], lng: p[1] })));
+        cityToReport = currentReportContext.city;
+        contextDescription = "Incidencia sobre una calle específica.";
+    } else {
+        // Comportamiento normal (Modo Clásico)
+        pointsToReport = playing ? zonePoints : lastGameZonePoints;
+        contextDescription = "Incidencia en zona general.";
+    }
     
-    if (pointsToReport.length === 0) {
-      alert("Debes jugar en una zona primero para poder reportar una incidencia sobre ella.");
+    if (!pointsToReport || pointsToReport.length === 0) {
+      alert("No hay una zona o calle activa para reportar una incidencia.");
       return;
     }
-    const description = prompt("Por favor, describe la incidencia (ej. 'Falta la calle X', 'La calle Y no debería estar', etc.):");
+
+    const description = prompt(`Por favor, describe la incidencia (ej. 'Falta la calle X', 'El nombre es incorrecto', etc.).\n\nContexto: ${contextDescription}`);
     if (!description || description.trim() === '') return;
+
     try {
         const { data: { session } } = await supabaseClient.auth.getSession();
         if (!session) {
             alert("Necesitas estar conectado para reportar una incidencia.");
             return;
         }
+
+        // Para geometrías de una sola línea (Modo Instinto), no necesitamos cerrar el polígono.
+        // Para polígonos (Modo Clásico), el formato ya es correcto.
         const zoneString = pointsToReport.map(p => `${p.lat},${p.lng}`).join(';');
+        
         const requestBody = {
             zone_points: zoneString,
             description: description,
-            city: userProfile.subscribedCity
+            city: cityToReport
         };
+
         const response = await fetch('/api/reportIncident', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
             body: JSON.stringify(requestBody)
         });
+
         if (!response.ok) {
             const errorData = await response.json();
             throw new Error(errorData.error || 'Error del servidor');
@@ -1028,6 +1070,7 @@ window.addEventListener('DOMContentLoaded', () => {
       alert(`Hubo un error al enviar tu reporte: ${error.message}`);
     }
   }
+  // --- FIN DE LA MODIFICACIÓN ---
 
 async function saveFailedStreet(streetData) {
     try {

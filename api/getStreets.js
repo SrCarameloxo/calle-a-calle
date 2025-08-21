@@ -199,38 +199,9 @@ module.exports = async (request, response) => {
     const blockedNames = new Set();
 
     if (currentCity) {
-        // 1. Cargar primero las reglas del panel de admin antiguo (baja prioridad)
-        const { data: oldOverrides, error: oldError } = await supabaseAdmin
-            .from('street_overrides_old')
-            .select('osm_name, display_name')
-            .eq('city', currentCity);
-        if (!oldError && oldOverrides) {
-            oldOverrides.forEach(rule => overrideRules.set(rule.osm_name, rule));
-        }
-
-        // 2. Cargar las reglas del editor nuevo (alta prioridad, sobreescribirán las anteriores)
-        const { data: newOverrides, error: newError } = await supabaseAdmin
-            .from('street_overrides')
-            .select('osm_id, display_name')
-            .eq('city', currentCity);
-
-        if (!newError && newOverrides) {
-            const idToNameMap = new Map();
-            initialData.elements.forEach(el => {
-                if (el.tags && el.tags.name) {
-                    idToNameMap.set(el.id, el.tags.name);
-                }
-            });
-            newOverrides.forEach(rule => {
-                const originalName = idToNameMap.get(rule.osm_id);
-                if (originalName) {
-                    overrideRules.set(originalName, { osm_name: originalName, display_name: rule.display_name });
-                }
-            });
-            console.log(`Reglas del editor unificadas. Total de reglas en memoria: ${overrideRules.size}`);
-        }
+        const { data: overrides, error } = await supabaseAdmin.from('street_overrides_old').select('osm_name, display_name').eq('city', currentCity);
+        if (!error) overrides.forEach(rule => overrideRules.set(rule.osm_name, rule));
         
-        // 3. Cargar la lista de bloqueo como antes
         const { data: blocked, error: blockedError } = await supabaseAdmin.from('street_blocklist').select('osm_name').eq('city', currentCity);
         if (!blockedError) blocked.forEach(rule => blockedNames.add(rule.osm_name));
     }
@@ -293,11 +264,8 @@ module.exports = async (request, response) => {
 
             if (!streetData) {
                 let processedStreet = {};
-                // --- INICIO DE LA MODIFICACIÓN ---
-                // Se busca la regla para CUALQUIERA de los nombres OSM del grupo
                 const rule = entity.osmNames.reduce((acc, name) => acc || overrideRules.get(name), null);
 
-                // Se obtiene la geometría usando todos los nombres originales
                 const queryNames = entity.osmNames.map(n => `way["name"="${n}"](around:${radius}, ${center.lat}, ${center.lng});`).join('');
                 const geometryQuery = `[out:json][timeout:25]; (${queryNames}); out body; >; out skel qt;`;
                 let res = await fetch('https://overpass-api.de/api/interpreter', { method: 'POST', body: geometryQuery });
@@ -312,14 +280,10 @@ module.exports = async (request, response) => {
                 
                 processedStreet.geometries = geometries;
 
-                // LÓGICA DE DECISIÓN DE NOMBRE REESTRUCTURADA
                 if (rule) {
-                    // VÍA 1: LA REGLA HUMANA TIENE PRIORIDAD ABSOLUTA
-                    console.log(`Regla encontrada para '${mainOsmName}', usando nombre: '${rule.display_name}'`);
                     processedStreet.displayName = rule.display_name.toUpperCase();
                 } else {
-                    // VÍA 2: NO HAY REGLA, SE USA EL ALGORITMO DE GOOGLE
-                    console.log(`No se encontró regla para '${mainOsmName}', procediendo con el algoritmo de Google.`);
+                    // --- INICIO: ALGORITMO "CONFIANZA PROGRESIVA" CON "RUEDA DE RECONOCIMIENTO" ---
                     let finalName = null;
                     const samplePoints = geometries.flatMap(g => g.points).filter((_, i, arr) => i % Math.max(1, Math.floor(arr.length / 6)) === 0).slice(0, 6).map(p => ({ lat: p[0], lng: p[1] }));
                     
@@ -330,34 +294,42 @@ module.exports = async (request, response) => {
                         const nameCounts = geocodedNames.reduce((acc, name) => { acc[name] = (acc[name] || 0) + 1; return acc; }, {});
                         const googleWinnerName = Object.keys(nameCounts).reduce((a, b) => nameCounts[a] > nameCounts[b] ? a : b);
 
+                        // --- [INICIO SECCIÓN MODIFICADA] Encrucijada de 3 Vías ---
                         const osmParts = extractNameParts(mainOsmName);
                         const googleParts = extractNameParts(googleWinnerName);
                         
+                        // Condición 1: Corrección de typos a nivel de caracteres
                         const isTypoCorrection = osmParts.type === googleParts.type && levenshtein(osmParts.baseName, googleParts.baseName) <= 2;
+                        
+                        // Condición 2: Coincidencia por recuento de palabras (tu nueva lógica)
                         const isWordCountMatch = osmParts.type === googleParts.type && areNamesSimilarByWordCount(osmParts.baseName, googleParts.baseName);
 
                         if (mainOsmName.toUpperCase() === googleWinnerName) {
+                            // Vía Rápida #1: Coincidencia Perfecta
                             finalName = googleWinnerName;
                         } else if (isTypoCorrection || isWordCountMatch) {
+                            // Vía Rápida #2: Corrección de Alta Confianza (cubre typos Y diferencias de palabras)
                             finalName = googleWinnerName;
                         } else {
+                            // Vía Lenta y Segura: Rueda de Reconocimiento Geográfica
                             const googlePlaceId = await findPlaceId(`${googleWinnerName}, ${currentCity}`, center, process.env.GOOGLE_PLACES_API_KEY);
                             const osmPlaceId = await findPlaceId(`${mainOsmName}, ${currentCity}`, center, process.env.GOOGLE_PLACES_API_KEY);
 
                             if (googlePlaceId && osmPlaceId) {
                                 if (googlePlaceId === osmPlaceId) {
-                                    finalName = googleWinnerName;
+                                    finalName = googleWinnerName; // Éxito por Identidad
                                 } else {
                                     const googlePlaceDetails = await getPlaceDetails(googlePlaceId, process.env.GOOGLE_PLACES_API_KEY);
                                     if (googlePlaceDetails) {
+                                        // Usamos el centroide de la geometría de OSM para la comparación
                                         const allPoints = geometries.flatMap(g => g.points);
                                         let avgLat = 0, avgLng = 0;
                                         allPoints.forEach(p => { avgLat += p[0]; avgLng += p[1]; });
                                         const osmCenter = { lat: avgLat / allPoints.length, lng: avgLng / allPoints.length };
                                         
-                                        const distance = getDistance(osmCenter, googlePlaceDetails.location);
+                                        const distance = getDistance(osmCenter, googlePlaceDetails.location); // Esta línea ahora funcionará
                                         if (distance < 6) {
-                                            finalName = googleWinnerName;
+                                            finalName = googleWinnerName; // Éxito por Proximidad
                                         } else {
                                             console.warn(`[Fallback] Rueda: '${googleWinnerName}' y '${mainOsmName}' son lugares distintos (${Math.round(distance)}m). Usando OSM.`);
                                             finalName = mainOsmName.toUpperCase();
@@ -367,17 +339,21 @@ module.exports = async (request, response) => {
                                     }
                                  }
                             } else if (googlePlaceId && !osmPlaceId) {
+                                // Regla de Fallo Inteligente
                                 console.warn(`Rueda: Google no conoce '${mainOsmName}', pero la votación encontró '${googleWinnerName}'. Confiando en la votación.`);
                                 finalName = googleWinnerName;
                             } else {
+                                // Fallback por falta de evidencia
                                 console.warn(`[Fallback] Rueda: No se encontró Place ID para '${googleWinnerName}' o '${mainOsmName}'. Usando OSM.`);
                                 finalName = mainOsmName.toUpperCase();
                             }
                         }
+                        // --- [FIN SECCIÓN MODIFICADA] ---
                     }
+
                     processedStreet.displayName = finalName || mainOsmName.toUpperCase();
+                    // --- FIN: ALGORITMO ---
                 }
-                // --- FIN DE LA MODIFICACIÓN ---
                 
                 streetData = processedStreet;
                 if(streetData.geometries && streetData.geometries.length > 0) {

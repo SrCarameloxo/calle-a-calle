@@ -43,15 +43,12 @@ export function startInstintoGame({ ui, gameMap, updatePanelUI, userProfile, set
     gameMap.off('click', addVertex); // Limpiar listener del mapa explícitamente
   }
 
-  // --- INICIO DE LA MODIFICACIÓN ---
-  // Nueva función de limpieza que solo afecta a la capa de la calle
   function clearStreetLayer() {
     if (streetLayerGroup) {
       gameMap.removeLayer(streetLayerGroup);
       streetLayerGroup = null;
     }
   }
-  // --- FIN DE LA MODIFICACIÓN ---
 
   function clearMapLayers(clearFull = false) {
     if (streetLayerGroup) gameMap.removeLayer(streetLayerGroup);
@@ -182,26 +179,20 @@ export function startInstintoGame({ ui, gameMap, updatePanelUI, userProfile, set
       ui.gameInterface.classList.remove('hidden');
       ui.progressBar.style.width = '0%';
       ui.reportBtnFAB.classList.remove('hidden');
-      // --- INICIO DE LA MODIFICACIÓN ---
-      // Cambiamos el estilo del polígono para que sirva de referencia visual
       if (zonePoly) {
           zonePoly.setStyle({
-              color: '#696969',      // Un gris oscuro
+              color: '#696969',
               weight: 2,
-              dashArray: '5, 5',    // Línea discontinua
-              fillOpacity: 0.0      // Sin relleno
+              dashArray: '5, 5',
+              fillOpacity: 0.0
           });
       }
-      // --- FIN DE LA MODIFICACIÓN ---
     });
     showNextQuestion();
   }
 
   function showNextQuestion() {
-    // --- INICIO DE LA MODIFICACIÓN ---
-    // Usamos la nueva función que solo limpia la calle anterior
     clearStreetLayer();
-    // --- FIN DE LA MODIFICACIÓN ---
 
     if (currentQuestionIndex >= gameQuestions.length) {
         endGame();
@@ -216,26 +207,23 @@ export function startInstintoGame({ ui, gameMap, updatePanelUI, userProfile, set
             : L.polyline(geom.points, { color: COL_NEUTRAL, weight: 8 });
         layer.addTo(streetLayerGroup);
     });
-
-    // --- INICIO DE LA MODIFICACIÓN ---
-    // Lógica de Zoom Inteligente (ahora funcionará en cada pregunta)
+    
+    // --- INICIO DE LA CORRECCIÓN ---
+    // El nombre de la variable es streetLayerGroup (con G mayúscula)
     if (zonePoly && streetLayerGroup.getLayers().length > 0) {
         const streetBounds = streetLayerGroup.getBounds();
         const zoneBounds = zonePoly.getBounds();
         
-        // Creamos una copia de los límites de la zona para no modificar el original
         const finalBounds = L.latLngBounds(zoneBounds.getSouthWest(), zoneBounds.getNorthEast());
         
-        // Extendemos los límites para que siempre incluyan la calle completa
         finalBounds.extend(streetBounds);
         
-        // Ajustamos la cámara a estos nuevos límites
         gameMap.fitBounds(finalBounds, { 
             paddingTopLeft: [ui.gameUiContainer.offsetWidth + 20, 20],
             paddingBottomRight: [20, 20]
         });
     }
-    // --- FIN DE LA MODIFICACIÓN ---
+    // --- FIN DE LA CORRECCIÓN ---
 
     setReportContext({
         geometries: correctAnswer.geometries,
@@ -343,13 +331,10 @@ export function startInstintoGame({ ui, gameMap, updatePanelUI, userProfile, set
     clearAllListeners();
     setReportContext(null);
     ui.reportBtnFAB.classList.add('hidden');
-    // --- INICIO DE LA MODIFICACIÓN ---
-    // Nos aseguramos de limpiar el polígono del mapa al terminar el juego
     if (zonePoly) {
         gameMap.removeLayer(zonePoly);
         zonePoly = null;
     }
-    // --- FIN DE LA MODIFICACIÓN ---
     updatePanelUI(() => {
         ui.gameInterface.classList.add('hidden');
         ui.endGameOptions.classList.remove('hidden');
@@ -395,10 +380,7 @@ export function startInstintoGame({ ui, gameMap, updatePanelUI, userProfile, set
       next: showNextQuestion,
       clear: () => {
         clearAllListeners();
-        // --- INICIO DE LA MODIFICACIÓN ---
-        // La función clear ahora llama a la limpieza completa, que ya se encarga de zonePoly
         clearMapLayers(true);
-        // --- FIN DE LA MODIFICACIÓN ---
         setReportContext(null);
         ui.reportBtnFAB.classList.add('hidden');
       }

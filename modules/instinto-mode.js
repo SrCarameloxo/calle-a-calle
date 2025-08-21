@@ -14,9 +14,11 @@ export function startInstintoGame({ ui, gameMap, updatePanelUI, userProfile, set
 
   // --- Estado y constantes locales del MODO INSTINTO ---
   const COL_ZONE = '#663399';
+  // --- INICIO DE LA MODIFICACIÓN ---
   const COL_NEUTRAL = '#0496FF'; // Azul eléctrico
   const COL_CORRECT = '#007a2f';
   const COL_INCORRECT = '#FF0033';
+  // --- FIN DE LA MODIFICACIÓN ---
   let drawing = false;
   let zonePoly = null;
   let tempMarkers = [];
@@ -41,13 +43,6 @@ export function startInstintoGame({ ui, gameMap, updatePanelUI, userProfile, set
     });
     listeners = [];
     gameMap.off('click', addVertex); // Limpiar listener del mapa explícitamente
-  }
-
-  function clearStreetLayer() {
-    if (streetLayerGroup) {
-      gameMap.removeLayer(streetLayerGroup);
-      streetLayerGroup = null;
-    }
   }
 
   function clearMapLayers(clearFull = false) {
@@ -179,21 +174,12 @@ export function startInstintoGame({ ui, gameMap, updatePanelUI, userProfile, set
       ui.gameInterface.classList.remove('hidden');
       ui.progressBar.style.width = '0%';
       ui.reportBtnFAB.classList.remove('hidden');
-      if (zonePoly) {
-          zonePoly.setStyle({
-              color: '#696969',
-              weight: 2,
-              dashArray: '5, 5',
-              fillOpacity: 0.0
-          });
-      }
     });
     showNextQuestion();
   }
 
   function showNextQuestion() {
-    clearStreetLayer();
-
+    clearMapLayers();
     if (currentQuestionIndex >= gameQuestions.length) {
         endGame();
         return;
@@ -207,23 +193,26 @@ export function startInstintoGame({ ui, gameMap, updatePanelUI, userProfile, set
             : L.polyline(geom.points, { color: COL_NEUTRAL, weight: 8 });
         layer.addTo(streetLayerGroup);
     });
-    
-    // --- INICIO DE LA CORRECCIÓN ---
-    // El nombre de la variable es streetLayerGroup (con G mayúscula)
+
+    // --- INICIO DE LA MODIFICACIÓN ---
+    // Lógica de Zoom Inteligente
     if (zonePoly && streetLayerGroup.getLayers().length > 0) {
         const streetBounds = streetLayerGroup.getBounds();
         const zoneBounds = zonePoly.getBounds();
         
+        // Creamos una copia de los límites de la zona para no modificar el original
         const finalBounds = L.latLngBounds(zoneBounds.getSouthWest(), zoneBounds.getNorthEast());
         
+        // Extendemos los límites para que siempre incluyan la calle completa
         finalBounds.extend(streetBounds);
         
+        // Ajustamos la cámara a estos nuevos límites
         gameMap.fitBounds(finalBounds, { 
             paddingTopLeft: [ui.gameUiContainer.offsetWidth + 20, 20],
             paddingBottomRight: [20, 20]
         });
     }
-    // --- FIN DE LA CORRECCIÓN ---
+    // --- FIN DE LA MODIFICACIÓN ---
 
     setReportContext({
         geometries: correctAnswer.geometries,
@@ -304,11 +293,14 @@ export function startInstintoGame({ ui, gameMap, updatePanelUI, userProfile, set
         });
     }
     
+    // --- INICIO DE LA MODIFICACIÓN ---
+    // Añadimos la clase para atenuar sutilmente los botones no seleccionados
     allOptionBtns.forEach(btn => {
         if (btn !== clickedButton && btn.textContent !== correctAnswer.googleName) {
             btn.classList.add('option-disabled');
         }
     });
+    // --- FIN DE LA MODIFICACIÓN ---
 
     if (userProfile.settings.enable_feedback_animation) {
         ui.gameUiContainer.classList.add(pulseClass);
@@ -331,10 +323,6 @@ export function startInstintoGame({ ui, gameMap, updatePanelUI, userProfile, set
     clearAllListeners();
     setReportContext(null);
     ui.reportBtnFAB.classList.add('hidden');
-    if (zonePoly) {
-        gameMap.removeLayer(zonePoly);
-        zonePoly = null;
-    }
     updatePanelUI(() => {
         ui.gameInterface.classList.add('hidden');
         ui.endGameOptions.classList.remove('hidden');

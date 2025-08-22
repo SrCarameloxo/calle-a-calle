@@ -43,6 +43,7 @@ export function startInstintoGame({ ui, gameMap, updatePanelUI, userProfile, set
     gameMap.off('click', addVertex); // Limpiar listener del mapa explícitamente
   }
 
+  // La limpieza inteligente se mantiene, es la correcta para el polígono.
   function clearMapLayers(clearFull = false) {
     if (streetLayerGroup) gameMap.removeLayer(streetLayerGroup);
     streetLayerGroup = null;
@@ -136,10 +137,13 @@ export function startInstintoGame({ ui, gameMap, updatePanelUI, userProfile, set
         tempMarkers = [];
     }
     await preloadStreets();
+    // --- INICIO DE LA MODIFICACIÓN: Filtro de seguridad ---
+    // Añadimos un filtro para eliminar calles sin geometría antes de generar preguntas.
     const validStreetList = streetList.filter(street => street.geometries && street.geometries.length > 0);
 
     if (validStreetList.length >= 4) {
         gameQuestions = generateQuestions(validStreetList);
+        // --- FIN DE LA MODIFICACIÓN ---
         startGameFlow(gameQuestions);
     } else {
         alert('La zona seleccionada no contiene suficientes calles. El Modo Instinto requiere al menos 4 calles distintas. Por favor, dibuja una zona más grande.');
@@ -171,6 +175,7 @@ export function startInstintoGame({ ui, gameMap, updatePanelUI, userProfile, set
     currentQuestionIndex = 0;
     score = 0;
     
+    // La lógica para el estilo del polígono se mantiene como la pediste.
     if (zonePoly) {
         zonePoly.setStyle({ color: COL_ZONE, weight: 2, dashArray: null, fillOpacity: 0.1 });
     }
@@ -200,6 +205,8 @@ export function startInstintoGame({ ui, gameMap, updatePanelUI, userProfile, set
         layer.addTo(streetLayerGroup);
     });
 
+    // --- CÓDIGO DE ZOOM INTELIGENTE ELIMINADO TEMPORALMENTE PARA RESTAURAR LA FUNCIONALIDAD ---
+
     setReportContext({
         geometries: correctAnswer.geometries,
         city: userProfile.subscribedCity
@@ -224,7 +231,11 @@ export function startInstintoGame({ ui, gameMap, updatePanelUI, userProfile, set
   }
 
   function handleAnswer(selectedOption, correctAnswer, clickedButton) {
-    clearAllListeners();
+    // --- INICIO DE LA MODIFICACIÓN ---
+    // Se elimina clearAllListeners() de aquí. Es la causa principal del bug.
+    // clearAllListeners(); 
+    // Los listeners de los botones se gestionan abajo.
+    // --- FIN DE LA MODIFICACIÓN ---
     const allOptionBtns = ui.instintoOptionsContainer.querySelectorAll('button');
     allOptionBtns.forEach(btn => {
         btn.disabled = true;
@@ -303,11 +314,7 @@ export function startInstintoGame({ ui, gameMap, updatePanelUI, userProfile, set
   }
   
   function endGame() {
-    // --- INICIO DE LA MODIFICACIÓN ---
-    // NO borramos todos los listeners aquí. Esto es CRUCIAL.
-    // El listener del botón "Establecer zona" debe sobrevivir.
-    // clearAllListeners(); 
-    // --- FIN DE LA MODIFICACIÓN ---
+    clearAllListeners(); // Limpiamos solo los listeners de la partida (botones de opción, etc.)
     setReportContext(null);
     ui.reportBtnFAB.classList.add('hidden');
 

@@ -922,7 +922,7 @@ window.addEventListener('DOMContentLoaded', () => {
       // Si estamos en modo Instinto, le pedimos al módulo que limpie su mapa
       // sin destruir sus listeners principales.
       if (currentGameMode === 'instinto' && activeModeControls && typeof activeModeControls.clear === 'function') {
-        activeModeControls.clear(false); // `false` significa limpieza suave.
+        activeModeControls.clear(false); // `false` significa limpieza suave (solo mapa).
       } else {
         // Si estamos en modo Clásico (o Revancha), hacemos la limpieza normal de main.js.
         clear(true);

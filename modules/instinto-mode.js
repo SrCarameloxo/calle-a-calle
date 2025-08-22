@@ -136,8 +136,14 @@ export function startInstintoGame({ ui, gameMap, updatePanelUI, userProfile, set
         tempMarkers = [];
     }
     await preloadStreets();
-    if (streetList.length >= 4) {
-        gameQuestions = generateQuestions(streetList);
+
+    // --- INICIO DE LA MODIFICACIÓN: Filtro de seguridad ---
+    // Añadimos un filtro para eliminar "calles fantasma" antes de generar preguntas.
+    const validStreetList = streetList.filter(street => street.geometries && street.geometries.length > 0);
+
+    if (validStreetList.length >= 4) {
+        gameQuestions = generateQuestions(validStreetList);
+        // --- FIN DE LA MODIFICACIÓN ---
         startGameFlow(gameQuestions);
     } else {
         alert('La zona seleccionada no contiene suficientes calles. El Modo Instinto requiere al menos 4 calles distintas. Por favor, dibuja una zona más grande.');
@@ -198,26 +204,17 @@ export function startInstintoGame({ ui, gameMap, updatePanelUI, userProfile, set
         layer.addTo(streetLayerGroup);
     });
 
-    // --- INICIO DE LA MODIFICACIÓN: Lógica de Zoom Inteligente ---
-    // Este bloque se ejecuta solo si la calle tiene una geometría visible.
+    // Lógica de Zoom Inteligente con control de seguridad.
     if (zonePoly && streetLayerGroup.getLayers().length > 0) {
-        // 1. Obtenemos los límites de la calle y de la zona de juego.
         const streetBounds = streetLayerGroup.getBounds();
         const zoneBounds = zonePoly.getBounds();
-        
-        // 2. Creamos un marco de visión que empieza siendo el del polígono.
         const finalBounds = L.latLngBounds(zoneBounds.getSouthWest(), zoneBounds.getNorthEast());
-        
-        // 3. Extendemos ese marco para que también incluya la calle completa.
         finalBounds.extend(streetBounds);
-        
-        // 4. Ajustamos la cámara a estos nuevos límites, compensando el panel de UI.
         gameMap.fitBounds(finalBounds, { 
             paddingTopLeft: [ui.gameUiContainer.offsetWidth + 20, 20],
             paddingBottomRight: [20, 20]
         });
     }
-    // --- FIN DE LA MODIFICACIÓN ---
 
     setReportContext({
         geometries: correctAnswer.geometries,

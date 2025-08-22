@@ -6,7 +6,7 @@
  * @param {object} context - Un objeto con las herramientas de main.js.
  * @param {object} context.ui - Referencias a los elementos del DOM.
  * @param {object} context.gameMap - La instancia del mapa de Leaflet.
- * @param {object} context.updatePanelUI - La función para animar el panel de UI.
+ * @param {function} context.updatePanelUI - La función para animar el panel de UI.
  * @returns {object} Un objeto con funciones para controlar el modo desde fuera.
  */
 export function startInstintoGame({ ui, gameMap, updatePanelUI, userProfile, setReportContext }) {
@@ -43,14 +43,11 @@ export function startInstintoGame({ ui, gameMap, updatePanelUI, userProfile, set
     gameMap.off('click', addVertex); // Limpiar listener del mapa explícitamente
   }
 
-  // --- INICIO DE LA MODIFICACIÓN 1: Limpieza Inteligente ---
-  // La función ahora solo borra el polígono si se le pide explícitamente con `clearFull = true`.
+  // Se mantiene la modificación anterior de la limpieza inteligente, es correcta.
   function clearMapLayers(clearFull = false) {
-    // Siempre borramos la capa de la calle de la pregunta anterior.
     if (streetLayerGroup) gameMap.removeLayer(streetLayerGroup);
     streetLayerGroup = null;
 
-    // Solo borramos el polígono y los marcadores si es una limpieza completa.
     if (clearFull) {
         if (zonePoly) gameMap.removeLayer(zonePoly);
         tempMarkers.forEach(m => gameMap.removeLayer(m));
@@ -63,7 +60,6 @@ export function startInstintoGame({ ui, gameMap, updatePanelUI, userProfile, set
         }
     }
   }
-  // --- FIN DE LA MODIFICACIÓN 1 ---
 
   function initializeDrawingProcess() {
     updatePanelUI(() => {
@@ -174,11 +170,13 @@ export function startInstintoGame({ ui, gameMap, updatePanelUI, userProfile, set
     currentQuestionIndex = 0;
     score = 0;
     
-    // --- INICIO DE LA MODIFICACIÓN 2: Aplicar estilo de "Tablero de Juego" ---
+    // --- INICIO DE LA MODIFICACIÓN: Estilo de Juego Activo ---
+    // Nos aseguramos de que el polígono tenga su estilo de "juego activo" (sólido y morado).
+    // Esto es importante para la primera partida y también si el usuario le da a "Repetir Zona".
     if (zonePoly) {
-        zonePoly.setStyle({ color: '#696969', weight: 2, dashArray: '5, 5', fillOpacity: 0.05 });
+        zonePoly.setStyle({ color: COL_ZONE, weight: 2, dashArray: null, fillOpacity: 0.1 });
     }
-    // --- FIN DE LA MODIFICACIÓN 2 ---
+    // --- FIN DE LA MODIFICACIÓN ---
 
     updatePanelUI(() => {
       ui.gameInterface.classList.remove('hidden');
@@ -189,10 +187,8 @@ export function startInstintoGame({ ui, gameMap, updatePanelUI, userProfile, set
   }
 
   function showNextQuestion() {
-    // --- INICIO DE LA MODIFICACIÓN 3: Llamada a la limpieza parcial ---
-    // Al no pasar `true`, la función solo borrará la calle anterior, conservando el polígono.
-    clearMapLayers();
-    // --- FIN DE LA MODIFICACIÓN 3 ---
+    // La limpieza parcial se mantiene, es correcta.
+    clearMapLayers(); 
 
     if (currentQuestionIndex >= gameQuestions.length) {
         endGame();
@@ -208,8 +204,16 @@ export function startInstintoGame({ ui, gameMap, updatePanelUI, userProfile, set
         layer.addTo(streetLayerGroup);
     });
 
-    // Esta sección de zoom todavía no está aquí, como pediste.
-    // La añadiremos en el siguiente paso.
+    if (zonePoly && streetLayerGroup.getLayers().length > 0) {
+        const streetBounds = streetLayerGroup.getBounds();
+        const zoneBounds = zonePoly.getBounds();
+        const finalBounds = L.latLngBounds(zoneBounds.getSouthWest(), zoneBounds.getNorthEast());
+        finalBounds.extend(streetBounds);
+        gameMap.fitBounds(finalBounds, { 
+            paddingTopLeft: [ui.gameUiContainer.offsetWidth + 20, 20],
+            paddingBottomRight: [20, 20]
+        });
+    }
 
     setReportContext({
         geometries: correctAnswer.geometries,
@@ -290,7 +294,6 @@ export function startInstintoGame({ ui, gameMap, updatePanelUI, userProfile, set
         });
     }
     
-    // Añadimos la clase para atenuar sutilmente los botones no seleccionados
     allOptionBtns.forEach(btn => {
         if (btn !== clickedButton && btn.textContent !== correctAnswer.googleName) {
             btn.classList.add('option-disabled');
@@ -318,6 +321,14 @@ export function startInstintoGame({ ui, gameMap, updatePanelUI, userProfile, set
     clearAllListeners();
     setReportContext(null);
     ui.reportBtnFAB.classList.add('hidden');
+
+    // --- INICIO DE LA MODIFICACIÓN: Estilo de Fin de Partida ---
+    // Ahora, al final de la partida, aplicamos el estilo gris y discontinuo.
+    if (zonePoly) {
+        zonePoly.setStyle({ color: '#696969', weight: 2, dashArray: '5, 5', fillOpacity: 0.05 });
+    }
+    // --- FIN DE LA MODIFICACIÓN ---
+
     updatePanelUI(() => {
         ui.gameInterface.classList.add('hidden');
         ui.endGameOptions.classList.remove('hidden');

@@ -412,6 +412,7 @@ window.addEventListener('DOMContentLoaded', () => {
     uiElements.reviewGameBtn.addEventListener('click', enterReviewMode);
     uiElements.saveZoneBtn.addEventListener('click', saveCurrentZone);
 
+    // --- INICIO DE LA MODIFICACIÓN ---
     uiElements.backToMenuBtn.addEventListener('click', () => {
         if (currentGameMode === 'revancha') {
             if (acertadasEnSesionRevancha.size > 0) {
@@ -420,10 +421,14 @@ window.addEventListener('DOMContentLoaded', () => {
                     deleteFailedStreet(streetName);
                 });
             }
+            // Al salir de revancha, volvemos al modo clásico por defecto.
+            setGameMode('classic');
         }
-        setGameMode('classic');
+        // Para el modo Instinto, no cambiamos el modo, `resetToInitialView` se encargará.
+        // Para el modo Clásico, el modo ya es 'classic'.
         resetToInitialView();
     });
+    // --- FIN DE LA MODIFICACIÓN ---
     
     uiElements.backFromReviewBtn.addEventListener('click', exitReviewMode);
     
@@ -917,11 +922,16 @@ window.addEventListener('DOMContentLoaded', () => {
     uiElements.nextBtn.disabled = true;
   }
   
+  // --- INICIO DE LA MODIFICACIÓN ---
   function resetToInitialView() {
       if (activeModeControls && typeof activeModeControls.clear === 'function') {
         activeModeControls.clear();
       }
-      activeModeControls = null;
+      // Solo borramos los controles si no estamos en modo Instinto, ya que los reutilizaremos.
+      if (currentGameMode !== 'instinto') {
+        activeModeControls = null;
+      }
+      
       clear(true);
       streetList = [];
       totalQuestions = 0;
@@ -935,25 +945,35 @@ window.addEventListener('DOMContentLoaded', () => {
       uiElements.repeatZoneBtn.onclick = null;
       uiElements.reviewGameBtn.onclick = null;
       uiElements.saveZoneBtn.onclick = null;
+      
       updatePanelUI(() => {
           ['start-options', 'loaded-zone-options', 'checkbox-wrapper', 'game-interface', 'end-game-options', 'back-from-review-btn'].forEach(id => {
               const el = document.getElementById(id);
               if (el) el.classList.add('hidden');
           });
           uiElements.reportBtnFAB.classList.add('hidden');
-          uiElements.drawZoneBtn.classList.remove('hidden');
+
+          // Lógica para decidir qué vista de inicio mostrar
+          if (currentGameMode === 'instinto') {
+              uiElements.drawZoneBtn.classList.add('hidden'); // Ocultamos el botón del modo clásico
+              if (activeModeControls && activeModeControls.restart) {
+                  activeModeControls.restart(); // Le pedimos al módulo Instinto que se reinicie
+              }
+          } else {
+              // Para 'classic' (y 'revancha', que ya se cambió a 'classic'), mostramos el botón de dibujar zona.
+              uiElements.drawZoneBtn.classList.remove('hidden');
+          }
+
           uiElements.progressBar.style.width = '0%';
           uiElements.instintoOptionsContainer.innerHTML = '';
           uiElements.gameQuestion.textContent = '';
           uiElements.progressCounter.textContent = '';
           uiElements.scoreDisplayToggle.textContent = '';
           uiElements.streakDisplay.classList.remove('visible');
-          // --- INICIO DE LA MODIFICACIÓN ---
-          // Limpiamos el contexto de reporte al volver al menú principal
           setReportContext(null);
-          // --- FIN DE LA MODIFICACIÓN ---
       });
   }
+  // --- FIN DE LA MODIFICACIÓN ---
 
   function playFromHistory(zoneString) {
     resetToInitialView();

@@ -359,6 +359,7 @@ export function startInstintoGame({ ui, gameMap, updatePanelUI, userProfile, set
   addManagedListener(ui.drawZoneBtn, 'click', initializeDrawingProcess);
   
   // --- Devolver los Controles del Módulo ---
+  // --- INICIO DE LA MODIFICACIÓN ---
   return {
       next: showNextQuestion,
       clear: () => {
@@ -366,6 +367,8 @@ export function startInstintoGame({ ui, gameMap, updatePanelUI, userProfile, set
         clearMapLayers(true);
         setReportContext(null);
         ui.reportBtnFAB.classList.add('hidden');
-      }
+      },
+      restart: initializeDrawingProcess
   };
+  // --- FIN DE LA MODIFICACIÓN ---
 }

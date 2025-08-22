@@ -6,7 +6,7 @@
  * @param {object} context - Un objeto con las herramientas de main.js.
  * @param {object} context.ui - Referencias a los elementos del DOM.
  * @param {object} context.gameMap - La instancia del mapa de Leaflet.
- * @param {function} context.updatePanelUI - La función para animar el panel de UI.
+ * @param {object} context.updatePanelUI - La función para animar el panel de UI.
  * @returns {object} Un objeto con funciones para controlar el modo desde fuera.
  */
 export function startInstintoGame({ ui, gameMap, updatePanelUI, userProfile, setReportContext }) {
@@ -43,14 +43,14 @@ export function startInstintoGame({ ui, gameMap, updatePanelUI, userProfile, set
     gameMap.off('click', addVertex); // Limpiar listener del mapa explícitamente
   }
 
-  // --- INICIO DE LA MODIFICACIÓN 1 ---
-  // Se ha modificado esta función para que solo borre el polígono cuando se lo pedimos explícitamente.
+  // --- INICIO DE LA MODIFICACIÓN 1: Limpieza Inteligente ---
+  // La función ahora solo borra el polígono si se le pide explícitamente con `clearFull = true`.
   function clearMapLayers(clearFull = false) {
     // Siempre borramos la capa de la calle de la pregunta anterior.
     if (streetLayerGroup) gameMap.removeLayer(streetLayerGroup);
     streetLayerGroup = null;
 
-    // Solo borramos el polígono y los marcadores si es una limpieza completa (al reiniciar o salir del modo).
+    // Solo borramos el polígono y los marcadores si es una limpieza completa.
     if (clearFull) {
         if (zonePoly) gameMap.removeLayer(zonePoly);
         tempMarkers.forEach(m => gameMap.removeLayer(m));
@@ -173,9 +173,8 @@ export function startInstintoGame({ ui, gameMap, updatePanelUI, userProfile, set
   function startGameFlow(questions) {
     currentQuestionIndex = 0;
     score = 0;
-
-    // --- INICIO DE LA MODIFICACIÓN 2 ---
-    // Cambiamos el estilo del polígono para que actúe como "tablero de juego".
+    
+    // --- INICIO DE LA MODIFICACIÓN 2: Aplicar estilo de "Tablero de Juego" ---
     if (zonePoly) {
         zonePoly.setStyle({ color: '#696969', weight: 2, dashArray: '5, 5', fillOpacity: 0.05 });
     }
@@ -190,9 +189,9 @@ export function startInstintoGame({ ui, gameMap, updatePanelUI, userProfile, set
   }
 
   function showNextQuestion() {
-    // --- INICIO DE LA MODIFICACIÓN 3 ---
-    // La llamada ahora es `clearMapLayers(false)`, que preservará el polígono.
-    clearMapLayers(false);
+    // --- INICIO DE LA MODIFICACIÓN 3: Llamada a la limpieza parcial ---
+    // Al no pasar `true`, la función solo borrará la calle anterior, conservando el polígono.
+    clearMapLayers();
     // --- FIN DE LA MODIFICACIÓN 3 ---
 
     if (currentQuestionIndex >= gameQuestions.length) {
@@ -209,23 +208,8 @@ export function startInstintoGame({ ui, gameMap, updatePanelUI, userProfile, set
         layer.addTo(streetLayerGroup);
     });
 
-    // Lógica de Zoom Inteligente (sin cambios, ahora funcionará porque `zonePoly` existe)
-    if (zonePoly && streetLayerGroup.getLayers().length > 0) {
-        const streetBounds = streetLayerGroup.getBounds();
-        const zoneBounds = zonePoly.getBounds();
-        
-        // Creamos una copia de los límites de la zona para no modificar el original
-        const finalBounds = L.latLngBounds(zoneBounds.getSouthWest(), zoneBounds.getNorthEast());
-        
-        // Extendemos los límites para que siempre incluyan la calle completa
-        finalBounds.extend(streetBounds);
-        
-        // Ajustamos la cámara a estos nuevos límites
-        gameMap.fitBounds(finalBounds, { 
-            paddingTopLeft: [ui.gameUiContainer.offsetWidth + 20, 20],
-            paddingBottomRight: [20, 20]
-        });
-    }
+    // Esta sección de zoom todavía no está aquí, como pediste.
+    // La añadiremos en el siguiente paso.
 
     setReportContext({
         geometries: correctAnswer.geometries,

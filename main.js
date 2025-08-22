@@ -273,15 +273,21 @@ window.addEventListener('DOMContentLoaded', () => {
         button.addEventListener('click', () => {
             const selectedMode = button.dataset.mode;
             if (button.disabled) return;
-            resetToInitialView();
+            
+            // --- INICIO DE LA MODIFICACIÓN ---
+            // Si hay un módulo activo, llamamos a su limpieza TOTAL (nukeListeners = true)
             if (activeModeControls && typeof activeModeControls.clear === 'function') {
-                activeModeControls.clear();
+                activeModeControls.clear(true);
             }
+            // --- FIN DE LA MODIFICACIÓN ---
+
             activeModeControls = null;
             setGameMode(selectedMode);
+            resetToInitialView(); // Reset a una vista limpia antes de iniciar el nuevo modo
             uiElements.menuContentPanel.classList.add('hidden');
+
             if (selectedMode === 'classic') {
-                // No se necesita acción especial, resetToInitialView ya muestra el botón correcto.
+                uiElements.drawZoneBtn.classList.remove('hidden');
             } else if (selectedMode === 'revancha') {
                 uiElements.drawZoneBtn.classList.add('hidden');
                 startRevanchaGame({
@@ -292,6 +298,7 @@ window.addEventListener('DOMContentLoaded', () => {
                     }
                 });
             } else if (selectedMode === 'instinto') {
+                uiElements.drawZoneBtn.classList.remove('hidden');
                 activeModeControls = startInstintoGame({ 
                     ui: uiElements, 
                     gameMap: gameMap, 
@@ -912,9 +919,13 @@ window.addEventListener('DOMContentLoaded', () => {
   
   // --- INICIO DE LA MODIFICACIÓN ---
   function resetToInitialView() {
-      // La limpieza de listeners del módulo se hace al cambiar de modo, no aquí.
+      // Si venimos del modo instinto, le pedimos que limpie su mapa (sin borrar listeners)
+      if (currentGameMode === 'instinto' && activeModeControls && typeof activeModeControls.clear === 'function') {
+        activeModeControls.clear(false); // false = no borrar listeners
+      }
       
-      clear(true); // Limpia el mapa y las variables de partida.
+      // La limpieza de las variables de main.js (modo clásico)
+      clear(true);
       streetList = [];
       totalQuestions = 0;
       streetsGuessedCorrectly = 0;
@@ -927,13 +938,14 @@ window.addEventListener('DOMContentLoaded', () => {
       uiElements.repeatZoneBtn.onclick = null;
       uiElements.reviewGameBtn.onclick = null;
       uiElements.saveZoneBtn.onclick = null;
+      
       updatePanelUI(() => {
           ['start-options', 'loaded-zone-options', 'checkbox-wrapper', 'game-interface', 'end-game-options', 'back-from-review-btn'].forEach(id => {
               const el = document.getElementById(id);
               if (el) el.classList.add('hidden');
           });
           uiElements.reportBtnFAB.classList.add('hidden');
-          uiElements.drawZoneBtn.classList.remove('hidden'); // Siempre mostramos el botón al resetear.
+          uiElements.drawZoneBtn.classList.remove('hidden');
           uiElements.progressBar.style.width = '0%';
           uiElements.instintoOptionsContainer.innerHTML = '';
           uiElements.gameQuestion.textContent = '';

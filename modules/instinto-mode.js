@@ -137,13 +137,10 @@ export function startInstintoGame({ ui, gameMap, updatePanelUI, userProfile, set
         tempMarkers = [];
     }
     await preloadStreets();
-    // --- INICIO DE LA MODIFICACIÓN: Filtro de seguridad ---
-    // Añadimos un filtro para eliminar calles sin geometría antes de generar preguntas.
     const validStreetList = streetList.filter(street => street.geometries && street.geometries.length > 0);
 
     if (validStreetList.length >= 4) {
         gameQuestions = generateQuestions(validStreetList);
-        // --- FIN DE LA MODIFICACIÓN ---
         startGameFlow(gameQuestions);
     } else {
         alert('La zona seleccionada no contiene suficientes calles. El Modo Instinto requiere al menos 4 calles distintas. Por favor, dibuja una zona más grande.');
@@ -175,7 +172,6 @@ export function startInstintoGame({ ui, gameMap, updatePanelUI, userProfile, set
     currentQuestionIndex = 0;
     score = 0;
     
-    // La lógica para el estilo del polígono se mantiene como la pediste.
     if (zonePoly) {
         zonePoly.setStyle({ color: COL_ZONE, weight: 2, dashArray: null, fillOpacity: 0.1 });
     }
@@ -204,8 +200,6 @@ export function startInstintoGame({ ui, gameMap, updatePanelUI, userProfile, set
             : L.polyline(geom.points, { color: COL_NEUTRAL, weight: 8 });
         layer.addTo(streetLayerGroup);
     });
-
-    // --- CÓDIGO DE ZOOM INTELIGENTE ELIMINADO TEMPORALMENTE PARA RESTAURAR LA FUNCIONALIDAD ---
 
     setReportContext({
         geometries: correctAnswer.geometries,
@@ -310,7 +304,10 @@ export function startInstintoGame({ ui, gameMap, updatePanelUI, userProfile, set
   }
   
   function endGame() {
-    clearAllListeners();
+    // --- INICIO DE LA MODIFICACIÓN ---
+    // NO borramos los listeners aquí para que el de "Establecer Zona" siga vivo.
+    // clearAllListeners(); 
+    // --- FIN DE LA MODIFICACIÓN ---
     setReportContext(null);
     ui.reportBtnFAB.classList.add('hidden');
 
@@ -359,16 +356,20 @@ export function startInstintoGame({ ui, gameMap, updatePanelUI, userProfile, set
   addManagedListener(ui.drawZoneBtn, 'click', initializeDrawingProcess);
   
   // --- Devolver los Controles del Módulo ---
-  // --- INICIO DE LA MODIFICACIÓN ---
   return {
       next: showNextQuestion,
-      clear: () => {
-        clearAllListeners();
+      // --- INICIO DE LA MODIFICACIÓN ---
+      clear: (nukeListeners = false) => {
+        // Limpiamos las capas del mapa SIEMPRE.
         clearMapLayers(true);
         setReportContext(null);
         ui.reportBtnFAB.classList.add('hidden');
-      },
-      restart: initializeDrawingProcess
+        
+        // SOLO borramos los listeners si es una limpieza total (al cambiar de modo).
+        if (nukeListeners) {
+          clearAllListeners();
+        }
+      }
+      // --- FIN DE LA MODIFICACIÓN ---
   };
-  // --- FIN DE LA MODIFICACIÓN ---
 }

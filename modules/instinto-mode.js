@@ -14,11 +14,9 @@ export function startInstintoGame({ ui, gameMap, updatePanelUI, userProfile, set
 
   // --- Estado y constantes locales del MODO INSTINTO ---
   const COL_ZONE = '#663399';
-  // --- INICIO DE LA MODIFICACIÓN ---
   const COL_NEUTRAL = '#0496FF'; // Azul eléctrico
   const COL_CORRECT = '#007a2f';
   const COL_INCORRECT = '#FF0033';
-  // --- FIN DE LA MODIFICACIÓN ---
   let drawing = false;
   let zonePoly = null;
   let tempMarkers = [];
@@ -45,15 +43,19 @@ export function startInstintoGame({ ui, gameMap, updatePanelUI, userProfile, set
     gameMap.off('click', addVertex); // Limpiar listener del mapa explícitamente
   }
 
+  // --- INICIO DE LA MODIFICACIÓN ---
+  // Se ha modificado esta función para que solo borre el polígono cuando se lo pedimos explícitamente.
   function clearMapLayers(clearFull = false) {
+    // Siempre borramos la capa de la calle de la pregunta anterior.
     if (streetLayerGroup) gameMap.removeLayer(streetLayerGroup);
-    if (zonePoly) gameMap.removeLayer(zonePoly);
-    tempMarkers.forEach(m => gameMap.removeLayer(m));
     streetLayerGroup = null;
-    zonePoly = null;
-    tempMarkers = [];
 
+    // Solo borramos el polígono y los marcadores si es una limpieza completa (al reiniciar o salir del modo).
     if (clearFull) {
+        if (zonePoly) gameMap.removeLayer(zonePoly);
+        tempMarkers.forEach(m => gameMap.removeLayer(m));
+        zonePoly = null;
+        tempMarkers = [];
         zonePoints = [];
         if (drawing) {
             gameMap.off('click', addVertex);
@@ -61,6 +63,7 @@ export function startInstintoGame({ ui, gameMap, updatePanelUI, userProfile, set
         }
     }
   }
+  // --- FIN DE LA MODIFICACIÓN ---
 
   function initializeDrawingProcess() {
     updatePanelUI(() => {
@@ -170,6 +173,14 @@ export function startInstintoGame({ ui, gameMap, updatePanelUI, userProfile, set
   function startGameFlow(questions) {
     currentQuestionIndex = 0;
     score = 0;
+
+    // --- INICIO DE LA MODIFICACIÓN ---
+    // Cambiamos el estilo del polígono para que actúe como "tablero de juego".
+    if (zonePoly) {
+        zonePoly.setStyle({ color: '#696969', weight: 2, dashArray: '5, 5', fillOpacity: 0.05 });
+    }
+    // --- FIN DE LA MODIFICACIÓN ---
+
     updatePanelUI(() => {
       ui.gameInterface.classList.remove('hidden');
       ui.progressBar.style.width = '0%';
@@ -179,7 +190,11 @@ export function startInstintoGame({ ui, gameMap, updatePanelUI, userProfile, set
   }
 
   function showNextQuestion() {
-    clearMapLayers();
+    // --- INICIO DE LA MODIFICACIÓN ---
+    // La llamada ahora es `clearMapLayers(false)`, que preservará el polígono.
+    clearMapLayers(false);
+    // --- FIN DE LA MODIFICACIÓN ---
+
     if (currentQuestionIndex >= gameQuestions.length) {
         endGame();
         return;
@@ -194,8 +209,7 @@ export function startInstintoGame({ ui, gameMap, updatePanelUI, userProfile, set
         layer.addTo(streetLayerGroup);
     });
 
-    // --- INICIO DE LA MODIFICACIÓN ---
-    // Lógica de Zoom Inteligente
+    // Lógica de Zoom Inteligente (sin cambios, ahora funcionará porque `zonePoly` existe)
     if (zonePoly && streetLayerGroup.getLayers().length > 0) {
         const streetBounds = streetLayerGroup.getBounds();
         const zoneBounds = zonePoly.getBounds();
@@ -212,7 +226,6 @@ export function startInstintoGame({ ui, gameMap, updatePanelUI, userProfile, set
             paddingBottomRight: [20, 20]
         });
     }
-    // --- FIN DE LA MODIFICACIÓN ---
 
     setReportContext({
         geometries: correctAnswer.geometries,
@@ -293,14 +306,12 @@ export function startInstintoGame({ ui, gameMap, updatePanelUI, userProfile, set
         });
     }
     
-    // --- INICIO DE LA MODIFICACIÓN ---
     // Añadimos la clase para atenuar sutilmente los botones no seleccionados
     allOptionBtns.forEach(btn => {
         if (btn !== clickedButton && btn.textContent !== correctAnswer.googleName) {
             btn.classList.add('option-disabled');
         }
     });
-    // --- FIN DE LA MODIFICACIÓN ---
 
     if (userProfile.settings.enable_feedback_animation) {
         ui.gameUiContainer.classList.add(pulseClass);

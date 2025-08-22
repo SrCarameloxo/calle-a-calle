@@ -43,7 +43,7 @@ export function startInstintoGame({ ui, gameMap, updatePanelUI, userProfile, set
     gameMap.off('click', addVertex); // Limpiar listener del mapa explícitamente
   }
 
-  // --- INICIO DE LA MODIFICACIÓN ---
+  // --- INICIO DE LA MODIFICACIÓN 1 ---
   // Se ha modificado esta función para que solo borre el polígono cuando se lo pedimos explícitamente.
   function clearMapLayers(clearFull = false) {
     // Siempre borramos la capa de la calle de la pregunta anterior.
@@ -63,7 +63,7 @@ export function startInstintoGame({ ui, gameMap, updatePanelUI, userProfile, set
         }
     }
   }
-  // --- FIN DE LA MODIFICACIÓN ---
+  // --- FIN DE LA MODIFICACIÓN 1 ---
 
   function initializeDrawingProcess() {
     updatePanelUI(() => {
@@ -174,12 +174,12 @@ export function startInstintoGame({ ui, gameMap, updatePanelUI, userProfile, set
     currentQuestionIndex = 0;
     score = 0;
 
-    // --- INICIO DE LA MODIFICACIÓN ---
+    // --- INICIO DE LA MODIFICACIÓN 2 ---
     // Cambiamos el estilo del polígono para que actúe como "tablero de juego".
     if (zonePoly) {
         zonePoly.setStyle({ color: '#696969', weight: 2, dashArray: '5, 5', fillOpacity: 0.05 });
     }
-    // --- FIN DE LA MODIFICACIÓN ---
+    // --- FIN DE LA MODIFICACIÓN 2 ---
 
     updatePanelUI(() => {
       ui.gameInterface.classList.remove('hidden');
@@ -190,10 +190,10 @@ export function startInstintoGame({ ui, gameMap, updatePanelUI, userProfile, set
   }
 
   function showNextQuestion() {
-    // --- INICIO DE LA MODIFICACIÓN ---
+    // --- INICIO DE LA MODIFICACIÓN 3 ---
     // La llamada ahora es `clearMapLayers(false)`, que preservará el polígono.
     clearMapLayers(false);
-    // --- FIN DE LA MODIFICACIÓN ---
+    // --- FIN DE LA MODIFICACIÓN 3 ---
 
     if (currentQuestionIndex >= gameQuestions.length) {
         endGame();

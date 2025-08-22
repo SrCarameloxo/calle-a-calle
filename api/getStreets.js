@@ -174,11 +174,16 @@ module.exports = async (request, response) => {
 
         if (streetsFromDb && streetsFromDb.length > 0) {
             console.log(`¡Éxito! Se encontraron ${streetsFromDb.length} calles en Supabase DB.`);
-            // 3. Transformar los datos al formato que el resto del código espera.
+            
+            // --- INICIO DE LA MODIFICACIÓN (PASO 1) ---
+            // Ahora no solo guardamos tags e id, sino también la geometría de la base de datos.
             initialData.elements = streetsFromDb.map(street => ({
                 id: street.id,
                 tags: street.tags,
+                geometry: street.geometry 
             }));
+            // --- FIN DE LA MODIFICACIÓN (PASO 1) ---
+
         } else {
             console.log("No se encontraron calles en Supabase DB para esta zona. Pasando a Overpass.");
             throw new Error("Zona vacía en DB, se necesita fallback a Overpass.");
@@ -195,37 +200,21 @@ module.exports = async (request, response) => {
     }
     // --- FIN: BLOQUE AÑADIDO PARA EL FLUJO HÍBRIDO ---
     
-    // --- INICIO DE LA MODIFICACIÓN ---
-    // Paso 1: Cargar las reglas del editor y crear un mapa de búsqueda por ID.
-    const editorOverrideMap = new Map();
-    if (currentCity) {
-        const { data: editorOverrides, error: editorOverridesError } = await supabaseAdmin
-            .from('street_overrides') // La tabla correcta que usa el editor.
-            .select('osm_id, display_name')
-            .eq('city', currentCity);
-
-        if (editorOverridesError) {
-            console.error('Error al cargar los overrides del editor:', editorOverridesError.message);
-        } else if (editorOverrides) {
-            for (const rule of editorOverrides) {
-                editorOverrideMap.set(rule.osm_id, rule.display_name);
-            }
-        }
-    }
-    
-    // Paso 2: Crear un mapa para poder encontrar el ID de una calle a partir de su nombre.
-    const nameToIdMap = new Map();
+    // --- INICIO DE LA MODIFICACIÓN (PASO 2) ---
+    // Creamos un mapa para poder buscar geometrías por ID de forma instantánea.
+    // Este mapa solo contendrá las geometrías de nuestra base de datos, que son la "verdad absoluta".
+    const geometryMap = new Map();
     if (initialData.elements) {
         for (const el of initialData.elements) {
-            if (el.tags && el.tags.name && el.id) {
-                if (!nameToIdMap.has(el.tags.name)) {
-                    nameToIdMap.set(el.tags.name, []);
+            if (el.id && el.geometry) { // Si el elemento tiene ID y geometría (vino de Supabase)
+                if (!geometryMap.has(el.id)) {
+                    geometryMap.set(el.id, []);
                 }
-                nameToIdMap.get(el.tags.name).push(el.id);
+                geometryMap.get(el.id).push(el.geometry);
             }
         }
     }
-    // --- FIN DE LA MODIFICACIÓN ---
+    // --- FIN DE LA MODIFICACIÓN (PASO 2) ---
 
     const overrideRules = new Map();
     const blockedNames = new Set();
@@ -238,7 +227,22 @@ module.exports = async (request, response) => {
         if (!blockedError) blocked.forEach(rule => blockedNames.add(rule.osm_name));
     }
 
-    // LÍNEA CRÍTICA CORREGIDA: Nos aseguramos de que cualquier calle que procesemos tenga un nombre.
+    const editorOverrideMap = new Map();
+    if (currentCity) {
+        const { data: editorOverrides } = await supabaseAdmin.from('street_overrides').select('osm_id, display_name').eq('city', currentCity);
+        if (editorOverrides) editorOverrides.forEach(rule => editorOverrideMap.set(rule.osm_id, rule.display_name));
+    }
+    
+    const nameToIdMap = new Map();
+    if (initialData.elements) {
+        for (const el of initialData.elements) {
+            if (el.tags && el.tags.name && el.id) {
+                if (!nameToIdMap.has(el.tags.name)) nameToIdMap.set(el.tags.name, []);
+                nameToIdMap.get(el.tags.name).push(el.id);
+            }
+        }
+    }
+
     const initialOsmNames = new Set(initialData.elements.filter(el => el.tags && el.tags.name).map(el => el.tags.name));
     const streetNamesInPoly = [...initialOsmNames].filter(name => !blockedNames.has(name));
     
@@ -296,49 +300,62 @@ module.exports = async (request, response) => {
 
             if (!streetData) {
                 let processedStreet = {};
-                const rule = entity.osmNames.reduce((acc, name) => acc || overrideRules.get(name), null);
 
-                // --- INICIO DE LA MODIFICACIÓN ---
-                // Paso 3: Buscar si esta entidad tiene una regla del editor.
-                let editorRule = null;
+                // --- INICIO DE LA MODIFICACIÓN (PASO 3) ---
+                // "CONTROL DE ADUANAS": Antes de preguntar a Overpass, comprobamos si ya tenemos la geometría desde nuestra base de datos.
                 const osmIdsForEntity = entity.osmNames.flatMap(name => nameToIdMap.get(name) || []);
+                let geometriesFromDb = [];
+
+                for (const id of osmIdsForEntity) {
+                    if (geometryMap.has(id)) {
+                        geometriesFromDb.push(...geometryMap.get(id));
+                    }
+                }
+
+                if (geometriesFromDb.length > 0) {
+                    // VÍA RÁPIDA: ¡Tenemos la geometría de nuestra base de datos! La usamos y prohibimos la llamada a Overpass.
+                    console.log(`Usando geometría de la BD para '${mainOsmName}' (ID: ${osmIdsForEntity.join(', ')}). Saltando Overpass.`);
+                    
+                    processedStreet.geometries = geometriesFromDb.map(geom => {
+                        // El formato de PostGIS (GeoJSON) es [longitud, latitud]. El juego espera [latitud, longitud].
+                        const points = geom.coordinates.map(p => [p[1], p[0]]); 
+                        const isClosed = points.length > 2 && points[0][0] === points[points.length - 1][0] && points[0][1] === points[points.length - 1][1];
+                        return { points, isClosed };
+                    }).filter(g => g.points.length > 1);
+
+                } else {
+                    // VÍA LENTA (FALLBACK): La geometría no estaba en nuestra base de datos. Dejamos que el motor original pregunte a Overpass.
+                    const queryNames = entity.osmNames.map(n => `way["name"="${n}"](around:${radius}, ${center.lat}, ${center.lng});`).join('');
+                    const geometryQuery = `[out:json][timeout:25]; (${queryNames}); out body; >; out skel qt;`;
+                    let res = await fetch('https://overpass-api.de/api/interpreter', { method: 'POST', body: geometryQuery });
+                    const geomData = await res.json();
+                    const elementsById = geomData.elements.reduce((acc, el) => { acc[el.id] = el; return acc; }, {});
+                    processedStreet.geometries = geomData.elements.filter(el => el.type === 'way').map(el => ({
+                        points: (el.nodes || []).map(id => elementsById[id]).filter(Boolean).map(n => [n.lat, n.lon]),
+                        isClosed: (el.nodes || []).length > 2 && el.nodes[0] === el.nodes[el.nodes.length - 1]
+                    })).filter(g => g.points.length > 1);
+                }
+
+                if (processedStreet.geometries.length === 0) continue;
+                // --- FIN DE LA MODIFICACIÓN (PASO 3) ---
+                
+                const rule = entity.osmNames.reduce((acc, name) => acc || overrideRules.get(name), null);
+                let editorRule = null;
                 for (const id of osmIdsForEntity) {
                     if (editorOverrideMap.has(id)) {
                         editorRule = { displayName: editorOverrideMap.get(id) };
                         break;
                     }
                 }
-                // --- FIN DE LA MODIFICACIÓN ---
-
-                const queryNames = entity.osmNames.map(n => `way["name"="${n}"](around:${radius}, ${center.lat}, ${center.lng});`).join('');
-                const geometryQuery = `[out:json][timeout:25]; (${queryNames}); out body; >; out skel qt;`;
-                let res = await fetch('https://overpass-api.de/api/interpreter', { method: 'POST', body: geometryQuery });
-                const geomData = await res.json();
-                const elementsById = geomData.elements.reduce((acc, el) => { acc[el.id] = el; return acc; }, {});
-                const geometries = geomData.elements.filter(el => el.type === 'way').map(el => ({
-                    points: (el.nodes || []).map(id => elementsById[id]).filter(Boolean).map(n => [n.lat, n.lon]),
-                    isClosed: (el.nodes || []).length > 2 && el.nodes[0] === el.nodes[el.nodes.length - 1]
-                })).filter(g => g.points.length > 1);
-
-                if (geometries.length === 0) continue;
                 
-                processedStreet.geometries = geometries;
-
-                // --- INICIO DE LA MODIFICACIÓN ---
-                // Paso 4: Aplicar la nueva lógica de prioridad.
                 if (editorRule) {
-                    // VÍA 1 (MÁXIMA PRIORIDAD): La corrección del editor anula todo lo demás.
                     processedStreet.displayName = editorRule.displayName.toUpperCase();
-                
                 } else if (rule) {
-                    // VÍA 2 (PRIORIDAD MEDIA): La regla del panel de admin para corregir a Google.
                     processedStreet.displayName = rule.display_name.toUpperCase();
-                
                 } else {
-                    // VÍA 3 (NORMAL): No hay reglas, se ejecuta tu motor de "Confianza Progresiva".
-                    // --- INICIO: ALGORITMO "CONFIANZA PROGRESIVA" CON "RUEDA DE RECONOCIMIENTO" ---
+                    // --- ALGORITMO "CONFIANZA PROGRESIVA" (sin cambios) ---
                     let finalName = null;
-                    const samplePoints = geometries.flatMap(g => g.points).filter((_, i, arr) => i % Math.max(1, Math.floor(arr.length / 6)) === 0).slice(0, 6).map(p => ({ lat: p[0], lng: p[1] }));
+                    const samplePoints = processedStreet.geometries.flatMap(g => g.points).filter((_, i, arr) => i % Math.max(1, Math.floor(arr.length / 6)) === 0).slice(0, 6).map(p => ({ lat: p[0], lng: p[1] }));
                     
                     const geocodeResults = await Promise.all(samplePoints.map(pt => geocode(pt, process.env.GOOGLE_API_KEY)));
                     const geocodedNames = geocodeResults.filter(Boolean).map(geo => geo.name);
@@ -367,7 +384,7 @@ module.exports = async (request, response) => {
                                 } else {
                                     const googlePlaceDetails = await getPlaceDetails(googlePlaceId, process.env.GOOGLE_PLACES_API_KEY);
                                     if (googlePlaceDetails) {
-                                        const allPoints = geometries.flatMap(g => g.points);
+                                        const allPoints = processedStreet.geometries.flatMap(g => g.points);
                                         let avgLat = 0, avgLng = 0;
                                         allPoints.forEach(p => { avgLat += p[0]; avgLng += p[1]; });
                                         const osmCenter = { lat: avgLat / allPoints.length, lng: avgLng / allPoints.length };
@@ -396,7 +413,6 @@ module.exports = async (request, response) => {
                     processedStreet.displayName = finalName || mainOsmName.toUpperCase();
                     // --- FIN: ALGORITMO ---
                 }
-                // --- FIN DE LA MODIFICACIÓN ---
                 
                 streetData = processedStreet;
                 if(streetData.geometries && streetData.geometries.length > 0) {

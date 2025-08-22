@@ -150,38 +150,39 @@ module.exports = async (request, response) => {
     const geoResult = await geocode(center, process.env.GOOGLE_API_KEY);
     const currentCity = geoResult ? geoResult.city : null;
 
-    // --- INICIO: BLOQUE AÑADIDO PARA EL FLUJO HÍBRIDO ---
     let initialData = { elements: [] };
+    // --- INICIO DE LA MODIFICACIÓN (PASO 1) ---
+    // La "Bandera de Memoria". La inicializamos en false.
+    let isDataFromSupabase = false;
+    // --- FIN DE LA MODIFICACIÓN (PASO 1) ---
 
     try {
         // --- PLAN A: INTENTAR OBTENER CALLES DESDE SUPABASE ---
         console.log("Plan A: Intentando obtener calles desde Supabase DB...");
         
-        // 1. Convertir los puntos del polígono a formato WKT que PostGIS entiende.
         const polygonCoords = zonePoints.map(p => `${p.lng} ${p.lat}`).join(', ');
         const polygonWKT = `POLYGON((${polygonCoords}, ${zonePoints[0].lng} ${zonePoints[0].lat}))`;
 
-        // 2. Llamar a la función RPC que creamos en la base de datos.
         const { data: streetsFromDb, error: rpcError } = await supabaseAdmin.rpc('get_streets_in_polygon', {
             polygon_wkt: polygonWKT
         });
 
         if (rpcError) {
-            console.error("Error en RPC de Supabase (probablemente geometría inválida), pasando a Overpass:", rpcError.message);
-            // CORRECCIÓN: NO lanzamos un error, forzamos el fallback creando una excepción controlada.
             throw new Error("Fallback a Overpass por error en RPC."); 
         }
 
         if (streetsFromDb && streetsFromDb.length > 0) {
             console.log(`¡Éxito! Se encontraron ${streetsFromDb.length} calles en Supabase DB.`);
             
-            // --- INICIO DE LA MODIFICACIÓN (PASO 1) ---
-            // Ahora no solo guardamos tags e id, sino también la geometría de la base de datos.
             initialData.elements = streetsFromDb.map(street => ({
                 id: street.id,
                 tags: street.tags,
                 geometry: street.geometry 
             }));
+
+            // --- INICIO DE LA MODIFICACIÓN (PASO 1) ---
+            // Si el Plan A funcionó, levantamos la bandera.
+            isDataFromSupabase = true;
             // --- FIN DE LA MODIFICACIÓN (PASO 1) ---
 
         } else {
@@ -198,15 +199,11 @@ module.exports = async (request, response) => {
         if (!res.ok) throw new Error(`Overpass API error: ${res.statusText}`);
         initialData = await res.json();
     }
-    // --- FIN: BLOQUE AÑADIDO PARA EL FLUJO HÍBRIDO ---
     
-    // --- INICIO DE LA MODIFICACIÓN (PASO 2) ---
-    // Creamos un mapa para poder buscar geometrías por ID de forma instantánea.
-    // Este mapa solo contendrá las geometrías de nuestra base de datos, que son la "verdad absoluta".
     const geometryMap = new Map();
     if (initialData.elements) {
         for (const el of initialData.elements) {
-            if (el.id && el.geometry) { // Si el elemento tiene ID y geometría (vino de Supabase)
+            if (el.id && el.geometry) {
                 if (!geometryMap.has(el.id)) {
                     geometryMap.set(el.id, []);
                 }
@@ -214,7 +211,6 @@ module.exports = async (request, response) => {
             }
         }
     }
-    // --- FIN DE LA MODIFICACIÓN (PASO 2) ---
 
     const overrideRules = new Map();
     const blockedNames = new Set();
@@ -268,12 +264,8 @@ module.exports = async (request, response) => {
         if (groupTypes.size > 1) {
             const hasAreaType = [...groupTypes].some(type => AREA_TYPES.has(type));
             const hasLineType = [...groupTypes].some(type => LINE_TYPES.has(type) || type === null);
-            if (hasAreaType && hasLineType) {
-                shouldSplit = true;
-            }
-            if (!hasAreaType && new Set([...groupTypes].filter(t => t !== null)).size > 1) {
-                shouldSplit = true;
-            }
+            if (hasAreaType && hasLineType) shouldSplit = true;
+            if (!hasAreaType && new Set([...groupTypes].filter(t => t !== null)).size > 1) shouldSplit = true;
         }
 
         let entitiesToProcess = [];
@@ -283,10 +275,7 @@ module.exports = async (request, response) => {
                 osmNames: [item.osmName]
             }));
         } else {
-            entitiesToProcess = [{
-                id: baseName,
-                osmNames: group.map(item => item.osmName)
-            }];
+            entitiesToProcess = [{ id: baseName, osmNames: group.map(item => item.osmName) }];
         }
         
         for (const entity of entitiesToProcess) {
@@ -301,30 +290,33 @@ module.exports = async (request, response) => {
             if (!streetData) {
                 let processedStreet = {};
 
-                // --- INICIO DE LA MODIFICACIÓN (PASO 3) ---
-                // "CONTROL DE ADUANAS": Antes de preguntar a Overpass, comprobamos si ya tenemos la geometría desde nuestra base de datos.
-                const osmIdsForEntity = entity.osmNames.flatMap(name => nameToIdMap.get(name) || []);
-                let geometriesFromDb = [];
+                // --- INICIO DE LA MODIFICACIÓN (PASO 2 y 3) ---
+                // "CONTROL DE FRONTERAS": Usamos la bandera para decidir el camino.
+                if (isDataFromSupabase) {
+                    // **CAMINO A: La bandera está levantada. PROHIBIDO hablar con Overpass.**
+                    const osmIdsForEntity = entity.osmNames.flatMap(name => nameToIdMap.get(name) || []);
+                    let geometriesFromDb = [];
 
-                for (const id of osmIdsForEntity) {
-                    if (geometryMap.has(id)) {
-                        geometriesFromDb.push(...geometryMap.get(id));
+                    for (const id of osmIdsForEntity) {
+                        if (geometryMap.has(id)) {
+                            geometriesFromDb.push(...geometryMap.get(id));
+                        }
                     }
-                }
-
-                if (geometriesFromDb.length > 0) {
-                    // VÍA RÁPIDA: ¡Tenemos la geometría de nuestra base de datos! La usamos y prohibimos la llamada a Overpass.
-                    console.log(`Usando geometría de la BD para '${mainOsmName}' (ID: ${osmIdsForEntity.join(', ')}). Saltando Overpass.`);
                     
-                    processedStreet.geometries = geometriesFromDb.map(geom => {
-                        // El formato de PostGIS (GeoJSON) es [longitud, latitud]. El juego espera [latitud, longitud].
-                        const points = geom.coordinates.map(p => [p[1], p[0]]); 
-                        const isClosed = points.length > 2 && points[0][0] === points[points.length - 1][0] && points[0][1] === points[points.length - 1][1];
-                        return { points, isClosed };
-                    }).filter(g => g.points.length > 1);
+                    if (geometriesFromDb.length > 0) {
+                        console.log(`[BD-MODE] Usando geometría de Supabase para '${mainOsmName}'.`);
+                        processedStreet.geometries = geometriesFromDb.map(geom => {
+                            const points = geom.coordinates.map(p => [p[1], p[0]]); 
+                            const isClosed = points.length > 2 && points[0][0] === points[points.length - 1][0] && points[0][1] === points[points.length - 1][1];
+                            return { points, isClosed };
+                        }).filter(g => g.points.length > 1);
+                    } else {
+                       processedStreet.geometries = []; // Si no hay geometría en la DB, no hay nada que mostrar.
+                    }
 
                 } else {
-                    // VÍA LENTA (FALLBACK): La geometría no estaba en nuestra base de datos. Dejamos que el motor original pregunte a Overpass.
+                    // **CAMINO B: La bandera está bajada. Se permite el flujo original a Overpass.**
+                    console.log(`[OVERPASS-MODE] Buscando geometría en Overpass para '${mainOsmName}'.`);
                     const queryNames = entity.osmNames.map(n => `way["name"="${n}"](around:${radius}, ${center.lat}, ${center.lng});`).join('');
                     const geometryQuery = `[out:json][timeout:25]; (${queryNames}); out body; >; out skel qt;`;
                     let res = await fetch('https://overpass-api.de/api/interpreter', { method: 'POST', body: geometryQuery });
@@ -335,12 +327,13 @@ module.exports = async (request, response) => {
                         isClosed: (el.nodes || []).length > 2 && el.nodes[0] === el.nodes[el.nodes.length - 1]
                     })).filter(g => g.points.length > 1);
                 }
+                // --- FIN DE LA MODIFICACIÓN (PASO 2 y 3) ---
 
                 if (processedStreet.geometries.length === 0) continue;
-                // --- FIN DE LA MODIFICACIÓN (PASO 3) ---
                 
                 const rule = entity.osmNames.reduce((acc, name) => acc || overrideRules.get(name), null);
                 let editorRule = null;
+                const osmIdsForEntity = entity.osmNames.flatMap(name => nameToIdMap.get(name) || []);
                 for (const id of osmIdsForEntity) {
                     if (editorOverrideMap.has(id)) {
                         editorRule = { displayName: editorOverrideMap.get(id) };
@@ -353,20 +346,15 @@ module.exports = async (request, response) => {
                 } else if (rule) {
                     processedStreet.displayName = rule.display_name.toUpperCase();
                 } else {
-                    // --- ALGORITMO "CONFIANZA PROGRESIVA" (sin cambios) ---
                     let finalName = null;
                     const samplePoints = processedStreet.geometries.flatMap(g => g.points).filter((_, i, arr) => i % Math.max(1, Math.floor(arr.length / 6)) === 0).slice(0, 6).map(p => ({ lat: p[0], lng: p[1] }));
-                    
                     const geocodeResults = await Promise.all(samplePoints.map(pt => geocode(pt, process.env.GOOGLE_API_KEY)));
                     const geocodedNames = geocodeResults.filter(Boolean).map(geo => geo.name);
-
                     if (geocodedNames.length > 0) {
                         const nameCounts = geocodedNames.reduce((acc, name) => { acc[name] = (acc[name] || 0) + 1; return acc; }, {});
                         const googleWinnerName = Object.keys(nameCounts).reduce((a, b) => nameCounts[a] > nameCounts[b] ? a : b);
-
                         const osmParts = extractNameParts(mainOsmName);
                         const googleParts = extractNameParts(googleWinnerName);
-                        
                         const isTypoCorrection = osmParts.type === googleParts.type && levenshtein(osmParts.baseName, googleParts.baseName) <= 2;
                         const isWordCountMatch = osmParts.type === googleParts.type && areNamesSimilarByWordCount(osmParts.baseName, googleParts.baseName);
 
@@ -388,12 +376,10 @@ module.exports = async (request, response) => {
                                         let avgLat = 0, avgLng = 0;
                                         allPoints.forEach(p => { avgLat += p[0]; avgLng += p[1]; });
                                         const osmCenter = { lat: avgLat / allPoints.length, lng: avgLng / allPoints.length };
-                                        
                                         const distance = getDistance(osmCenter, googlePlaceDetails.location);
                                         if (distance < 6) {
                                             finalName = googleWinnerName;
                                         } else {
-                                            console.warn(`[Fallback] Rueda: '${googleWinnerName}' y '${mainOsmName}' son lugares distintos (${Math.round(distance)}m). Usando OSM.`);
                                             finalName = mainOsmName.toUpperCase();
                                         }
                                     } else {
@@ -401,17 +387,13 @@ module.exports = async (request, response) => {
                                     }
                                  }
                             } else if (googlePlaceId && !osmPlaceId) {
-                                console.warn(`Rueda: Google no conoce '${mainOsmName}', pero la votación encontró '${googleWinnerName}'. Confiando en la votación.`);
                                 finalName = googleWinnerName;
                             } else {
-                                console.warn(`[Fallback] Rueda: No se encontró Place ID para '${googleWinnerName}' o '${mainOsmName}'. Usando OSM.`);
                                 finalName = mainOsmName.toUpperCase();
                             }
                         }
                     }
-
                     processedStreet.displayName = finalName || mainOsmName.toUpperCase();
-                    // --- FIN: ALGORITMO ---
                 }
                 
                 streetData = processedStreet;
@@ -426,13 +408,9 @@ module.exports = async (request, response) => {
             
             const hasLines = streetData.geometries.some(g => !g.isClosed);
             const hasAreas = streetData.geometries.some(g => g.isClosed);
-            if (hasLines && hasAreas) {
-                streetData.geometries = streetData.geometries.filter(g => !g.isClosed);
-            }
+            if (hasLines && hasAreas) streetData.geometries = streetData.geometries.filter(g => !g.isClosed);
             const finalGeomHasArea = streetData.geometries.some(g => g.isClosed);
-            if (!POIsAllowed && finalGeomHasArea) {
-                continue;
-            }
+            if (!POIsAllowed && finalGeomHasArea) continue;
 
             seenIds.add(entity.id);
             finalStreetList.push({
@@ -442,7 +420,6 @@ module.exports = async (request, response) => {
         }
     }
     
-    // --- INICIO: ENSAMBLADOR DE CALLES ---
     const callesEnsambladas = new Map();
     for (const calle of finalStreetList) {
         if (callesEnsambladas.has(calle.googleName)) {
@@ -452,7 +429,6 @@ module.exports = async (request, response) => {
         }
     }
     const assembledStreetList = Array.from(callesEnsambladas.values());
-    // --- FIN: ENSAMBLADOR DE CALLES ---
     
     assembledStreetList.sort(() => Math.random() - 0.5);
     response.status(200).json({ streets: assembledStreetList });

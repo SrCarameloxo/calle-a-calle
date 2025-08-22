@@ -5,7 +5,7 @@ import { startInstintoGame } from './modules/instinto-mode.js';
 window.addEventListener('DOMContentLoaded', () => {
 
   const SUPABASE_URL = 'https://hppzwfwtedghpsxfonoh.supabase.co';
-  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhwcHp3Znd0ZWRnaHBzeGZvbm9oIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQxMjQzNDMsImV4cCI6MjA2OTcwMDM0M30.BAh6i5iJ5YkDBoydfkC9azAD4eMdYBkEBdxws9kj5Hg';
+  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhwcHp3Znd0ZWRnaHBzeGZvbm9oIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQxMjQzNDMsImV4cCI6MjA2OTcwMDM4M30.BAh6i5iJ5YkDBoydfkC9azAD4eMdYBkEBdxws9kj5Hg';
   // Hacemos que supabaseClient sea accesible globalmente para que los módulos puedan usarlo.
   window.supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
@@ -927,7 +927,9 @@ window.addEventListener('DOMContentLoaded', () => {
       if (activeModeControls && typeof activeModeControls.clear === 'function') {
         activeModeControls.clear();
       }
-      // Solo borramos los controles si no estamos en modo Instinto, ya que los reutilizaremos.
+      
+      // Si estamos en un modo que no sea 'instinto', eliminamos los controles.
+      // Si es 'instinto', los mantenemos para que el botón "Establecer zona" siga funcionando.
       if (currentGameMode !== 'instinto') {
         activeModeControls = null;
       }
@@ -945,31 +947,25 @@ window.addEventListener('DOMContentLoaded', () => {
       uiElements.repeatZoneBtn.onclick = null;
       uiElements.reviewGameBtn.onclick = null;
       uiElements.saveZoneBtn.onclick = null;
-      
+
       updatePanelUI(() => {
           ['start-options', 'loaded-zone-options', 'checkbox-wrapper', 'game-interface', 'end-game-options', 'back-from-review-btn'].forEach(id => {
               const el = document.getElementById(id);
               if (el) el.classList.add('hidden');
           });
           uiElements.reportBtnFAB.classList.add('hidden');
-
-          // Lógica para decidir qué vista de inicio mostrar
-          if (currentGameMode === 'instinto') {
-              uiElements.drawZoneBtn.classList.add('hidden'); // Ocultamos el botón del modo clásico
-              if (activeModeControls && activeModeControls.restart) {
-                  activeModeControls.restart(); // Le pedimos al módulo Instinto que se reinicie
-              }
-          } else {
-              // Para 'classic' (y 'revancha', que ya se cambió a 'classic'), mostramos el botón de dibujar zona.
-              uiElements.drawZoneBtn.classList.remove('hidden');
-          }
-
+          
+          // Tanto para el modo Clásico como para el modo Instinto, la vista inicial
+          // consiste en mostrar el botón de "Establecer zona".
+          uiElements.drawZoneBtn.classList.remove('hidden');
+          
           uiElements.progressBar.style.width = '0%';
           uiElements.instintoOptionsContainer.innerHTML = '';
           uiElements.gameQuestion.textContent = '';
           uiElements.progressCounter.textContent = '';
           uiElements.scoreDisplayToggle.textContent = '';
           uiElements.streakDisplay.classList.remove('visible');
+          // Limpiamos el contexto de reporte al volver al menú principal
           setReportContext(null);
       });
   }

@@ -88,16 +88,11 @@ window.addEventListener('DOMContentLoaded', () => {
   let currentGameMode = 'classic'; 
   let acertadasEnSesionRevancha = new Set();
   let activeModeControls = null;
-  // --- INICIO DE LA MODIFICACIÓN ---
-  let currentReportContext = null; // Variable para el reporte contextual
-  // --- FIN DE LA MODIFICACIÓN ---
+  let currentReportContext = null;
 
-  // --- INICIO DE LA MODIFICACIÓN ---
-  // Función para que los módulos puedan establecer el contexto del reporte
   function setReportContext(context) {
       currentReportContext = context;
   }
-  // --- FIN DE LA MODIFICACIÓN ---
 
   function setGameMode(mode) {
     if (!mode) return;
@@ -286,6 +281,7 @@ window.addEventListener('DOMContentLoaded', () => {
             setGameMode(selectedMode);
             uiElements.menuContentPanel.classList.add('hidden');
             if (selectedMode === 'classic') {
+                // No se necesita acción especial, resetToInitialView ya muestra el botón correcto.
             } else if (selectedMode === 'revancha') {
                 uiElements.drawZoneBtn.classList.add('hidden');
                 startRevanchaGame({
@@ -296,8 +292,6 @@ window.addEventListener('DOMContentLoaded', () => {
                     }
                 });
             } else if (selectedMode === 'instinto') {
-                // --- INICIO DE LA MODIFICACIÓN ---
-                // Pasamos la función setReportContext al módulo del modo instinto
                 activeModeControls = startInstintoGame({ 
                     ui: uiElements, 
                     gameMap: gameMap, 
@@ -305,7 +299,6 @@ window.addEventListener('DOMContentLoaded', () => {
                     userProfile: userProfile,
                     setReportContext: setReportContext 
                 });
-                // --- FIN DE LA MODIFICACIÓN ---
             }
         });
     });
@@ -412,6 +405,7 @@ window.addEventListener('DOMContentLoaded', () => {
     uiElements.reviewGameBtn.addEventListener('click', enterReviewMode);
     uiElements.saveZoneBtn.addEventListener('click', saveCurrentZone);
 
+    // --- INICIO DE LA MODIFICACIÓN ---
     uiElements.backToMenuBtn.addEventListener('click', () => {
         if (currentGameMode === 'revancha') {
             if (acertadasEnSesionRevancha.size > 0) {
@@ -420,10 +414,13 @@ window.addEventListener('DOMContentLoaded', () => {
                     deleteFailedStreet(streetName);
                 });
             }
+            // Al salir de revancha, volvemos al modo clásico por defecto.
+            setGameMode('classic');
         }
-        setGameMode('classic');
+        // Para Instinto y Clásico, no cambiamos el modo, simplemente reseteamos la vista.
         resetToInitialView();
     });
+    // --- FIN DE LA MODIFICACIÓN ---
     
     uiElements.backFromReviewBtn.addEventListener('click', exitReviewMode);
     
@@ -917,11 +914,18 @@ window.addEventListener('DOMContentLoaded', () => {
     uiElements.nextBtn.disabled = true;
   }
   
+  // --- INICIO DE LA MODIFICACIÓN ---
   function resetToInitialView() {
       if (activeModeControls && typeof activeModeControls.clear === 'function') {
         activeModeControls.clear();
       }
-      activeModeControls = null;
+      
+      // Si el modo actual NO es 'instinto', borramos los controles del módulo.
+      // Si ES 'instinto', los mantenemos para que su listener en 'drawZoneBtn' siga activo.
+      if (currentGameMode !== 'instinto') {
+        activeModeControls = null;
+      }
+      
       clear(true);
       streetList = [];
       totalQuestions = 0;
@@ -941,19 +945,20 @@ window.addEventListener('DOMContentLoaded', () => {
               if (el) el.classList.add('hidden');
           });
           uiElements.reportBtnFAB.classList.add('hidden');
+
+          // La pantalla de inicio tanto para Clásico como para Instinto es el botón de dibujar.
           uiElements.drawZoneBtn.classList.remove('hidden');
+
           uiElements.progressBar.style.width = '0%';
           uiElements.instintoOptionsContainer.innerHTML = '';
           uiElements.gameQuestion.textContent = '';
           uiElements.progressCounter.textContent = '';
           uiElements.scoreDisplayToggle.textContent = '';
           uiElements.streakDisplay.classList.remove('visible');
-          // --- INICIO DE LA MODIFICACIÓN ---
-          // Limpiamos el contexto de reporte al volver al menú principal
           setReportContext(null);
-          // --- FIN DE LA MODIFICACIÓN ---
       });
   }
+  // --- FIN DE LA MODIFICACIÓN ---
 
   function playFromHistory(zoneString) {
     resetToInitialView();
@@ -1011,8 +1016,6 @@ window.addEventListener('DOMContentLoaded', () => {
       startGameFlow();
   }
 
-  // --- INICIO DE LA MODIFICACIÓN ---
-  // La función de reporte ahora es más inteligente y usa el contexto
   async function reportIncident() {
     let pointsToReport;
     let cityToReport = userProfile.subscribedCity;
@@ -1044,8 +1047,6 @@ window.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        // Para geometrías de una sola línea (Modo Instinto), no necesitamos cerrar el polígono.
-        // Para polígonos (Modo Clásico), el formato ya es correcto.
         const zoneString = pointsToReport.map(p => `${p.lat},${p.lng}`).join(';');
         
         const requestBody = {
@@ -1070,7 +1071,6 @@ window.addEventListener('DOMContentLoaded', () => {
       alert(`Hubo un error al enviar tu reporte: ${error.message}`);
     }
   }
-  // --- FIN DE LA MODIFICACIÓN ---
 
 async function saveFailedStreet(streetData) {
     try {

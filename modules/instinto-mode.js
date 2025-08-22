@@ -335,6 +335,7 @@ export function startInstintoGame({ ui, gameMap, updatePanelUI, userProfile, set
             startGameFlow(gameQuestions.sort(() => Math.random() - 0.5));
         };
         addManagedListener(ui.repeatZoneBtn, 'click', repeatListener, { once: true });
+        addManagedListener(ui.drawZoneBtn, 'click', initializeDrawingProcess);
         ui.backToMenuBtn.classList.remove('hidden');
     });
   }

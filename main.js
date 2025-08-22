@@ -917,7 +917,6 @@ window.addEventListener('DOMContentLoaded', () => {
     uiElements.nextBtn.disabled = true;
   }
   
-  // --- INICIO DE LA MODIFICACIÓN ---
   function resetToInitialView() {
       // Si estamos en modo Instinto, le pedimos al módulo que limpie su mapa
       // sin destruir sus listeners principales.
@@ -959,7 +958,6 @@ window.addEventListener('DOMContentLoaded', () => {
           setReportContext(null);
       });
   }
-  // --- FIN DE LA MODIFICACIÓN ---
 
   function playFromHistory(zoneString) {
     resetToInitialView();
@@ -969,7 +967,35 @@ window.addEventListener('DOMContentLoaded', () => {
       return { lat: parseFloat(lat), lng: parseFloat(lng) };
     });
     if (points.length < 3) return;
+
+    // --- INICIO DE LA MODIFICACIÓN ---
+    if (currentGameMode === 'instinto') {
+        if (activeModeControls && activeModeControls.startWithZone) {
+            // Preparamos los datos de la zona para el módulo Instinto.
+            const instintoZonePoints = points.map(p => L.latLng(p.lat, p.lng));
+            
+            // main.js sigue siendo responsable de dibujar la capa inicial y centrar el mapa.
+            zonePoints = instintoZonePoints; // Actualizamos la variable global
+            zonePoly = L.polygon(zonePoints, { color: COL_ZONE, weight: 2, fillOpacity: 0.1 }).addTo(gameMap);
+            
+            // Delegamos el inicio de la partida al módulo Instinto.
+            activeModeControls.startWithZone(instintoZonePoints);
+
+            // Tareas finales de UI
+            uiElements.menuContentPanel.classList.add('hidden'); 
+            recenterMapWithPadding(zonePoly.getBounds());
+            
+            // Salimos de la función para no ejecutar la lógica del modo clásico.
+            return; 
+        } else {
+             console.error("Error: Modo Instinto activo pero su controlador no está disponible.");
+             alert("Ha ocurrido un error al cargar la zona en Modo Instinto.");
+             return;
+        }
+    }
+    // --- FIN DE LA MODIFICACIÓN ---
     
+    // El código original para el modo clásico se ejecuta si no se entró en el if anterior.
     updatePanelUI(() => {
         uiElements.drawZoneBtn.classList.add('hidden');
         tempMarkers.forEach(m => gameMap.removeLayer(m));

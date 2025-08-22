@@ -360,13 +360,45 @@ export function startInstintoGame({ ui, gameMap, updatePanelUI, userProfile, set
       }
   }
 
+  // --- INICIO DE LA MODIFICACIÓN ---
+  /**
+   * Inicia una partida directamente con una zona predefinida,
+   * saltándose el paso de dibujado manual.
+   * @param {L.LatLng[]} predefinedPoints - Un array de puntos de Leaflet para la zona.
+   */
+  async function startWithPredefinedZone(predefinedPoints) {
+    // Establecemos la zona internamente y ocultamos la UI de inicio
+    zonePoints = predefinedPoints;
+    // zonePoly ya ha sido dibujado por main.js, así que no necesitamos crearlo aquí.
+    
+    updatePanelUI(() => {
+        ui.drawZoneBtn.classList.add('hidden');
+        ui.startOptions.classList.add('hidden');
+        ui.loadedZoneOptions.classList.add('hidden');
+    });
+
+    // Ejecutamos la misma lógica que al pulsar "Start"
+    await preloadStreets();
+    const validStreetList = streetList.filter(street => street.geometries && street.geometries.length > 0);
+
+    if (validStreetList.length >= 4) {
+        gameQuestions = generateQuestions(validStreetList);
+        startGameFlow(gameQuestions);
+    } else {
+        alert('La zona seleccionada no contiene suficientes calles. El Modo Instinto requiere al menos 4 calles distintas. Por favor, selecciona otra zona o dibuja una más grande.');
+        ui.drawZoneBtn.classList.remove('hidden');
+        addManagedListener(ui.drawZoneBtn, 'click', initializeDrawingProcess);
+        clearMapLayers(true);
+    }
+  }
+  // --- FIN DE LA MODIFICACIÓN ---
+
   // --- Punto de Entrada Inicial del Módulo ---
   addManagedListener(ui.drawZoneBtn, 'click', initializeDrawingProcess);
   
   // --- Devolver los Controles del Módulo ---
   return {
       next: showNextQuestion,
-      // --- INICIO DE LA MODIFICACIÓN ---
       clear: (nukeListeners = false) => {
         // Limpia el mapa de polígonos y capas de juego.
         clearMapLayers(true);
@@ -378,7 +410,9 @@ export function startInstintoGame({ ui, gameMap, updatePanelUI, userProfile, set
           console.log("Modo Instinto: Realizando limpieza total de listeners.");
           clearAllListeners();
         }
-      }
+      },
+      // --- INICIO DE LA MODIFICACIÓN ---
+      startWithZone: startWithPredefinedZone
       // --- FIN DE LA MODIFICACIÓN ---
   };
 }

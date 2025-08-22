@@ -405,7 +405,6 @@ window.addEventListener('DOMContentLoaded', () => {
     uiElements.reviewGameBtn.addEventListener('click', enterReviewMode);
     uiElements.saveZoneBtn.addEventListener('click', saveCurrentZone);
 
-    // --- INICIO DE LA MODIFICACIÓN ---
     uiElements.backToMenuBtn.addEventListener('click', () => {
         if (currentGameMode === 'revancha') {
             if (acertadasEnSesionRevancha.size > 0) {
@@ -414,13 +413,10 @@ window.addEventListener('DOMContentLoaded', () => {
                     deleteFailedStreet(streetName);
                 });
             }
-            // Al salir de revancha, volvemos al modo clásico por defecto.
             setGameMode('classic');
         }
-        // Para Instinto y Clásico, no cambiamos el modo, simplemente reseteamos la vista.
         resetToInitialView();
     });
-    // --- FIN DE LA MODIFICACIÓN ---
     
     uiElements.backFromReviewBtn.addEventListener('click', exitReviewMode);
     
@@ -916,17 +912,9 @@ window.addEventListener('DOMContentLoaded', () => {
   
   // --- INICIO DE LA MODIFICACIÓN ---
   function resetToInitialView() {
-      if (activeModeControls && typeof activeModeControls.clear === 'function') {
-        activeModeControls.clear();
-      }
+      // La limpieza de listeners del módulo se hace al cambiar de modo, no aquí.
       
-      // Si el modo actual NO es 'instinto', borramos los controles del módulo.
-      // Si ES 'instinto', los mantenemos para que su listener en 'drawZoneBtn' siga activo.
-      if (currentGameMode !== 'instinto') {
-        activeModeControls = null;
-      }
-      
-      clear(true);
+      clear(true); // Limpia el mapa y las variables de partida.
       streetList = [];
       totalQuestions = 0;
       streetsGuessedCorrectly = 0;
@@ -945,10 +933,7 @@ window.addEventListener('DOMContentLoaded', () => {
               if (el) el.classList.add('hidden');
           });
           uiElements.reportBtnFAB.classList.add('hidden');
-
-          // La pantalla de inicio tanto para Clásico como para Instinto es el botón de dibujar.
-          uiElements.drawZoneBtn.classList.remove('hidden');
-
+          uiElements.drawZoneBtn.classList.remove('hidden'); // Siempre mostramos el botón al resetear.
           uiElements.progressBar.style.width = '0%';
           uiElements.instintoOptionsContainer.innerHTML = '';
           uiElements.gameQuestion.textContent = '';
@@ -1022,12 +1007,10 @@ window.addEventListener('DOMContentLoaded', () => {
     let contextDescription = "Incidencia en zona general.";
 
     if (currentReportContext) {
-        // Estamos en un modo con contexto (Instinto)
         pointsToReport = currentReportContext.geometries.flatMap(g => g.points.map(p => ({ lat: p[0], lng: p[1] })));
         cityToReport = currentReportContext.city;
         contextDescription = "Incidencia sobre una calle específica.";
     } else {
-        // Comportamiento normal (Modo Clásico)
         pointsToReport = playing ? zonePoints : lastGameZonePoints;
         contextDescription = "Incidencia en zona general.";
     }

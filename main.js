@@ -283,7 +283,7 @@ window.addEventListener('DOMContentLoaded', () => {
 
             activeModeControls = null;
             setGameMode(selectedMode);
-            resetToInitialView(); // Reset a una vista limpia antes de iniciar el nuevo modo
+            resetToInitialView();
             uiElements.menuContentPanel.classList.add('hidden');
 
             if (selectedMode === 'classic') {
@@ -919,13 +919,16 @@ window.addEventListener('DOMContentLoaded', () => {
   
   // --- INICIO DE LA MODIFICACIÓN ---
   function resetToInitialView() {
-      // Si venimos del modo instinto, le pedimos que limpie su mapa (sin borrar listeners)
+      // Si estamos en modo Instinto, le pedimos al módulo que limpie su mapa
+      // sin destruir sus listeners principales.
       if (currentGameMode === 'instinto' && activeModeControls && typeof activeModeControls.clear === 'function') {
-        activeModeControls.clear(false); // false = no borrar listeners
+        activeModeControls.clear(false); // `false` significa limpieza suave.
+      } else {
+        // Si estamos en modo Clásico (o Revancha), hacemos la limpieza normal de main.js.
+        clear(true);
       }
       
-      // La limpieza de las variables de main.js (modo clásico)
-      clear(true);
+      // Limpiamos las variables de estado del juego de main.js.
       streetList = [];
       totalQuestions = 0;
       streetsGuessedCorrectly = 0;
@@ -939,13 +942,14 @@ window.addEventListener('DOMContentLoaded', () => {
       uiElements.reviewGameBtn.onclick = null;
       uiElements.saveZoneBtn.onclick = null;
       
+      // Actualizamos la UI para mostrar la vista de inicio.
       updatePanelUI(() => {
           ['start-options', 'loaded-zone-options', 'checkbox-wrapper', 'game-interface', 'end-game-options', 'back-from-review-btn'].forEach(id => {
               const el = document.getElementById(id);
               if (el) el.classList.add('hidden');
           });
           uiElements.reportBtnFAB.classList.add('hidden');
-          uiElements.drawZoneBtn.classList.remove('hidden');
+          uiElements.drawZoneBtn.classList.remove('hidden'); // Siempre mostramos el botón al resetear.
           uiElements.progressBar.style.width = '0%';
           uiElements.instintoOptionsContainer.innerHTML = '';
           uiElements.gameQuestion.textContent = '';

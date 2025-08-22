@@ -43,7 +43,6 @@ export function startInstintoGame({ ui, gameMap, updatePanelUI, userProfile, set
     gameMap.off('click', addVertex); // Limpiar listener del mapa explícitamente
   }
 
-  // La limpieza inteligente se mantiene, es la correcta para el polígono.
   function clearMapLayers(clearFull = false) {
     if (streetLayerGroup) gameMap.removeLayer(streetLayerGroup);
     streetLayerGroup = null;
@@ -305,7 +304,8 @@ export function startInstintoGame({ ui, gameMap, updatePanelUI, userProfile, set
   
   function endGame() {
     // --- INICIO DE LA MODIFICACIÓN ---
-    // NO borramos los listeners aquí para que el de "Establecer Zona" siga vivo.
+    // NO borramos todos los listeners aquí. Esto es CRUCIAL.
+    // El listener del botón "Establecer zona" debe sobrevivir.
     // clearAllListeners(); 
     // --- FIN DE LA MODIFICACIÓN ---
     setReportContext(null);
@@ -360,13 +360,14 @@ export function startInstintoGame({ ui, gameMap, updatePanelUI, userProfile, set
       next: showNextQuestion,
       // --- INICIO DE LA MODIFICACIÓN ---
       clear: (nukeListeners = false) => {
-        // Limpiamos las capas del mapa SIEMPRE.
+        // Limpia el mapa de polígonos y capas de juego.
         clearMapLayers(true);
         setReportContext(null);
         ui.reportBtnFAB.classList.add('hidden');
         
-        // SOLO borramos los listeners si es una limpieza total (al cambiar de modo).
+        // Solo si se pide una limpieza total (al cambiar de modo), borramos los listeners.
         if (nukeListeners) {
+          console.log("Modo Instinto: Realizando limpieza total de listeners.");
           clearAllListeners();
         }
       }

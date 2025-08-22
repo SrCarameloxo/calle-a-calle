@@ -43,7 +43,7 @@ export function startInstintoGame({ ui, gameMap, updatePanelUI, userProfile, set
     gameMap.off('click', addVertex); // Limpiar listener del mapa explícitamente
   }
 
-  // Se mantiene la modificación anterior de la limpieza inteligente, es correcta.
+  // La limpieza inteligente se mantiene, es la correcta para el polígono.
   function clearMapLayers(clearFull = false) {
     if (streetLayerGroup) gameMap.removeLayer(streetLayerGroup);
     streetLayerGroup = null;
@@ -137,8 +137,13 @@ export function startInstintoGame({ ui, gameMap, updatePanelUI, userProfile, set
         tempMarkers = [];
     }
     await preloadStreets();
-    if (streetList.length >= 4) {
-        gameQuestions = generateQuestions(streetList);
+    // --- INICIO DE LA MODIFICACIÓN: Filtro de seguridad ---
+    // Añadimos un filtro para eliminar calles sin geometría antes de generar preguntas.
+    const validStreetList = streetList.filter(street => street.geometries && street.geometries.length > 0);
+
+    if (validStreetList.length >= 4) {
+        gameQuestions = generateQuestions(validStreetList);
+        // --- FIN DE LA MODIFICACIÓN ---
         startGameFlow(gameQuestions);
     } else {
         alert('La zona seleccionada no contiene suficientes calles. El Modo Instinto requiere al menos 4 calles distintas. Por favor, dibuja una zona más grande.');
@@ -170,13 +175,10 @@ export function startInstintoGame({ ui, gameMap, updatePanelUI, userProfile, set
     currentQuestionIndex = 0;
     score = 0;
     
-    // --- INICIO DE LA MODIFICACIÓN: Estilo de Juego Activo ---
-    // Nos aseguramos de que el polígono tenga su estilo de "juego activo" (sólido y morado).
-    // Esto es importante para la primera partida y también si el usuario le da a "Repetir Zona".
+    // La lógica para el estilo del polígono se mantiene como la pediste.
     if (zonePoly) {
         zonePoly.setStyle({ color: COL_ZONE, weight: 2, dashArray: null, fillOpacity: 0.1 });
     }
-    // --- FIN DE LA MODIFICACIÓN ---
 
     updatePanelUI(() => {
       ui.gameInterface.classList.remove('hidden');
@@ -187,7 +189,6 @@ export function startInstintoGame({ ui, gameMap, updatePanelUI, userProfile, set
   }
 
   function showNextQuestion() {
-    // La limpieza parcial se mantiene, es correcta.
     clearMapLayers(); 
 
     if (currentQuestionIndex >= gameQuestions.length) {
@@ -204,16 +205,7 @@ export function startInstintoGame({ ui, gameMap, updatePanelUI, userProfile, set
         layer.addTo(streetLayerGroup);
     });
 
-    if (zonePoly && streetLayerGroup.getLayers().length > 0) {
-        const streetBounds = streetLayerGroup.getBounds();
-        const zoneBounds = zonePoly.getBounds();
-        const finalBounds = L.latLngBounds(zoneBounds.getSouthWest(), zoneBounds.getNorthEast());
-        finalBounds.extend(streetBounds);
-        gameMap.fitBounds(finalBounds, { 
-            paddingTopLeft: [ui.gameUiContainer.offsetWidth + 20, 20],
-            paddingBottomRight: [20, 20]
-        });
-    }
+    // --- CÓDIGO DE ZOOM INTELIGENTE ELIMINADO TEMPORALMENTE PARA RESTAURAR LA FUNCIONALIDAD ---
 
     setReportContext({
         geometries: correctAnswer.geometries,
@@ -322,12 +314,9 @@ export function startInstintoGame({ ui, gameMap, updatePanelUI, userProfile, set
     setReportContext(null);
     ui.reportBtnFAB.classList.add('hidden');
 
-    // --- INICIO DE LA MODIFICACIÓN: Estilo de Fin de Partida ---
-    // Ahora, al final de la partida, aplicamos el estilo gris y discontinuo.
     if (zonePoly) {
         zonePoly.setStyle({ color: '#696969', weight: 2, dashArray: '5, 5', fillOpacity: 0.05 });
     }
-    // --- FIN DE LA MODIFICACIÓN ---
 
     updatePanelUI(() => {
         ui.gameInterface.classList.add('hidden');

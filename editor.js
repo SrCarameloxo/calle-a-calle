@@ -98,6 +98,9 @@ document.addEventListener('DOMContentLoaded', () => {
     let streetsToMerge = [];
     let selectedCity = null;
     let originalStreetNameForEdit = null; 
+    // --- AÑADIDO: Estado para la tecla Shift y la calle gris sobre la que está el cursor ---
+    let isShiftPressed = false;
+    let currentlyHoveredGreyStreet = null;
 
     function updateStatusPanel(text, active = true) {
         if (active && text) {
@@ -483,9 +486,20 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
                 invisibleHitbox.visibleLayer = layer;
                 invisibleHitbox.addTo(geojsonLayer);
+                
                 const onLayerClick = (e) => {
                     L.DomEvent.stopPropagation(e);
                     const visibleLayer = e.target.visibleLayer;
+                    
+                    // --- AÑADIDO: Lógica de bloqueo de clic en calles grises ---
+                    const clickedFeature = visibleLayer.feature;
+                    const hasName = clickedFeature.properties.tags && clickedFeature.properties.tags.name;
+                    // Si la calle NO tiene nombre (es gris) Y la tecla Shift NO está pulsada, no hacemos NADA.
+                    if (!hasName && !isShiftPressed) {
+                        return; // Salimos de la función inmediatamente.
+                    }
+                    // --- FIN DE LA MODIFICACIÓN ---
+
                     if (isCuttingMode) {
                         handleCutStreet(visibleLayer, e.latlng);
                     } else if (isMergingMode) {
@@ -495,6 +509,23 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                 };
                 invisibleHitbox.on('click', onLayerClick);
+
+                // --- AÑADIDO: Lógica de feedback visual con el cursor ---
+                const featureHasName = feature.properties.tags && feature.properties.tags.name;
+                if (!featureHasName) {
+                    // Si es una calle gris, añadimos los listeners para cambiar el cursor.
+                    invisibleHitbox.on('mouseover', () => {
+                        currentlyHoveredGreyStreet = invisibleHitbox; // Guardamos referencia
+                        map.getContainer().style.cursor = isShiftPressed ? 'pointer' : 'not-allowed';
+                    });
+                    
+                    invisibleHitbox.on('mouseout', () => {
+                        currentlyHoveredGreyStreet = null; // Limpiamos referencia
+                        map.getContainer().style.cursor = ''; // Restablecemos cursor
+                    });
+                }
+                // --- FIN DE LA MODIFICACIÓN ---
+
                 if (tags && tags.name) {
                     layer.bindPopup(`<b>${tags.name}</b><br>ID: ${feature.properties.id}`);
                 } else {
@@ -554,6 +585,28 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
     
+    // --- AÑADIDO: Listeners globales para la tecla Shift ---
+    window.addEventListener('keydown', (e) => {
+        if (e.key === 'Shift' && !isShiftPressed) {
+            isShiftPressed = true;
+            // Si el cursor está sobre una calle gris cuando se pulsa Shift, lo actualizamos
+            if (currentlyHoveredGreyStreet) {
+                map.getContainer().style.cursor = 'pointer';
+            }
+        }
+    });
+
+    window.addEventListener('keyup', (e) => {
+        if (e.key === 'Shift') {
+            isShiftPressed = false;
+            // Si el cursor está sobre una calle gris cuando se suelta Shift, lo actualizamos
+            if (currentlyHoveredGreyStreet) {
+                map.getContainer().style.cursor = 'not-allowed';
+            }
+        }
+    });
+    // --- FIN DE LA MODIFICACIÓN ---
+
     async function checkAuthAndLoad() {
         const { data: { session }, error: sessionError } = await supabase.auth.getSession();
         if (sessionError || !session) {

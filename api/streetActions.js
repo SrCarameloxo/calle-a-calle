@@ -89,10 +89,11 @@ module.exports = async (request, response) => {
             // --- FIN DE LA MODIFICACIÓN ---
 
         } else if (action === 'delete') {
-            // --- NUEVA LÓGICA PARA BORRAR ---
-            // --- INICIO DE LA MODIFICACIÓN ---
             const { id, osm_name, city } = payload;
-            if (!id || !osm_name || !city) return response.status(400).json({ error: 'Falta el ID, osm_name o city para la acción de borrar.' });
+
+            // --- INICIO DE LA MODIFICACIÓN: VALIDACIÓN FLEXIBLE ---
+            // Ahora solo exigimos el ID, que es lo único indispensable para la base de datos.
+            if (!id) return response.status(400).json({ error: 'Falta el ID para la acción de borrar.' });
             // --- FIN DE LA MODIFICACIÓN ---
             
             const { error } = await supabase
@@ -102,16 +103,22 @@ module.exports = async (request, response) => {
 
             if (error) throw error;
             
-            // --- INICIO DE LA MODIFICACIÓN ---
-            // Invalidar la caché de la calle que se ha ocultado
-            const parts = extractNameParts(osm_name);
-            if (parts.baseName) {
-                const cacheKey = `street_v18:${city}:${parts.baseName.replace(/\s/g, '_')}`;
-                await kv.del(cacheKey);
-                console.log(`Caché limpiada para calle borrada: ${cacheKey}`);
+            let message = `Way ${id} ocultado con éxito.`;
+
+            // --- INICIO DE LA MODIFICACIÓN: LIMPIEZA DE CACHÉ CONDICIONAL ---
+            // La limpieza de caché solo se ejecuta si la calle tenía nombre y ciudad.
+            if (osm_name && city) {
+                const parts = extractNameParts(osm_name);
+                if (parts.baseName) {
+                    const cacheKey = `street_v18:${city}:${parts.baseName.replace(/\s/g, '_')}`;
+                    await kv.del(cacheKey);
+                    console.log(`Caché limpiada para calle borrada: ${cacheKey}`);
+                    message = `Way ${id} ocultado y caché limpiada con éxito.`;
+                }
             }
-            return response.status(200).json({ message: `Way ${id} ocultado y caché limpiada con éxito.` });
             // --- FIN DE LA MODIFICACIÓN ---
+
+            return response.status(200).json({ message });
 
         } else if (action === 'create') {
             // --- NUEVA LÓGICA PARA CREAR ---

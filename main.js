@@ -274,12 +274,9 @@ window.addEventListener('DOMContentLoaded', () => {
             const selectedMode = button.dataset.mode;
             if (button.disabled) return;
             
-            // --- INICIO DE LA MODIFICACIÓN ---
-            // Si hay un módulo activo, llamamos a su limpieza TOTAL (nukeListeners = true)
             if (activeModeControls && typeof activeModeControls.clear === 'function') {
                 activeModeControls.clear(true);
             }
-            // --- FIN DE LA MODIFICACIÓN ---
 
             activeModeControls = null;
             setGameMode(selectedMode);
@@ -761,21 +758,48 @@ window.addEventListener('DOMContentLoaded', () => {
     return g;
   }
 
+  // --- INICIO DE LA MODIFICACIÓN ---
   function getDistanceToStreet(userPoint, streetLayer) {
-      let minDistance = Infinity, closestPointOnStreet = null;
+      let minDistancePixels = Infinity;
+      let closestPointOnStreet = null;
+  
       streetLayer.eachLayer(layer => {
-          let latlngs = (layer instanceof L.Polygon) ? layer.getLatLngs()[0] : (layer instanceof L.Polyline) ? layer.getLatLngs() : [];
-          if(latlngs.length < 2) return;
+          const latlngs = (layer instanceof L.Polygon) ? layer.getLatLngs()[0] : (layer instanceof L.Polyline) ? layer.getLatLngs() : [];
+          if (latlngs.length < 2) return;
+  
           for (let i = 0; i < latlngs.length - 1; i++) {
-              let p1=gameMap.latLngToLayerPoint(latlngs[i]), p2=gameMap.latLngToLayerPoint(latlngs[i+1]), p=gameMap.latLngToLayerPoint(userPoint);
-              let x=p1.x,y=p1.y,dx=p2.x-x,dy=p2.y-y;
-              if(dx!==0||dy!==0){let t=((p.x-x)*dx+(p.y-y)*dy)/(dx*dx+dy*dy);if(t>1){x=p2.x;y=p2.y}else if(t>0){x+=dx*t;y+=dy*t}}
-              dx=p.x-x;dy=p.y-y;let dist=dx*dx+dy*dy;
-              if(dist<minDistance){minDistance=dist;closestPointOnStreet=gameMap.layerPointToLatLng(L.point(x,y))}
+              const p1 = gameMap.latLngToLayerPoint(latlngs[i]);
+              const p2 = gameMap.latLngToLayerPoint(latlngs[i + 1]);
+              const p = gameMap.latLngToLayerPoint(userPoint);
+              
+              let x = p1.x, y = p1.y, dx = p2.x - x, dy = p2.y - y;
+              
+              if (dx !== 0 || dy !== 0) {
+                  const t = ((p.x - x) * dx + (p.y - y) * dy) / (dx * dx + dy * dy);
+                  if (t > 1) {
+                      x = p2.x;
+                      y = p2.y;
+                  } else if (t > 0) {
+                      x += dx * t;
+                      y += dy * t;
+                  }
+              }
+              
+              dx = p.x - x;
+              dy = p.y - y;
+              const dist = dx * dx + dy * dy;
+              
+              if (dist < minDistancePixels) {
+                  minDistancePixels = dist;
+                  closestPointOnStreet = gameMap.layerPointToLatLng(L.point(x, y));
+              }
           }
       });
-      return { distance: Math.sqrt(minDistance), point: closestPointOnStreet };
+  
+      const finalDistanceInMeters = closestPointOnStreet ? userPoint.distanceTo(closestPointOnStreet) : Infinity;
+      return { distance: finalDistanceInMeters, point: closestPointOnStreet };
   }
+  // --- FIN DE LA MODIFICACIÓN ---
 
   function endGame() {
     if (currentGameMode === 'instinto') {
@@ -918,16 +942,12 @@ window.addEventListener('DOMContentLoaded', () => {
   }
   
   function resetToInitialView() {
-      // Si estamos en modo Instinto, le pedimos al módulo que limpie su mapa
-      // sin destruir sus listeners principales.
       if (currentGameMode === 'instinto' && activeModeControls && typeof activeModeControls.clear === 'function') {
-        activeModeControls.clear(false); // `false` significa limpieza suave (solo mapa).
+        activeModeControls.clear(false); 
       } else {
-        // Si estamos en modo Clásico (o Revancha), hacemos la limpieza normal de main.js.
         clear(true);
       }
       
-      // Limpiamos las variables de estado del juego de main.js.
       streetList = [];
       totalQuestions = 0;
       streetsGuessedCorrectly = 0;
@@ -941,14 +961,13 @@ window.addEventListener('DOMContentLoaded', () => {
       uiElements.reviewGameBtn.onclick = null;
       uiElements.saveZoneBtn.onclick = null;
       
-      // Actualizamos la UI para mostrar la vista de inicio.
       updatePanelUI(() => {
           ['start-options', 'loaded-zone-options', 'checkbox-wrapper', 'game-interface', 'end-game-options', 'back-from-review-btn'].forEach(id => {
               const el = document.getElementById(id);
               if (el) el.classList.add('hidden');
           });
           uiElements.reportBtnFAB.classList.add('hidden');
-          uiElements.drawZoneBtn.classList.remove('hidden'); // Siempre mostramos el botón al resetear.
+          uiElements.drawZoneBtn.classList.remove('hidden');
           uiElements.progressBar.style.width = '0%';
           uiElements.instintoOptionsContainer.innerHTML = '';
           uiElements.gameQuestion.textContent = '';
@@ -968,24 +987,18 @@ window.addEventListener('DOMContentLoaded', () => {
     });
     if (points.length < 3) return;
 
-    // --- INICIO DE LA MODIFICACIÓN ---
     if (currentGameMode === 'instinto') {
         if (activeModeControls && activeModeControls.startWithZone) {
-            // Preparamos los datos de la zona para el módulo Instinto.
             const instintoZonePoints = points.map(p => L.latLng(p.lat, p.lng));
             
-            // main.js sigue siendo responsable de dibujar la capa inicial y centrar el mapa.
-            zonePoints = instintoZonePoints; // Actualizamos la variable global
+            zonePoints = instintoZonePoints; 
             zonePoly = L.polygon(zonePoints, { color: COL_ZONE, weight: 2, fillOpacity: 0.1 }).addTo(gameMap);
             
-            // Delegamos el inicio de la partida al módulo Instinto.
             activeModeControls.startWithZone(instintoZonePoints);
 
-            // Tareas finales de UI
             uiElements.menuContentPanel.classList.add('hidden'); 
             recenterMapWithPadding(zonePoly.getBounds());
             
-            // Salimos de la función para no ejecutar la lógica del modo clásico.
             return; 
         } else {
              console.error("Error: Modo Instinto activo pero su controlador no está disponible.");
@@ -993,9 +1006,7 @@ window.addEventListener('DOMContentLoaded', () => {
              return;
         }
     }
-    // --- FIN DE LA MODIFICACIÓN ---
     
-    // El código original para el modo clásico se ejecuta si no se entró en el if anterior.
     updatePanelUI(() => {
         uiElements.drawZoneBtn.classList.add('hidden');
         tempMarkers.forEach(m => gameMap.removeLayer(m));

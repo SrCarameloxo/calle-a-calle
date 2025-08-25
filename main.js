@@ -1369,6 +1369,12 @@ async function saveFailedStreet(streetData) {
         if (statsPanel && !statsPanel.classList.contains('hidden')) {
             await displayStats();
         }
+        
+        // También refrescar estadísticas expandidas si están abiertas
+        const expandedStatsPanel = document.getElementById('expanded-stats-modal');
+        if (expandedStatsPanel && !expandedStatsPanel.classList.contains('hidden')) {
+            await displayExpandedStats();
+        }
     } catch (error) {
         console.error('Error guardando estadísticas:', error.message);
     }
@@ -1725,18 +1731,10 @@ async function saveFailedStreet(streetData) {
             <div class="stats-section">
                 <h3 class="stats-section-title">🗺️ Análisis Geográfico</h3>
                 
-                <!-- Controles del mapa de calor -->
-                <div class="mb-4 flex space-x-2">
-                    <button id="heatmap-global-btn" class="heatmap-control-btn active">
-                        <span class="text-lg">🌍</span>
-                        <span>Vista Global</span>
-                        <small>Dificultad de la ciudad</small>
-                    </button>
-                    <button id="heatmap-personal-btn" class="heatmap-control-btn">
-                        <span class="text-lg">👤</span>
-                        <span>Vista Personal</span>
-                        <small>Tu progreso</small>
-                    </button>
+                <!-- Solo vista personal -->
+                <div class="mb-4 text-center">
+                    <span class="text-lg">👤</span>
+                    <span class="text-white font-medium ml-2">Tus Zonas Jugadas</span>
                 </div>
                 
                 <!-- Contenedor del mapa -->
@@ -2111,7 +2109,7 @@ async function saveFailedStreet(streetData) {
     heatmapData.data.forEach((zone, index) => {
         let elements = []; // Array para almacenar elementos (círculos o polígonos)
         
-        if (zone.polygon && currentHeatmapType === 'personal') {
+        if (zone.polygon) {
             // Renderizar polígono real para datos personales
             const polygonLatLngs = zone.polygon.map(point => [point[0], point[1]]);
             
@@ -2168,14 +2166,9 @@ async function saveFailedStreet(streetData) {
                 
                 // Solo añadir tooltip al círculo central
                 if (i === 0) {
-                    const tooltipContent = currentHeatmapType === 'global' 
-                        ? `<strong>${zone.name || 'Zona'}</strong><br/>
-                           ${Math.round(zone.accuracy * 100)}% de éxito<br/>
-                           ${zone.gamesPlayed || 0} partidas jugadas`
-                        : `<strong>${zone.name || 'Tu zona'}</strong><br/>
-                           ${Math.round(zone.accuracy * 100)}% de precisión<br/>
-                           ${zone.gamesCount} partidas<br/>
-                           ${zone.totalCorrect}/${zone.totalAttempts} aciertos`;
+                    const tooltipContent = `<strong>${zone.name || 'Tu zona'}</strong><br/>
+                       ${Math.round(zone.accuracy * 100)}% de precisión<br/>
+                       ${zone.totalCorrect}/${zone.totalAttempts} aciertos`;
                            
                     circle.bindTooltip(tooltipContent, {
                         sticky: true,

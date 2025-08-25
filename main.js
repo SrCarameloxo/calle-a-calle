@@ -1321,19 +1321,19 @@ async function saveFailedStreet(streetData) {
         const { data: { session } } = await supabaseClient.auth.getSession();
         if (!session || total === 0) return;
 
-        // Por ahora solo guardamos los datos básicos que ya funcionan
+        // Preparar coordenadas de la zona para el mapa de calor
+        const zonePolygon = zonePoints.length > 0 ? zonePoints.map(p => [p.lat, p.lng]) : null;
+        
         const gameData = {
             user_id: session.user.id,
             correct_guesses: correct,
-            total_questions: total
+            total_questions: total,
+            zone_polygon: zonePolygon ? JSON.stringify(zonePolygon) : null
         };
         
-        // Cuando se actualice la base de datos, se podrán añadir más campos:
+        // Campos adicionales que se pueden añadir cuando se actualice la base de datos:
         // accuracy_percentage: Math.round((correct / total) * 100),
         // game_mode: currentGameMode || 'classic',
-        // zone_bounds: zonePoints.length > 0 ? JSON.stringify(zonePoints) : null,
-        // zone_center_lat: zoneCenterPoint?.lat || null,
-        // zone_center_lng: zoneCenterPoint?.lng || null,
         // zone_name: getCurrentZoneName() || null,
         // duration_seconds: Math.floor((Date.now() - gameStartTime) / 1000),
         // max_streak: maxStreak || 0
@@ -1721,6 +1721,17 @@ async function saveFailedStreet(streetData) {
                         </div>
                     </div>
                     
+                    <!-- Botón expandir mapa -->
+                    <button id="expand-heatmap-btn" class="absolute top-2 right-2 bg-gray-800/80 hover:bg-gray-700/80 text-white p-2 rounded-lg transition-colors backdrop-blur-sm border border-gray-600/30" title="Expandir mapa">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="15,3 21,3 21,9"></polyline>
+                            <polyline points="9,21 3,21 3,15"></polyline>
+                            <line x1="21" y1="3" x2="14" y2="10"></line>
+                            <line x1="3" y1="21" x2="10" y2="14"></line>
+                        </svg>
+                    </button>
+                </div>
+                    
                     <!-- Leyenda -->
                     <div class="mt-3 flex items-center justify-center space-x-6 text-sm">
                         <div class="flex items-center space-x-2">
@@ -1827,6 +1838,7 @@ async function saveFailedStreet(streetData) {
     const redLabel = document.getElementById('heatmap-red-label');
     const greenLabel = document.getElementById('heatmap-green-label');
     const description = document.getElementById('heatmap-description');
+    const expandBtn = document.getElementById('expand-heatmap-btn');
     
     if (globalBtn) {
         globalBtn.addEventListener('click', () => {
@@ -1848,8 +1860,104 @@ async function saveFailedStreet(streetData) {
         });
     }
     
+    if (expandBtn) {
+        expandBtn.addEventListener('click', openExpandedHeatmapModal);
+    }
+    
     // Inicializar mapa de calor con vista global
     initializeHeatmap();
+  }
+  
+  // === MODAL DE MAPA EXPANDIDO ===
+  async function openExpandedHeatmapModal() {
+    const modal = document.getElementById('expanded-heatmap-modal');
+    const container = document.getElementById('expanded-heatmap-container');
+    
+    modal.classList.remove('hidden');
+    
+    try {
+        // Crear mapa expandido con zoom completo
+        container.innerHTML = '<div id="expanded-heatmap-leaflet" style="width: 100%; height: 100%;"></div>';
+        
+        const expandedMap = L.map('expanded-heatmap-leaflet', {
+            center: [38.8794, -6.9706],
+            zoom: 12,
+            zoomControl: true,
+            scrollWheelZoom: true,
+            doubleClickZoom: true,
+            dragging: true
+        });
+        
+        // Mismo estilo de mapa que el juego
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager_nolabels/{z}/{x}/{y}{r}.png', {
+            attribution: '© OSM & CARTO',
+            maxZoom: 19,
+            subdomains: 'abcd'
+        }).addTo(expandedMap);
+        
+        // Cargar datos del mapa de calor
+        const heatmapData = await fetchHeatmapData(currentHeatmapType);
+        renderHeatmap(heatmapData, expandedMap);
+        
+        // Configurar controles mini
+        setupExpandedHeatmapControls(expandedMap);
+        
+        // Guardar referencia
+        window.expandedHeatmapMap = expandedMap;
+        
+        // Forzar resize del mapa tras un momento
+        setTimeout(() => expandedMap.invalidateSize(), 200);
+        
+    } catch (error) {
+        console.error('Error creando mapa expandido:', error);
+        container.innerHTML = '<div class="flex items-center justify-center h-full text-gray-400">Error al cargar mapa expandido</div>';
+    }
+  }
+  
+  function setupExpandedHeatmapControls(mapInstance) {
+    const miniGlobalBtn = document.getElementById('mini-global-btn');
+    const miniPersonalBtn = document.getElementById('mini-personal-btn');
+    const closeBtn = document.getElementById('close-expanded-heatmap');
+    const backdrop = document.getElementById('heatmap-backdrop');
+    const modal = document.getElementById('expanded-heatmap-modal');
+    
+    const closeModal = () => {
+        modal.classList.add('hidden');
+        if (window.expandedHeatmapMap) {
+            window.expandedHeatmapMap.remove();
+            window.expandedHeatmapMap = null;
+        }
+    };
+    
+    closeBtn.addEventListener('click', closeModal);
+    backdrop.addEventListener('click', closeModal);
+    
+    // Controles de tipo de vista
+    miniGlobalBtn.addEventListener('click', async () => {
+        if (currentHeatmapType === 'global') return;
+        
+        currentHeatmapType = 'global';
+        miniGlobalBtn.classList.add('bg-blue-600', 'text-white', 'active');
+        miniGlobalBtn.classList.remove('bg-gray-700', 'text-gray-300');
+        miniPersonalBtn.classList.add('bg-gray-700', 'text-gray-300');
+        miniPersonalBtn.classList.remove('bg-blue-600', 'text-white', 'active');
+        
+        const heatmapData = await fetchHeatmapData('global');
+        renderHeatmap(heatmapData, mapInstance);
+    });
+    
+    miniPersonalBtn.addEventListener('click', async () => {
+        if (currentHeatmapType === 'personal') return;
+        
+        currentHeatmapType = 'personal';
+        miniPersonalBtn.classList.add('bg-blue-600', 'text-white', 'active');
+        miniPersonalBtn.classList.remove('bg-gray-700', 'text-gray-300');
+        miniGlobalBtn.classList.add('bg-gray-700', 'text-gray-300');
+        miniGlobalBtn.classList.remove('bg-blue-600', 'text-white', 'active');
+        
+        const heatmapData = await fetchHeatmapData('personal');
+        renderHeatmap(heatmapData, mapInstance);
+    });
   }
   
   async function initializeHeatmap() {
@@ -1871,9 +1979,11 @@ async function saveFailedStreet(streetData) {
             keyboard: false
         });
         
-        // Añadir tiles del mapa
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: ''
+        // Añadir tiles del mapa (mismo estilo que el juego)
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager_nolabels/{z}/{x}/{y}{r}.png', {
+            attribution: '',
+            maxZoom: 19,
+            subdomains: 'abcd'
         }).addTo(miniMap);
         
         // Cargar y renderizar datos iniciales (global)
@@ -1970,44 +2080,82 @@ async function saveFailedStreet(streetData) {
     heatmapLayer = L.layerGroup();
     
     heatmapData.data.forEach((zone, index) => {
-        // Sistema de múltiples círculos para efecto de difuminado gradual
-        const baseRadius = 600;
-        const circles = [];
-        
-        // Crear múltiples círculos concéntricos para difuminado suave
-        for (let i = 0; i < 4; i++) {
-            const radiusMultiplier = 1 + (i * 0.3); // 1x, 1.3x, 1.6x, 1.9x
-            const opacityMultiplier = 1 - (i * 0.25); // 1, 0.75, 0.5, 0.25
+        if (zone.polygon && currentHeatmapType === 'personal') {
+            // Renderizar polígono real para datos personales
+            const polygonLatLngs = zone.polygon.map(point => [point[0], point[1]]);
             
-            const circle = L.circle([zone.lat, zone.lng], {
-                radius: baseRadius * radiusMultiplier,
-                fillColor: zone.color,
-                color: zone.color,
-                weight: 0,
-                fillOpacity: (zone.opacity || 0.6) * opacityMultiplier,
-                className: `heatmap-zone heatmap-layer-${i}`
-            });
-            
-            // Solo añadir tooltip al círculo central
-            if (i === 0) {
-                const tooltipContent = currentHeatmapType === 'global' 
-                    ? `<strong>${zone.name || 'Zona'}</strong><br/>
-                       ${Math.round(zone.accuracy * 100)}% de éxito<br/>
-                       ${zone.gamesPlayed || 0} partidas jugadas`
-                    : `<strong>${zone.name || 'Tu zona'}</strong><br/>
-                       ${Math.round(zone.accuracy * 100)}% de precisión<br/>
-                       ${zone.gamesCount} partidas<br/>
-                       ${zone.totalCorrect}/${zone.totalAttempts} aciertos`;
-                       
-                circle.bindTooltip(tooltipContent, {
-                    sticky: true,
-                    direction: 'top',
-                    className: 'heatmap-tooltip'
+            // Crear múltiples capas de polígono para efecto difuminado
+            for (let i = 0; i < 4; i++) {
+                const bufferSize = i * 100; // Buffer en metros para cada capa
+                const opacityMultiplier = 1 - (i * 0.25); // 1, 0.75, 0.5, 0.25
+                
+                // Crear polígono con buffer simulado (expandido)
+                const bufferedPolygon = expandPolygon(polygonLatLngs, bufferSize);
+                
+                const polygon = L.polygon(bufferedPolygon, {
+                    fillColor: zone.color,
+                    color: zone.color,
+                    weight: i === 0 ? 1 : 0,
+                    fillOpacity: (zone.opacity || 0.6) * opacityMultiplier,
+                    className: `heatmap-polygon heatmap-layer-${i}`
                 });
+                
+                // Solo añadir tooltip al polígono principal
+                if (i === 0) {
+                    const tooltipContent = `<strong>${zone.name || 'Tu zona'}</strong><br/>
+                           ${Math.round(zone.accuracy * 100)}% de precisión<br/>
+                           ${zone.totalCorrect}/${zone.totalAttempts} aciertos<br/>
+                           ${zone.gameDate ? new Date(zone.gameDate).toLocaleDateString() : ''}`;
+                           
+                    polygon.bindTooltip(tooltipContent, {
+                        sticky: true,
+                        direction: 'top',
+                        className: 'heatmap-tooltip'
+                    });
+                }
+                
+                heatmapLayer.addLayer(polygon);
             }
+        } else {
+            // Sistema de múltiples círculos para datos globales o fallback
+            const baseRadius = 600;
+            const circles = [];
             
-            circles.push(circle);
-            heatmapLayer.addLayer(circle);
+            // Crear múltiples círculos concéntricos para difuminado suave
+            for (let i = 0; i < 4; i++) {
+                const radiusMultiplier = 1 + (i * 0.3); // 1x, 1.3x, 1.6x, 1.9x
+                const opacityMultiplier = 1 - (i * 0.25); // 1, 0.75, 0.5, 0.25
+                
+                const circle = L.circle([zone.lat, zone.lng], {
+                    radius: baseRadius * radiusMultiplier,
+                    fillColor: zone.color,
+                    color: zone.color,
+                    weight: 0,
+                    fillOpacity: (zone.opacity || 0.6) * opacityMultiplier,
+                    className: `heatmap-zone heatmap-layer-${i}`
+                });
+                
+                // Solo añadir tooltip al círculo central
+                if (i === 0) {
+                    const tooltipContent = currentHeatmapType === 'global' 
+                        ? `<strong>${zone.name || 'Zona'}</strong><br/>
+                           ${Math.round(zone.accuracy * 100)}% de éxito<br/>
+                           ${zone.gamesPlayed || 0} partidas jugadas`
+                        : `<strong>${zone.name || 'Tu zona'}</strong><br/>
+                           ${Math.round(zone.accuracy * 100)}% de precisión<br/>
+                           ${zone.gamesCount} partidas<br/>
+                           ${zone.totalCorrect}/${zone.totalAttempts} aciertos`;
+                           
+                    circle.bindTooltip(tooltipContent, {
+                        sticky: true,
+                        direction: 'top',
+                        className: 'heatmap-tooltip'
+                    });
+                }
+                
+                circles.push(circle);
+                heatmapLayer.addLayer(circle);
+            }
         }
         
         // Añadir animación de entrada escalonada
@@ -2065,6 +2213,36 @@ async function saveFailedStreet(streetData) {
     }
   }
   
+  /**
+   * Expandir polígono para crear efecto difuminado
+   */
+  function expandPolygon(coordinates, bufferMeters) {
+    if (bufferMeters === 0) return coordinates;
+    
+    // Calcular centroide del polígono
+    let centerLat = 0, centerLng = 0;
+    coordinates.forEach(coord => {
+        centerLat += coord[0];
+        centerLng += coord[1];
+    });
+    centerLat /= coordinates.length;
+    centerLng /= coordinates.length;
+    
+    // Expandir cada punto alejándolo del centro
+    return coordinates.map(coord => {
+        const deltaLat = coord[0] - centerLat;
+        const deltaLng = coord[1] - centerLng;
+        
+        // Factor de expansión basado en el buffer (aproximadamente 100m = 0.001 grados)
+        const expansionFactor = 1 + (bufferMeters * 0.00001);
+        
+        return [
+            centerLat + (deltaLat * expansionFactor),
+            centerLng + (deltaLng * expansionFactor)
+        ];
+    });
+  }
+
   /**
    * Limpiar mapa de calor
    */

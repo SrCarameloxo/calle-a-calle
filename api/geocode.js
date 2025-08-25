@@ -48,7 +48,7 @@ export default async function handler(request, response) {
 
         const { data: userStats, error } = await supabase
           .from('game_stats')
-          .select('correct_guesses, total_questions, created_at')
+          .select('correct_guesses, total_questions, created_at, zone_polygon')
           .eq('user_id', user_id)
           .order('created_at', { ascending: false });
 
@@ -109,38 +109,34 @@ function processPersonalHeatmapData(stats) {
   if (stats.length === 0) return [];
 
   const personalZones = [];
-  const timeGroups = groupGamesByTime(stats);
   
-  timeGroups.forEach((games, index) => {
-    const totalAttempts = games.reduce((sum, game) => sum + game.total_questions, 0);
-    const totalCorrect = games.reduce((sum, game) => sum + game.correct_guesses, 0);
-    
-    if (totalAttempts > 0) {
-      const accuracy = totalCorrect / totalAttempts;
-      const gamesCount = games.length;
+  stats.forEach((game, index) => {
+    if (game.total_questions > 0 && game.zone_polygon) {
+      const accuracy = game.correct_guesses / game.total_questions;
       
-      // Coordenadas distribuidas alrededor de Badajoz
-      const baseCoords = [
-        [38.8794, -6.9706], [38.8850, -6.9650], [38.8750, -6.9800],
-        [38.8700, -6.9600], [38.8900, -6.9500], [38.8650, -6.9750]
-      ];
-      
-      const coordIndex = index % baseCoords.length;
-      const [baseLat, baseLng] = baseCoords[coordIndex];
-      const lat = baseLat + (Math.random() - 0.5) * 0.02;
-      const lng = baseLng + (Math.random() - 0.5) * 0.02;
-      
-      personalZones.push({
-        lat: lat,
-        lng: lng,
-        accuracy: accuracy,
-        gamesCount: gamesCount,
-        totalCorrect: totalCorrect,
-        totalAttempts: totalAttempts,
-        color: getHeatmapColor(accuracy, 'personal'),
-        opacity: calculatePersonalOpacity(accuracy, gamesCount),
-        name: `Zona ${index + 1}`
-      });
+      try {
+        const polygon = JSON.parse(game.zone_polygon);
+        
+        if (Array.isArray(polygon) && polygon.length >= 3) {
+          // Calcular el centroide del polígono para el punto principal
+          const centroid = calculatePolygonCentroid(polygon);
+          
+          personalZones.push({
+            lat: centroid.lat,
+            lng: centroid.lng,
+            polygon: polygon,
+            accuracy: accuracy,
+            totalCorrect: game.correct_guesses,
+            totalAttempts: game.total_questions,
+            color: getHeatmapColor(accuracy, 'personal'),
+            opacity: calculatePersonalOpacity(accuracy, 1),
+            name: `Partida ${index + 1}`,
+            gameDate: game.created_at
+          });
+        }
+      } catch (error) {
+        console.log('Error parsing zone_polygon for game:', error);
+      }
     }
   });
   
@@ -171,6 +167,23 @@ function calculatePersonalOpacity(accuracy, gamesCount) {
   const accuracyFactor = accuracy < 0.5 ? 1.2 : 0.8; // Fallos más visibles
   
   return Math.min(maxOpacity, minOpacity + (maxOpacity - minOpacity) * countFactor * accuracyFactor);
+}
+
+function calculatePolygonCentroid(polygon) {
+  let totalLat = 0;
+  let totalLng = 0;
+  let count = 0;
+
+  polygon.forEach(point => {
+    totalLat += point[0]; // lat
+    totalLng += point[1]; // lng
+    count++;
+  });
+
+  return {
+    lat: totalLat / count,
+    lng: totalLng / count
+  };
 }
 
 function getHeatmapColor(score, type) {

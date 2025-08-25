@@ -322,6 +322,14 @@ export function startInstintoGame({ ui, gameMap, updatePanelUI, userProfile, set
         zonePoly.setStyle({ color: '#696969', weight: 2, dashArray: '5, 5', fillOpacity: 0.05 });
     }
 
+    // GUARDAR ESTADÍSTICAS DEL MODO INSTINTO
+    if (window.saveGameStats) {
+        console.log('Guardando estadísticas del modo instinto:', score, '/', gameQuestions.length);
+        window.saveGameStats(score, gameQuestions.length);
+    } else {
+        console.error('saveGameStats no está disponible en window');
+    }
+
     updatePanelUI(() => {
         ui.gameInterface.classList.add('hidden');
         ui.endGameOptions.classList.remove('hidden');

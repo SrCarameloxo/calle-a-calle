@@ -1327,6 +1327,13 @@ async function saveFailedStreet(streetData) {
         const zonePolygon = pointsToSave.length > 0 ? pointsToSave.map(p => [p.lat, p.lng]) : null;
         console.log('Guardando partida con zona:', zonePolygon ? `${zonePolygon.length} puntos` : 'sin zona');
         
+        // Intentar primero con zone_polygon, si falla intentar sin él
+        let gameData = {
+            user_id: session.user.id,
+            correct_guesses: correct,
+            total_questions: total
+        };
+        
         // Guardar polígono en localStorage temporalmente hasta que se añada la columna a la DB
         if (zonePolygon) {
             const gameKey = `game_${session.user.id}_${Date.now()}`;
@@ -1340,13 +1347,6 @@ async function saveFailedStreet(streetData) {
             localStorage.setItem(gameKey, JSON.stringify(gamePolygonData));
             console.log('Polígono guardado en localStorage:', gameKey);
         }
-        
-        // Intentar primero con zone_polygon, si falla intentar sin él
-        let gameData = {
-            user_id: session.user.id,
-            correct_guesses: correct,
-            total_questions: total
-        };
         
         // Solo añadir zone_polygon si tenemos datos
         if (zonePolygon) {
@@ -1765,24 +1765,23 @@ async function saveFailedStreet(streetData) {
                     <div class="mt-3 flex items-center justify-center space-x-6 text-sm">
                         <div class="flex items-center space-x-2">
                             <div class="w-4 h-4 bg-red-500 rounded-full"></div>
-                            <span class="text-gray-300" id="heatmap-red-label">Zonas difíciles</span>
+                            <span class="text-gray-300">Necesitas repasar</span>
                         </div>
                         <div class="flex items-center space-x-2">
                             <div class="w-4 h-4 bg-yellow-500 rounded-full"></div>
-                            <span class="text-gray-300">Intermedias</span>
+                            <span class="text-gray-300">Regular</span>
                         </div>
                         <div class="flex items-center space-x-2">
                             <div class="w-4 h-4 bg-green-500 rounded-full"></div>
-                            <span class="text-gray-300" id="heatmap-green-label">Zonas fáciles</span>
+                            <span class="text-gray-300">Dominadas</span>
                         </div>
                     </div>
                 </div>
                 
                 <!-- Información adicional -->
                 <div class="mt-4 p-3 bg-gray-800/30 rounded-lg border border-gray-700/30">
-                    <p class="text-sm text-gray-400" id="heatmap-description">
-                        <strong>Vista Global:</strong> Muestra las zonas más y menos falladas por toda la comunidad. 
-                        Ideal para principiantes que buscan empezar por zonas más fáciles.
+                    <p class="text-sm text-gray-400">
+                        <strong>Tu progreso personal:</strong> Las zonas rojas necesitan más práctica, las verdes están bien controladas. Solo aparecen zonas que has jugado.
                     </p>
                 </div>
             </div>
@@ -1975,12 +1974,12 @@ async function saveFailedStreet(streetData) {
         const miniMap = L.map('heatmap-mini-map', {
             center: [38.8794, -6.9706], // Centro de Badajoz
             zoom: 13,
-            zoomControl: false,
+            zoomControl: true,
             dragging: true,
-            scrollWheelZoom: false,
-            doubleClickZoom: false,
-            boxZoom: false,
-            keyboard: false
+            scrollWheelZoom: true,
+            doubleClickZoom: true,
+            boxZoom: true,
+            keyboard: true
         });
         
         // Añadir tiles del mapa (mismo estilo que el juego)
@@ -1992,6 +1991,7 @@ async function saveFailedStreet(streetData) {
         
         // Cargar y renderizar datos iniciales (personal)
         const heatmapData = await fetchHeatmapData('personal');
+        console.log('Datos del mapa de calor cargados:', heatmapData);
         renderHeatmap(heatmapData, miniMap);
         
         // Guardar referencia al mini mapa
@@ -2060,17 +2060,20 @@ async function saveFailedStreet(streetData) {
 
   function getLocalStorageGames(userId) {
     const games = [];
+    console.log('Buscando partidas en localStorage para usuario:', userId);
     for (let i = 0; i < localStorage.length; i++) {
         const key = localStorage.key(i);
         if (key && key.startsWith(`game_${userId}_`)) {
             try {
                 const gameData = JSON.parse(localStorage.getItem(key));
                 games.push(gameData);
+                console.log('Partida encontrada en localStorage:', key, gameData);
             } catch (e) {
                 console.warn('Error parsing localStorage game:', key, e);
             }
         }
     }
+    console.log('Total partidas en localStorage:', games.length);
     return games.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
   }
 
@@ -2158,7 +2161,12 @@ async function saveFailedStreet(streetData) {
    */
   function renderHeatmap(heatmapData, mapInstance = null) {
     const targetMap = mapInstance || gameMap;
-    if (!targetMap) return;
+    if (!targetMap) {
+        console.log('No hay mapa target para renderizar');
+        return;
+    }
+    
+    console.log('Renderizando mapa de calor:', heatmapData.data.length, 'zonas');
     
     // Limpiar capa anterior
     if (heatmapLayer) {

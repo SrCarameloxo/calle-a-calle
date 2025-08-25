@@ -89,6 +89,8 @@ window.addEventListener('DOMContentLoaded', () => {
     }
   };
   let currentStreak = 0;
+  let maxStreak = 0;
+  let gameStartTime = null;
   let showScoreAsPercentage = false;
 
   let currentGameMode = 'classic'; 
@@ -565,6 +567,7 @@ window.addEventListener('DOMContentLoaded', () => {
       acertadasEnSesionRevancha.clear();
 
       playing = true; qIdx = 0; streetsGuessedCorrectly = 0; currentStreak = 0;
+      maxStreak = 0; gameStartTime = Date.now();
       updatePanelUI(() => {
           uiElements.gameInterface.classList.remove('hidden');
           uiElements.progressBar.style.width = '0%';
@@ -742,6 +745,7 @@ window.addEventListener('DOMContentLoaded', () => {
 
         streetsGuessedCorrectly++;
         currentStreak++;
+        if (currentStreak > maxStreak) maxStreak = currentStreak;
         updateScoreDisplay('¡Correcto!', '#28a745');
         if (userProfile.settings.enable_sounds) {
             const sound = document.getElementById('correct-sound');
@@ -1316,10 +1320,44 @@ async function saveFailedStreet(streetData) {
     try {
         const { data: { session } } = await supabaseClient.auth.getSession();
         if (!session || total === 0) return;
-        await supabaseClient.from('game_stats').insert({ user_id: session.user.id, correct_guesses: correct, total_questions: total });
+
+        // Preparar datos extendidos para las estadísticas
+        // Preparar datos de la zona para análisis de mapa de calor futuro
+        const zoneCenterPoint = zonePoints.length > 0 ? {
+            lat: zonePoints.reduce((sum, p) => sum + p.lat, 0) / zonePoints.length,
+            lng: zonePoints.reduce((sum, p) => sum + p.lng, 0) / zonePoints.length
+        } : null;
+
+        const gameData = {
+            user_id: session.user.id,
+            correct_guesses: correct,
+            total_questions: total,
+            accuracy_percentage: Math.round((correct / total) * 100),
+            game_mode: currentGameMode || 'classic',
+            zone_bounds: zonePoints.length > 0 ? JSON.stringify(zonePoints) : null,
+            zone_center_lat: zoneCenterPoint?.lat || null,
+            zone_center_lng: zoneCenterPoint?.lng || null,
+            zone_name: getCurrentZoneName() || null,
+            duration_seconds: Math.floor((Date.now() - gameStartTime) / 1000),
+            max_streak: maxStreak || 0,
+            created_at: new Date().toISOString()
+        };
+
+        await supabaseClient.from('game_stats').insert(gameData);
+        console.log('Estadísticas guardadas correctamente');
     } catch (error) {
         console.error('Error guardando estadísticas:', error.message);
     }
+  }
+
+  function getCurrentZoneName() {
+    // Generar nombre descriptivo basado en el centro de la zona
+    if (zonePoints.length === 0) return null;
+    
+    const centerLat = zonePoints.reduce((sum, p) => sum + p.lat, 0) / zonePoints.length;
+    const centerLng = zonePoints.reduce((sum, p) => sum + p.lng, 0) / zonePoints.length;
+    
+    return `Zona (${centerLat.toFixed(3)}, ${centerLng.toFixed(3)})`;
   }
 
   async function displayStats() {
@@ -1328,20 +1366,411 @@ async function saveFailedStreet(streetData) {
     try {
         const { data: { session } } = await supabaseClient.auth.getSession();
         if (!session) return;
-        const { data: stats, error } = await supabaseClient.from('game_stats').select('correct_guesses, total_questions').eq('user_id', session.user.id).order('created_at', { ascending: false }).limit(15);
+        
+        const { data: stats, error } = await supabaseClient.from('game_stats')
+            .select('correct_guesses, total_questions, accuracy_percentage, max_streak, game_mode, created_at')
+            .eq('user_id', session.user.id)
+            .order('created_at', { ascending: false })
+            .limit(50);
+            
         if (error) throw error;
+        
         if (stats.length === 0) {
-            statsContent.innerHTML = '<p>Juega una partida para ver tus estadísticas.</p>';
+            statsContent.innerHTML = `
+                <div class="text-center space-y-4">
+                    <div class="text-6xl">🎯</div>
+                    <p class="text-lg text-gray-300">¡Empieza tu aventura!</p>
+                    <p class="text-sm text-gray-400">Juega tu primera partida para desbloquear estadísticas increíbles</p>
+                </div>
+            `;
             return;
         }
+        
+        // Calcular estadísticas generales
         const totalCorrect = stats.reduce((sum, game) => sum + game.correct_guesses, 0);
         const totalPlayed = stats.reduce((sum, game) => sum + game.total_questions, 0);
-        const percentage = totalPlayed > 0 ? Math.round((totalCorrect / totalPlayed) * 100) : 0;
-        statsContent.innerHTML = `<div class="text-center"><p class="text-5xl font-bold text-blue-400">${percentage}%</p><p class="mt-2 text-lg text-gray-300">de aciertos</p><p class="text-sm text-gray-400">(${totalCorrect} de ${totalPlayed} en las últimas partidas)</p></div>`;
+        const totalGames = stats.length;
+        const averageAccuracy = Math.round(stats.reduce((sum, game) => sum + (game.accuracy_percentage || 0), 0) / totalGames);
+        const bestStreak = Math.max(...stats.map(game => game.max_streak || 0));
+        const recentGames = stats.slice(0, 5);
+        
+        // Estadísticas por modo de juego
+        const modeStats = stats.reduce((acc, game) => {
+            const mode = game.game_mode || 'classic';
+            if (!acc[mode]) acc[mode] = { games: 0, accuracy: 0 };
+            acc[mode].games++;
+            acc[mode].accuracy += game.accuracy_percentage || 0;
+            return acc;
+        }, {});
+        
+        Object.keys(modeStats).forEach(mode => {
+            modeStats[mode].accuracy = Math.round(modeStats[mode].accuracy / modeStats[mode].games);
+        });
+        
+        // Racha de días jugados
+        const playDates = [...new Set(stats.map(game => new Date(game.created_at).toDateString()))];
+        const streakDays = calculatePlayStreak(playDates);
+        
+        statsContent.innerHTML = `
+            <div class="space-y-6">
+                <!-- Estadística principal -->
+                <div class="text-center bg-gradient-to-r from-blue-500/20 to-purple-500/20 rounded-lg p-4">
+                    <div class="text-4xl font-bold text-blue-400">${averageAccuracy}%</div>
+                    <div class="text-lg text-gray-300 mt-1">Precisión promedio</div>
+                    <div class="text-sm text-gray-400">${totalCorrect} de ${totalPlayed} calles acertadas</div>
+                </div>
+                
+                <!-- Métricas destacadas -->
+                <div class="grid grid-cols-2 gap-3 text-center">
+                    <div class="bg-gray-800/50 rounded-lg p-3">
+                        <div class="text-2xl font-bold text-green-400">${totalGames}</div>
+                        <div class="text-xs text-gray-400 uppercase tracking-wide">Partidas</div>
+                    </div>
+                    <div class="bg-gray-800/50 rounded-lg p-3">
+                        <div class="text-2xl font-bold text-yellow-400">${bestStreak}</div>
+                        <div class="text-xs text-gray-400 uppercase tracking-wide">Mejor racha</div>
+                    </div>
+                    <div class="bg-gray-800/50 rounded-lg p-3">
+                        <div class="text-2xl font-bold text-purple-400">${streakDays}</div>
+                        <div class="text-xs text-gray-400 uppercase tracking-wide">Días jugados</div>
+                    </div>
+                    <div class="bg-gray-800/50 rounded-lg p-3">
+                        <div class="text-2xl font-bold text-orange-400">${Object.keys(modeStats).length}</div>
+                        <div class="text-xs text-gray-400 uppercase tracking-wide">Modos</div>
+                    </div>
+                </div>
+                
+                <!-- Progreso reciente -->
+                <div class="space-y-2">
+                    <h4 class="text-sm font-semibold text-gray-300">Últimas 5 partidas</h4>
+                    <div class="flex justify-between items-center space-x-1">
+                        ${recentGames.map(game => `
+                            <div class="flex-1 h-2 rounded-full ${getAccuracyColor(game.accuracy_percentage || 0)} opacity-75"></div>
+                        `).join('')}
+                    </div>
+                </div>
+                
+                <!-- Botón expandir -->
+                <button id="expand-stats-btn" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-4 rounded-lg transition duration-300">
+                    📊 Ver estadísticas completas
+                </button>
+            </div>
+        `;
+        
+        // Añadir event listener al botón expandir
+        document.getElementById('expand-stats-btn')?.addEventListener('click', openExpandedStats);
+        
     } catch (error) {
         console.error('Error cargando estadísticas:', error.message);
         statsContent.innerHTML = '<p class="text-red-400">Error al cargar estadísticas.</p>';
     }
+  }
+  
+  function getAccuracyColor(accuracy) {
+    if (accuracy >= 80) return 'bg-green-500';
+    if (accuracy >= 60) return 'bg-yellow-500';
+    if (accuracy >= 40) return 'bg-orange-500';
+    return 'bg-red-500';
+  }
+  
+  function calculatePlayStreak(playDates) {
+    if (playDates.length === 0) return 0;
+    
+    playDates.sort((a, b) => new Date(b) - new Date(a));
+    let streak = 1;
+    let currentDate = new Date(playDates[0]);
+    
+    for (let i = 1; i < playDates.length; i++) {
+        const prevDate = new Date(playDates[i]);
+        const dayDiff = Math.floor((currentDate - prevDate) / (1000 * 60 * 60 * 24));
+        
+        if (dayDiff === 1) {
+            streak++;
+            currentDate = prevDate;
+        } else {
+            break;
+        }
+    }
+    
+    return streak;
+  }
+  
+  async function openExpandedStats() {
+    try {
+        // Ocultar el panel de juego
+        const gameUiContainer = document.getElementById('game-ui-container');
+        gameUiContainer.style.opacity = '0.3';
+        gameUiContainer.style.pointerEvents = 'none';
+        
+        const modal = document.getElementById('expanded-stats-modal');
+        const content = document.getElementById('expanded-stats-content');
+        
+        content.innerHTML = '<div class="text-center"><p>Cargando estadísticas detalladas...</p></div>';
+        modal.classList.remove('hidden');
+        
+        // Cargar datos completos
+        const { data: { session } } = await supabaseClient.auth.getSession();
+        if (!session) return;
+        
+        const { data: stats, error } = await supabaseClient.from('game_stats')
+            .select('*')
+            .eq('user_id', session.user.id)
+            .order('created_at', { ascending: false });
+            
+        if (error) throw error;
+        
+        // Generar el contenido completo
+        content.innerHTML = generateExpandedStatsContent(stats);
+        
+        // Añadir event listeners
+        setupExpandedStatsListeners();
+        
+    } catch (error) {
+        console.error('Error cargando estadísticas expandidas:', error);
+        document.getElementById('expanded-stats-content').innerHTML = 
+            '<p class="text-red-400 text-center">Error al cargar las estadísticas detalladas</p>';
+    }
+  }
+  
+  function generateExpandedStatsContent(stats) {
+    if (stats.length === 0) {
+        return `
+            <div class="text-center space-y-6">
+                <div class="text-8xl">📈</div>
+                <h3 class="text-2xl font-bold">¡Tus estadísticas te esperan!</h3>
+                <p class="text-gray-300">Juega algunas partidas para ver tu progreso aquí</p>
+            </div>
+        `;
+    }
+    
+    // Calcular estadísticas avanzadas
+    const totalGames = stats.length;
+    const totalCorrect = stats.reduce((sum, game) => sum + game.correct_guesses, 0);
+    const totalPlayed = stats.reduce((sum, game) => sum + game.total_questions, 0);
+    const averageAccuracy = Math.round((totalCorrect / totalPlayed) * 100);
+    const bestGame = stats.reduce((best, game) => 
+        (game.accuracy_percentage || 0) > (best.accuracy_percentage || 0) ? game : best, stats[0]);
+    const totalPlayTime = stats.reduce((sum, game) => sum + (game.duration_seconds || 0), 0);
+    
+    // Estadísticas por modo
+    const modeBreakdown = stats.reduce((acc, game) => {
+        const mode = game.game_mode || 'classic';
+        if (!acc[mode]) acc[mode] = { count: 0, accuracy: 0, totalCorrect: 0, totalPlayed: 0 };
+        acc[mode].count++;
+        acc[mode].totalCorrect += game.correct_guesses;
+        acc[mode].totalPlayed += game.total_questions;
+        acc[mode].accuracy = Math.round((acc[mode].totalCorrect / acc[mode].totalPlayed) * 100);
+        return acc;
+    }, {});
+    
+    const modeNames = {
+        'classic': '🎯 Clásico',
+        'revancha': '🔄 Revancha', 
+        'instinto': '🧠 Instinto'
+    };
+    
+    // Historial de partidas (últimas 20)
+    const recentGames = stats.slice(0, 20);
+    
+    return `
+        <div class="space-y-6">
+            <!-- Resumen general -->
+            <div class="stats-section">
+                <h3 class="stats-section-title">🏆 Resumen General</h3>
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div class="text-center">
+                        <div class="text-3xl font-bold text-blue-400">${totalGames}</div>
+                        <div class="text-sm text-gray-400">Partidas totales</div>
+                    </div>
+                    <div class="text-center">
+                        <div class="text-3xl font-bold text-green-400">${averageAccuracy}%</div>
+                        <div class="text-sm text-gray-400">Precisión media</div>
+                    </div>
+                    <div class="text-center">
+                        <div class="text-3xl font-bold text-purple-400">${Math.floor(totalPlayTime / 60)}</div>
+                        <div class="text-sm text-gray-400">Minutos jugados</div>
+                    </div>
+                    <div class="text-center">
+                        <div class="text-3xl font-bold text-yellow-400">${bestGame.accuracy_percentage || 0}%</div>
+                        <div class="text-sm text-gray-400">Mejor partida</div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Estadísticas por modo -->
+            <div class="stats-section">
+                <h3 class="stats-section-title">🎮 Por Modo de Juego</h3>
+                <div class="space-y-3">
+                    ${Object.entries(modeBreakdown).map(([mode, data]) => `
+                        <div class="flex justify-between items-center p-3 bg-gray-800/50 rounded-lg">
+                            <div class="flex items-center space-x-3">
+                                <span class="text-lg">${modeNames[mode] || mode}</span>
+                                <span class="text-sm text-gray-400">${data.count} partidas</span>
+                            </div>
+                            <div class="flex items-center space-x-4">
+                                <span class="text-lg font-bold" style="color: ${getAccuracyTextColor(data.accuracy)}">${data.accuracy}%</span>
+                                <span class="text-sm text-gray-400">${data.totalCorrect}/${data.totalPlayed}</span>
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+            
+            <!-- Historial de partidas -->
+            <div class="stats-section">
+                <h3 class="stats-section-title">📋 Historial de Partidas</h3>
+                <div class="space-y-2 max-h-96 overflow-y-auto">
+                    ${recentGames.map((game, index) => {
+                        const date = new Date(game.created_at);
+                        const timeAgo = getTimeAgo(date);
+                        return `
+                            <div class="game-history-item">
+                                <div class="flex items-center space-x-4 flex-1">
+                                    <div class="w-12 h-12 rounded-full flex items-center justify-center text-lg font-bold" 
+                                         style="background-color: ${getAccuracyBackgroundColor(game.accuracy_percentage || 0)}">
+                                        ${game.accuracy_percentage || 0}%
+                                    </div>
+                                    <div class="flex-1">
+                                        <div class="flex items-center space-x-2 mb-1">
+                                            <span class="font-semibold">${modeNames[game.game_mode] || game.game_mode}</span>
+                                            <span class="text-xs bg-gray-700 px-2 py-1 rounded">${timeAgo}</span>
+                                        </div>
+                                        <div class="text-sm text-gray-400">
+                                            ${game.correct_guesses}/${game.total_questions} calles • 
+                                            ${game.max_streak || 0} racha máxima • 
+                                            ${Math.floor((game.duration_seconds || 0) / 60)}min
+                                        </div>
+                                        ${game.zone_name ? `<div class="text-xs text-gray-500 mt-1">${game.zone_name}</div>` : ''}
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                    }).join('')}
+                </div>
+            </div>
+            
+            <!-- Próximamente -->
+            <div class="stats-section">
+                <h3 class="stats-section-title">🚀 Próximamente</h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="p-4 bg-gradient-to-r from-green-500/20 to-blue-500/20 rounded-lg border border-green-500/30">
+                        <div class="text-lg font-bold mb-2">🗺️ Mapa de Calor</div>
+                        <div class="text-sm text-gray-300">Visualiza tus zonas dominadas y áreas de mejora</div>
+                    </div>
+                    <div class="p-4 bg-gradient-to-r from-purple-500/20 to-pink-500/20 rounded-lg border border-purple-500/30">
+                        <div class="text-lg font-bold mb-2">🏅 Logros</div>
+                        <div class="text-sm text-gray-300">Sistema de insignias y desafíos</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+  }
+  
+  function getAccuracyTextColor(accuracy) {
+    if (accuracy >= 80) return '#10b981';
+    if (accuracy >= 60) return '#f59e0b';
+    if (accuracy >= 40) return '#f97316';
+    return '#ef4444';
+  }
+  
+  function getAccuracyBackgroundColor(accuracy) {
+    if (accuracy >= 80) return 'rgba(16, 185, 129, 0.2)';
+    if (accuracy >= 60) return 'rgba(245, 158, 11, 0.2)';
+    if (accuracy >= 40) return 'rgba(249, 115, 22, 0.2)';
+    return 'rgba(239, 68, 68, 0.2)';
+  }
+  
+  function getTimeAgo(date) {
+    const now = new Date();
+    const diffMs = now - date;
+    const diffMins = Math.floor(diffMs / (1000 * 60));
+    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+    
+    if (diffMins < 60) return `${diffMins}min`;
+    if (diffHours < 24) return `${diffHours}h`;
+    return `${diffDays}d`;
+  }
+  
+  function setupExpandedStatsListeners() {
+    const modal = document.getElementById('expanded-stats-modal');
+    const closeBtn = document.getElementById('close-expanded-stats');
+    const backdrop = document.getElementById('stats-backdrop');
+    const gameUiContainer = document.getElementById('game-ui-container');
+    
+    const closeModal = () => {
+        modal.classList.add('hidden');
+        gameUiContainer.style.opacity = '1';
+        gameUiContainer.style.pointerEvents = 'auto';
+    };
+    
+    closeBtn.addEventListener('click', closeModal);
+    backdrop.addEventListener('click', closeModal);
+    
+    // Cerrar con ESC
+    const handleEsc = (e) => {
+        if (e.key === 'Escape') {
+            closeModal();
+            document.removeEventListener('keydown', handleEsc);
+        }
+    };
+    document.addEventListener('keydown', handleEsc);
+  }
+
+  // ===============================
+  // FUNCIONES BASE PARA MAPA DE CALOR FUTURO
+  // ===============================
+  
+  /**
+   * Función preparada para implementar mapa de calor
+   * Analizará las zonas jugadas y mostrará:
+   * - Verde: Zonas dominadas (>80% precisión)
+   * - Amarillo: Zonas intermedias (60-80% precisión)  
+   * - Rojo: Zonas a repasar (<60% precisión)
+   */
+  async function generateHeatmapData() {
+    try {
+        const { data: { session } } = await supabaseClient.auth.getSession();
+        if (!session) return null;
+        
+        const { data: stats } = await supabaseClient.from('game_stats')
+            .select('zone_center_lat, zone_center_lng, accuracy_percentage, zone_bounds')
+            .eq('user_id', session.user.id)
+            .not('zone_center_lat', 'is', null);
+            
+        // Agrupar por proximidad geográfica y calcular precisión promedio
+        return processZoneData(stats);
+    } catch (error) {
+        console.error('Error generando datos de mapa de calor:', error);
+        return null;
+    }
+  }
+  
+  function processZoneData(stats) {
+    // TODO: Implementar clustering de zonas cercanas
+    // TODO: Calcular precisión promedio por cluster
+    // TODO: Asignar colores según precisión
+    return stats.map(stat => ({
+        lat: stat.zone_center_lat,
+        lng: stat.zone_center_lng,
+        accuracy: stat.accuracy_percentage,
+        color: getHeatmapColor(stat.accuracy_percentage)
+    }));
+  }
+  
+  function getHeatmapColor(accuracy) {
+    if (accuracy >= 80) return 'green';
+    if (accuracy >= 60) return 'yellow'; 
+    return 'red';
+  }
+  
+  // Placeholder para la función de renderizado del mapa de calor
+  function renderHeatmap(heatmapData) {
+    // TODO: Crear capa de mapa de calor en Leaflet
+    // TODO: Añadir controles de filtro (mostrar solo green/yellow/red)
+    // TODO: Añadir tooltips con estadísticas detalladas
+    console.log('Mapa de calor listo para implementar con:', heatmapData);
   }
 
   uiElements.googleLoginBtn.addEventListener('click', signInWithGoogle);

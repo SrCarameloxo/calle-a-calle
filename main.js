@@ -1346,23 +1346,21 @@ async function saveFailedStreet(streetData) {
         // duration_seconds: Math.floor((Date.now() - gameStartTime) / 1000),
         // max_streak: maxStreak || 0
 
-        console.log('Datos a insertar:', gameData);
-        let { data: insertResult, error: insertError } = await supabaseClient.from('game_stats').insert(gameData);
+        // Primero intentamos solo los campos básicos que sabemos que existen
+        const basicData = {
+            user_id: gameData.user_id,
+            correct_guesses: gameData.correct_guesses,
+            total_questions: gameData.total_questions
+        };
         
-        // Si hay error y estamos intentando guardar zone_polygon, intentar sin él
-        if (insertError && gameData.zone_polygon) {
-            console.warn('Error con zone_polygon, intentando sin él:', insertError);
-            const { zone_polygon, ...gameDataWithoutPolygon } = gameData;
-            const result = await supabaseClient.from('game_stats').insert(gameDataWithoutPolygon);
-            insertResult = result.data;
-            insertError = result.error;
-        }
+        console.log('Guardando datos básicos:', basicData);
+        const { data: insertResult, error: insertError } = await supabaseClient.from('game_stats').insert(basicData);
         
         if (insertError) {
-            console.error('Error definitivo al insertar:', insertError);
+            console.error('Error al insertar datos básicos:', insertError);
             throw insertError;
         }
-        console.log('Resultado de inserción:', insertResult);
+        console.log('Partida guardada exitosamente');
         
         console.log('Estadísticas guardadas correctamente');
         
@@ -2017,8 +2015,8 @@ async function saveFailedStreet(streetData) {
             subdomains: 'abcd'
         }).addTo(miniMap);
         
-        // Cargar y renderizar datos iniciales (global)
-        const heatmapData = await fetchHeatmapData('global');
+        // Cargar y renderizar datos iniciales (personal)
+        const heatmapData = await fetchHeatmapData('personal');
         renderHeatmap(heatmapData, miniMap);
         
         // Guardar referencia al mini mapa
@@ -2042,7 +2040,7 @@ async function saveFailedStreet(streetData) {
   // ===============================
   
   let heatmapLayer = null;
-  let currentHeatmapType = 'global'; // 'global' o 'personal'
+  let currentHeatmapType = 'personal'; // Solo personal
   
   /**
    * Obtener datos del mapa de calor desde la API
@@ -2191,17 +2189,7 @@ async function saveFailedStreet(streetData) {
             }
         }
         
-        // Añadir animación de entrada escalonada
-        setTimeout(() => {
-            elements.forEach((element, elementIndex) => {
-                const domElement = element.getElement();
-                if (domElement) {
-                    domElement.style.transition = 'all 0.8s ease-out';
-                    domElement.style.transform = 'scale(1)';
-                    domElement.style.opacity = element.options.fillOpacity;
-                }
-            });
-        }, index * 150); // Delay progresivo por zona
+        // Sin animaciones - renderizado inmediato
     });
     
     // Añadir al mapa
@@ -2286,18 +2274,11 @@ async function saveFailedStreet(streetData) {
     }
   }
   
-  function getHeatmapColor(accuracy, type = 'global') {
-    if (type === 'global') {
-        // Global: rojo = difícil, verde = fácil
-        if (accuracy >= 0.8) return '#10b981'; // Verde
-        if (accuracy >= 0.6) return '#f59e0b'; // Amarillo
-        return '#ef4444'; // Rojo
-    } else {
-        // Personal: verde = dominado, rojo = necesita repaso
-        if (accuracy >= 0.8) return '#10b981'; // Verde
-        if (accuracy >= 0.6) return '#f59e0b'; // Amarillo  
-        return '#ef4444'; // Rojo
-    }
+  function getHeatmapColor(accuracy, type = 'personal') {
+    // Colores brillantes y dopaminicos
+    if (accuracy >= 0.8) return '#00ff00'; // Verde brillante - Dominada
+    if (accuracy >= 0.6) return '#ffff00'; // Amarillo brillante - Regular
+    return '#ff0000'; // Rojo brillante - Necesita repaso
   }
 
   uiElements.googleLoginBtn.addEventListener('click', signInWithGoogle);

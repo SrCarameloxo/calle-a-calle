@@ -1909,13 +1909,16 @@ async function saveFailedStreet(streetData) {
   async function fetchHeatmapData(type = 'global') {
     try {
         const { data: { session } } = await supabaseClient.auth.getSession();
-        const params = new URLSearchParams({ type });
+        const params = new URLSearchParams({ 
+            action: 'heatmap',
+            type: type
+        });
         
         if (type === 'personal' && session) {
             params.append('user_id', session.user.id);
         }
         
-        const response = await fetch(`/api/getHeatmapData?${params}`);
+        const response = await fetch(`/api/geocode?${params}`);
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         
         return await response.json();

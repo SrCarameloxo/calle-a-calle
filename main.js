@@ -8,6 +8,26 @@ window.addEventListener('DOMContentLoaded', () => {
   const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhwcHp3Znd0ZWRnaHBzeGZvbm9oIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQxMjQzNDMsImV4cCI6MjA2OTcwMDM0M30.BAh6i5iJ5YkDBoydfkC9azAD4eMdYBkEBdxws9kj5Hg';
   // Hacemos que supabaseClient sea accesible globalmente para que los módulos puedan usarlo.
   window.supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  
+  // Exponer variables necesarias para módulos externos
+  window.getGameState = () => ({
+    currentGameMode,
+    zonePoints,
+    lastGameZonePoints
+  });
+  
+  // Debug function para verificar datos
+  window.debugStats = async () => {
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    if (!session) return console.log('No hay sesión');
+    
+    console.log('=== DEBUG ESTADÍSTICAS ===');
+    const dbStats = await supabaseClient.from('game_stats').select('*').eq('user_id', session.user.id);
+    console.log('Partidas en DB:', dbStats.data?.length || 0, dbStats.data);
+    
+    const localGames = getLocalStorageGames(session.user.id);
+    console.log('Partidas en localStorage:', localGames.length, localGames);
+  };
 
   // --- Selectores de elementos DOM ---
   const uiElements = {
@@ -1316,7 +1336,8 @@ async function saveFailedStreet(streetData) {
     }
   }
 
-  async function saveGameStats(correct, total) {
+  // Hacer función y variables disponibles globalmente para módulos externos
+  window.saveGameStats = async function saveGameStats(correct, total) {
     try {
         const { data: { session } } = await supabaseClient.auth.getSession();
         if (!session || total === 0) return;
@@ -1497,7 +1518,7 @@ async function saveFailedStreet(streetData) {
                     </div>
                     <div class="space-y-2">
                         <div class="flex space-x-1 h-3">
-                            ${recentGames.slice(0, 5).map(game => `
+                            ${recentGames.slice(0, 5).reverse().map(game => `
                                 <div class="flex-1 rounded-full ${getAccuracyColor(game.accuracy_percentage || 0)} opacity-80 hover:opacity-100 transition-opacity" 
                                      title="${game.accuracy_percentage}% - ${new Date(game.created_at).toLocaleDateString()}"></div>
                             `).join('')}
@@ -2069,13 +2090,18 @@ async function saveFailedStreet(streetData) {
             try {
                 const gameData = JSON.parse(localStorage.getItem(key));
                 games.push(gameData);
-                console.log('Partida encontrada en localStorage:', key, gameData);
+                console.log('Partida encontrada en localStorage:', key, 'modo:', gameData.game_mode, gameData);
             } catch (e) {
                 console.warn('Error parsing localStorage game:', key, e);
             }
         }
     }
     console.log('Total partidas en localStorage:', games.length);
+    console.log('Desglose por modo:', games.reduce((acc, game) => {
+        const mode = game.game_mode || 'classic';
+        acc[mode] = (acc[mode] || 0) + 1;
+        return acc;
+    }, {}));
     return games.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
   }
 

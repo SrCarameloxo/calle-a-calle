@@ -28,7 +28,7 @@ export default async function handler(request, response) {
         // Obtener datos globales de toda la ciudad
         const { data: globalStats, error } = await supabase
           .from('game_stats')
-          .select('correct_guesses, total_questions, created_at, user_id');
+          .select('correct_guesses, total_questions, created_at, user_id, zone_polygon');
 
         if (error) throw error;
 
@@ -111,31 +111,63 @@ function processPersonalHeatmapData(stats) {
   const personalZones = [];
   
   stats.forEach((game, index) => {
-    if (game.total_questions > 0 && game.zone_polygon) {
+    if (game.total_questions > 0) {
       const accuracy = game.correct_guesses / game.total_questions;
       
-      try {
-        const polygon = JSON.parse(game.zone_polygon);
-        
-        if (Array.isArray(polygon) && polygon.length >= 3) {
-          // Calcular el centroide del polígono para el punto principal
-          const centroid = calculatePolygonCentroid(polygon);
+      if (game.zone_polygon) {
+        try {
+          const polygon = JSON.parse(game.zone_polygon);
           
-          personalZones.push({
-            lat: centroid.lat,
-            lng: centroid.lng,
-            polygon: polygon,
-            accuracy: accuracy,
-            totalCorrect: game.correct_guesses,
-            totalAttempts: game.total_questions,
-            color: getHeatmapColor(accuracy, 'personal'),
-            opacity: calculatePersonalOpacity(accuracy, 1),
-            name: `Partida ${index + 1}`,
-            gameDate: game.created_at
-          });
+          if (Array.isArray(polygon) && polygon.length >= 3) {
+            // Calcular el centroide del polígono para el punto principal
+            const centroid = calculatePolygonCentroid(polygon);
+            
+            personalZones.push({
+              lat: centroid.lat,
+              lng: centroid.lng,
+              polygon: polygon,
+              accuracy: accuracy,
+              totalCorrect: game.correct_guesses,
+              totalAttempts: game.total_questions,
+              color: getHeatmapColor(accuracy, 'personal'),
+              opacity: calculatePersonalOpacity(accuracy, 1),
+              name: `Partida ${index + 1}`,
+              gameDate: game.created_at
+            });
+          }
+        } catch (error) {
+          console.log('Error parsing zone_polygon for game:', error);
+          // Fallback a coordenadas simuladas si no hay polígono
+          addFallbackZone();
         }
-      } catch (error) {
-        console.log('Error parsing zone_polygon for game:', error);
+      } else {
+        // Si no hay zone_polygon, crear zona simulada
+        addFallbackZone();
+      }
+      
+      function addFallbackZone() {
+        // Coordenadas simuladas distribuidas en Badajoz
+        const baseCoords = [
+          [38.8794, -6.9706], [38.8850, -6.9650], [38.8750, -6.9800],
+          [38.8700, -6.9600], [38.8900, -6.9500], [38.8650, -6.9750]
+        ];
+        
+        const coordIndex = index % baseCoords.length;
+        const [baseLat, baseLng] = baseCoords[coordIndex];
+        const lat = baseLat + (Math.random() - 0.5) * 0.02;
+        const lng = baseLng + (Math.random() - 0.5) * 0.02;
+        
+        personalZones.push({
+          lat: lat,
+          lng: lng,
+          accuracy: accuracy,
+          totalCorrect: game.correct_guesses,
+          totalAttempts: game.total_questions,
+          color: getHeatmapColor(accuracy, 'personal'),
+          opacity: calculatePersonalOpacity(accuracy, 1),
+          name: `Partida ${index + 1}`,
+          gameDate: game.created_at
+        });
       }
     }
   });

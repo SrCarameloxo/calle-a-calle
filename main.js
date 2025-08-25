@@ -1323,13 +1323,19 @@ async function saveFailedStreet(streetData) {
 
         // Preparar coordenadas de la zona para el mapa de calor
         const zonePolygon = zonePoints.length > 0 ? zonePoints.map(p => [p.lat, p.lng]) : null;
+        console.log('Guardando partida con zona:', zonePolygon ? `${zonePolygon.length} puntos` : 'sin zona');
         
-        const gameData = {
+        // Intentar primero con zone_polygon, si falla intentar sin él
+        let gameData = {
             user_id: session.user.id,
             correct_guesses: correct,
-            total_questions: total,
-            zone_polygon: zonePolygon ? JSON.stringify(zonePolygon) : null
+            total_questions: total
         };
+        
+        // Solo añadir zone_polygon si tenemos datos
+        if (zonePolygon) {
+            gameData.zone_polygon = JSON.stringify(zonePolygon);
+        }
         
         // Campos adicionales que se pueden añadir cuando se actualice la base de datos:
         // accuracy_percentage: Math.round((correct / total) * 100),
@@ -1338,8 +1344,31 @@ async function saveFailedStreet(streetData) {
         // duration_seconds: Math.floor((Date.now() - gameStartTime) / 1000),
         // max_streak: maxStreak || 0
 
-        await supabaseClient.from('game_stats').insert(gameData);
+        console.log('Datos a insertar:', gameData);
+        let { data: insertResult, error: insertError } = await supabaseClient.from('game_stats').insert(gameData);
+        
+        // Si hay error y estamos intentando guardar zone_polygon, intentar sin él
+        if (insertError && gameData.zone_polygon) {
+            console.warn('Error con zone_polygon, intentando sin él:', insertError);
+            const { zone_polygon, ...gameDataWithoutPolygon } = gameData;
+            const result = await supabaseClient.from('game_stats').insert(gameDataWithoutPolygon);
+            insertResult = result.data;
+            insertError = result.error;
+        }
+        
+        if (insertError) {
+            console.error('Error definitivo al insertar:', insertError);
+            throw insertError;
+        }
+        console.log('Resultado de inserción:', insertResult);
+        
         console.log('Estadísticas guardadas correctamente');
+        
+        // Refrescar estadísticas si el panel está abierto
+        const statsPanel = document.getElementById('stats-content');
+        if (statsPanel && !statsPanel.classList.contains('hidden')) {
+            await displayStats();
+        }
     } catch (error) {
         console.error('Error guardando estadísticas:', error.message);
     }

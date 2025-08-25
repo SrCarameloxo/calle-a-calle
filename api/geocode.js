@@ -26,9 +26,19 @@ export default async function handler(request, response) {
       // === NUEVA FUNCIONALIDAD DE MAPA DE CALOR ===
       if (type === 'global') {
         // Obtener datos globales de toda la ciudad
-        const { data: globalStats, error } = await supabase
+        // Intentar primero con zone_polygon, si falla sin él
+        let { data: globalStats, error } = await supabase
           .from('game_stats')
           .select('correct_guesses, total_questions, created_at, user_id, zone_polygon');
+          
+        // Si hay error por la columna zone_polygon, intentar sin ella
+        if (error && error.message && error.message.includes('zone_polygon')) {
+          const result = await supabase
+            .from('game_stats')
+            .select('correct_guesses, total_questions, created_at, user_id');
+          globalStats = result.data;
+          error = result.error;
+        }
 
         if (error) throw error;
 
@@ -46,11 +56,23 @@ export default async function handler(request, response) {
           return response.status(400).json({ error: 'user_id required for personal heatmap' });
         }
 
-        const { data: userStats, error } = await supabase
+        // Intentar primero con zone_polygon, si falla sin él
+        let { data: userStats, error } = await supabase
           .from('game_stats')
           .select('correct_guesses, total_questions, created_at, zone_polygon')
           .eq('user_id', user_id)
           .order('created_at', { ascending: false });
+          
+        // Si hay error por la columna zone_polygon, intentar sin ella
+        if (error && error.message && error.message.includes('zone_polygon')) {
+          const result = await supabase
+            .from('game_stats')
+            .select('correct_guesses, total_questions, created_at')
+            .eq('user_id', user_id)
+            .order('created_at', { ascending: false });
+          userStats = result.data;
+          error = result.error;
+        }
 
         if (error) throw error;
 

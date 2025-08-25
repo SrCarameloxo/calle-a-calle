@@ -1322,7 +1322,9 @@ async function saveFailedStreet(streetData) {
         if (!session || total === 0) return;
 
         // Preparar coordenadas de la zona para el mapa de calor
-        const zonePolygon = zonePoints.length > 0 ? zonePoints.map(p => [p.lat, p.lng]) : null;
+        // Usar lastGameZonePoints si está disponible, sino zonePoints
+        const pointsToSave = (lastGameZonePoints && lastGameZonePoints.length > 0) ? lastGameZonePoints : zonePoints;
+        const zonePolygon = pointsToSave.length > 0 ? pointsToSave.map(p => [p.lat, p.lng]) : null;
         console.log('Guardando partida con zona:', zonePolygon ? `${zonePolygon.length} puntos` : 'sin zona');
         
         // Intentar primero con zone_polygon, si falla intentar sin él
@@ -2109,6 +2111,8 @@ async function saveFailedStreet(streetData) {
     heatmapLayer = L.layerGroup();
     
     heatmapData.data.forEach((zone, index) => {
+        let elements = []; // Array para almacenar elementos (círculos o polígonos)
+        
         if (zone.polygon && currentHeatmapType === 'personal') {
             // Renderizar polígono real para datos personales
             const polygonLatLngs = zone.polygon.map(point => [point[0], point[1]]);
@@ -2143,12 +2147,12 @@ async function saveFailedStreet(streetData) {
                     });
                 }
                 
+                elements.push(polygon);
                 heatmapLayer.addLayer(polygon);
             }
         } else {
             // Sistema de múltiples círculos para datos globales o fallback
             const baseRadius = 600;
-            const circles = [];
             
             // Crear múltiples círculos concéntricos para difuminado suave
             for (let i = 0; i < 4; i++) {
@@ -2182,19 +2186,19 @@ async function saveFailedStreet(streetData) {
                     });
                 }
                 
-                circles.push(circle);
+                elements.push(circle);
                 heatmapLayer.addLayer(circle);
             }
         }
         
         // Añadir animación de entrada escalonada
         setTimeout(() => {
-            circles.forEach((circle, circleIndex) => {
-                const element = circle.getElement();
-                if (element) {
-                    element.style.transition = 'all 0.8s ease-out';
-                    element.style.transform = 'scale(1)';
-                    element.style.opacity = circle.options.fillOpacity;
+            elements.forEach((element, elementIndex) => {
+                const domElement = element.getElement();
+                if (domElement) {
+                    domElement.style.transition = 'all 0.8s ease-out';
+                    domElement.style.transform = 'scale(1)';
+                    domElement.style.opacity = element.options.fillOpacity;
                 }
             });
         }, index * 150); // Delay progresivo por zona

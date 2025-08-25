@@ -323,11 +323,15 @@ export function startInstintoGame({ ui, gameMap, updatePanelUI, userProfile, set
     }
 
     // GUARDAR ESTADÍSTICAS DEL MODO INSTINTO
-    if (window.saveGameStats) {
+    if (window.saveGameStats && window.setZonePointsFromModule) {
+        // Establecer los puntos de zona para el mapa de calor
+        const zonePointsForHeatmap = zonePoints.map(p => ({ lat: p.lat, lng: p.lng }));
+        window.setZonePointsFromModule(zonePointsForHeatmap);
+        
         console.log('Guardando estadísticas del modo instinto:', score, '/', gameQuestions.length);
         window.saveGameStats(score, gameQuestions.length);
     } else {
-        console.error('saveGameStats no está disponible en window');
+        console.error('saveGameStats o setZonePointsFromModule no están disponibles en window');
     }
 
     updatePanelUI(() => {

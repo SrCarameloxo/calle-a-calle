@@ -410,6 +410,7 @@ window.addEventListener('DOMContentLoaded', () => {
                     }
                 });
             } else if (selectedMode === 'instinto') {
+                setGameMode('instinto'); // Establecer el modo de juego a instinto
                 uiElements.drawZoneBtn.classList.remove('hidden');
                 activeModeControls = startInstintoGame({ 
                     ui: uiElements, 
@@ -1337,6 +1338,11 @@ async function saveFailedStreet(streetData) {
   }
 
   // Hacer función y variables disponibles globalmente para módulos externos
+  window.setZonePointsFromModule = function(points) {
+    lastGameZonePoints = points;
+    console.log('Zona establecida desde módulo externo:', points ? points.length + ' puntos' : 'sin zona');
+  };
+  
   window.saveGameStats = async function saveGameStats(correct, total) {
     try {
         const { data: { session } } = await supabaseClient.auth.getSession();

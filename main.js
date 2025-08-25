@@ -1327,6 +1327,20 @@ async function saveFailedStreet(streetData) {
         const zonePolygon = pointsToSave.length > 0 ? pointsToSave.map(p => [p.lat, p.lng]) : null;
         console.log('Guardando partida con zona:', zonePolygon ? `${zonePolygon.length} puntos` : 'sin zona');
         
+        // Guardar polígono en localStorage temporalmente hasta que se añada la columna a la DB
+        if (zonePolygon) {
+            const gameKey = `game_${session.user.id}_${Date.now()}`;
+            const gamePolygonData = {
+                user_id: session.user.id,
+                correct_guesses: gameData.correct_guesses,
+                total_questions: gameData.total_questions,
+                zone_polygon: zonePolygon,
+                created_at: new Date().toISOString()
+            };
+            localStorage.setItem(gameKey, JSON.stringify(gamePolygonData));
+            console.log('Polígono guardado en localStorage:', gameKey);
+        }
+        
         // Intentar primero con zone_polygon, si falla intentar sin él
         let gameData = {
             user_id: session.user.id,
@@ -1397,13 +1411,28 @@ async function saveFailedStreet(streetData) {
         const { data: { session } } = await supabaseClient.auth.getSession();
         if (!session) return;
         
-        const { data: stats, error } = await supabaseClient.from('game_stats')
+        // Obtener datos de la base de datos
+        const { data: dbStats, error } = await supabaseClient.from('game_stats')
             .select('correct_guesses, total_questions, created_at')
             .eq('user_id', session.user.id)
-            .order('created_at', { ascending: false })
-            .limit(50);
+            .order('created_at', { ascending: false });
             
         if (error) throw error;
+        
+        // Obtener datos del localStorage
+        const localStats = getLocalStorageGames(session.user.id);
+        
+        // Combinar y ordenar todos los datos
+        const allStats = [
+            ...(dbStats || []),
+            ...localStats.map(game => ({
+                correct_guesses: game.correct_guesses,
+                total_questions: game.total_questions,
+                created_at: game.created_at
+            }))
+        ].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+        
+        const stats = allStats;
         
         if (stats.length === 0) {
             statsContent.innerHTML = `
@@ -1447,8 +1476,8 @@ async function saveFailedStreet(streetData) {
         const streakDays = calculatePlayStreak(playDates);
         
         statsContent.innerHTML = `
-            <div class="space-y-5">
-                <!-- Estadística principal más elegante -->
+            <div class="space-y-4">
+                <!-- Solo Precisión Media -->
                 <div class="relative overflow-hidden">
                     <div class="absolute inset-0 bg-gradient-to-r from-blue-600/10 via-purple-600/10 to-blue-600/10"></div>
                     <div class="relative p-6 text-center border border-gray-600/30 rounded-xl backdrop-blur-sm">
@@ -1458,58 +1487,15 @@ async function saveFailedStreet(streetData) {
                     </div>
                 </div>
                 
-                <!-- Métricas en grid más profesional -->
-                <div class="grid grid-cols-2 gap-3">
-                    <div class="bg-gray-800/30 border border-gray-700/40 rounded-lg p-4 hover:bg-gray-800/40 transition-colors">
-                        <div class="flex items-center justify-between">
-                            <div class="text-2xl font-bold text-emerald-400">${totalGames}</div>
-                            <div class="w-8 h-8 bg-emerald-500/20 rounded-lg flex items-center justify-center">
-                                <span class="text-emerald-400 text-sm">📊</span>
-                            </div>
-                        </div>
-                        <div class="text-xs text-gray-400 uppercase tracking-wide mt-1">Partidas Totales</div>
-                    </div>
-                    
-                    <div class="bg-gray-800/30 border border-gray-700/40 rounded-lg p-4 hover:bg-gray-800/40 transition-colors">
-                        <div class="flex items-center justify-between">
-                            <div class="text-2xl font-bold text-amber-400">${bestGame.accuracy_percentage}<span class="text-sm">%</span></div>
-                            <div class="w-8 h-8 bg-amber-500/20 rounded-lg flex items-center justify-center">
-                                <span class="text-amber-400 text-sm">🎯</span>
-                            </div>
-                        </div>
-                        <div class="text-xs text-gray-400 uppercase tracking-wide mt-1">Mejor Resultado</div>
-                    </div>
-                    
-                    <div class="bg-gray-800/30 border border-gray-700/40 rounded-lg p-4 hover:bg-gray-800/40 transition-colors">
-                        <div class="flex items-center justify-between">
-                            <div class="text-2xl font-bold text-violet-400">${streakDays}</div>
-                            <div class="w-8 h-8 bg-violet-500/20 rounded-lg flex items-center justify-center">
-                                <span class="text-violet-400 text-sm">📅</span>
-                            </div>
-                        </div>
-                        <div class="text-xs text-gray-400 uppercase tracking-wide mt-1">Días Activos</div>
-                    </div>
-                    
-                    <div class="bg-gray-800/30 border border-gray-700/40 rounded-lg p-4 hover:bg-gray-800/40 transition-colors">
-                        <div class="flex items-center justify-between">
-                            <div class="text-2xl font-bold text-cyan-400">${totalCorrect}</div>
-                            <div class="w-8 h-8 bg-cyan-500/20 rounded-lg flex items-center justify-center">
-                                <span class="text-cyan-400 text-sm">✓</span>
-                            </div>
-                        </div>
-                        <div class="text-xs text-gray-400 uppercase tracking-wide mt-1">Total Aciertos</div>
-                    </div>
-                </div>
-                
-                <!-- Progreso reciente más elegante -->
+                <!-- Progreso Reciente (últimas 5) -->
                 <div class="space-y-3">
                     <div class="flex items-center justify-between">
                         <h4 class="text-sm font-medium text-gray-300">Progreso Reciente</h4>
-                        <span class="text-xs text-gray-500">Últimas ${recentGames.length} partidas</span>
+                        <span class="text-xs text-gray-500">Últimas 5 partidas</span>
                     </div>
                     <div class="space-y-2">
-                        <div class="flex space-x-1 h-2">
-                            ${recentGames.map(game => `
+                        <div class="flex space-x-1 h-3">
+                            ${recentGames.slice(0, 5).map(game => `
                                 <div class="flex-1 rounded-full ${getAccuracyColor(game.accuracy_percentage || 0)} opacity-80 hover:opacity-100 transition-opacity" 
                                      title="${game.accuracy_percentage}% - ${new Date(game.created_at).toLocaleDateString()}"></div>
                             `).join('')}
@@ -1524,7 +1510,7 @@ async function saveFailedStreet(streetData) {
                 <!-- Botón expandir mejorado -->
                 <button id="expand-stats-btn" class="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-medium py-3 px-4 rounded-lg transition-all duration-300 shadow-lg hover:shadow-xl flex items-center justify-center space-x-2">
                     <span>📈</span>
-                    <span>Análisis Detallado</span>
+                    <span>Estadísticas Completas</span>
                 </button>
             </div>
         `;
@@ -1580,16 +1566,32 @@ async function saveFailedStreet(streetData) {
         content.innerHTML = '<div class="text-center"><p>Cargando estadísticas detalladas...</p></div>';
         modal.classList.remove('hidden');
         
-        // Cargar datos completos
+        // Cargar datos completos (base de datos + localStorage)
         const { data: { session } } = await supabaseClient.auth.getSession();
         if (!session) return;
         
-        const { data: stats, error } = await supabaseClient.from('game_stats')
+        // Obtener datos de la base de datos
+        const { data: dbStats, error } = await supabaseClient.from('game_stats')
             .select('correct_guesses, total_questions, created_at')
             .eq('user_id', session.user.id)
             .order('created_at', { ascending: false });
             
         if (error) throw error;
+        
+        // Obtener datos del localStorage
+        const localStats = getLocalStorageGames(session.user.id);
+        
+        // Combinar y ordenar todos los datos
+        const allStats = [
+            ...(dbStats || []),
+            ...localStats.map(game => ({
+                correct_guesses: game.correct_guesses,
+                total_questions: game.total_questions,
+                created_at: game.created_at
+            }))
+        ].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+        
+        const stats = allStats;
         
         // Generar el contenido completo
         content.innerHTML = generateExpandedStatsContent(stats);
@@ -1860,38 +1862,13 @@ async function saveFailedStreet(streetData) {
   }
   
   function setupHeatmapControls() {
-    const globalBtn = document.getElementById('heatmap-global-btn');
-    const personalBtn = document.getElementById('heatmap-personal-btn');
-    const redLabel = document.getElementById('heatmap-red-label');
-    const greenLabel = document.getElementById('heatmap-green-label');
-    const description = document.getElementById('heatmap-description');
     const expandBtn = document.getElementById('expand-heatmap-btn');
-    
-    if (globalBtn) {
-        globalBtn.addEventListener('click', () => {
-            toggleHeatmapView('global');
-            redLabel.textContent = 'Zonas difíciles';
-            greenLabel.textContent = 'Zonas fáciles';
-            description.innerHTML = `<strong>Vista Global:</strong> Muestra las zonas más y menos falladas por toda la comunidad. 
-                                    Ideal para principiantes que buscan empezar por zonas más fáciles.`;
-        });
-    }
-    
-    if (personalBtn) {
-        personalBtn.addEventListener('click', () => {
-            toggleHeatmapView('personal');
-            redLabel.textContent = 'Necesitas repasar';
-            greenLabel.textContent = 'Zonas dominadas';
-            description.innerHTML = `<strong>Vista Personal:</strong> Tu progreso personal. Las zonas rojas necesitan más práctica, 
-                                    las verdes están bien controladas. Solo aparecen zonas que has jugado.`;
-        });
-    }
     
     if (expandBtn) {
         expandBtn.addEventListener('click', openExpandedHeatmapModal);
     }
     
-    // Inicializar mapa de calor con vista global
+    // Inicializar mapa de calor con vista personal
     initializeHeatmap();
   }
   
@@ -2043,9 +2020,24 @@ async function saveFailedStreet(streetData) {
   /**
    * Obtener datos del mapa de calor desde la API
    */
-  async function fetchHeatmapData(type = 'global') {
+  async function fetchHeatmapData(type = 'personal') {
     try {
         const { data: { session } } = await supabaseClient.auth.getSession();
+        
+        // Primero intentar obtener datos del localStorage para polígonos
+        if (type === 'personal' && session) {
+            const localGames = getLocalStorageGames(session.user.id);
+            if (localGames.length > 0) {
+                console.log('Usando datos del localStorage:', localGames.length, 'partidas');
+                return {
+                    type: 'personal',
+                    data: processLocalGameData(localGames),
+                    totalGames: localGames.length
+                };
+            }
+        }
+        
+        // Si no hay datos locales, intentar API
         const params = new URLSearchParams({ 
             action: 'heatmap',
             type: type
@@ -2064,6 +2056,76 @@ async function saveFailedStreet(streetData) {
         // Fallback a datos simulados
         return generateFallbackHeatmapData(type);
     }
+  }
+
+  function getLocalStorageGames(userId) {
+    const games = [];
+    for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith(`game_${userId}_`)) {
+            try {
+                const gameData = JSON.parse(localStorage.getItem(key));
+                games.push(gameData);
+            } catch (e) {
+                console.warn('Error parsing localStorage game:', key, e);
+            }
+        }
+    }
+    return games.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+  }
+
+  function processLocalGameData(games) {
+    return games.map((game, index) => {
+        const accuracy = game.correct_guesses / game.total_questions;
+        
+        if (game.zone_polygon && Array.isArray(game.zone_polygon) && game.zone_polygon.length >= 3) {
+            // Calcular centroide del polígono
+            const polygon = game.zone_polygon;
+            let centerLat = 0, centerLng = 0;
+            polygon.forEach(point => {
+                centerLat += point[0];
+                centerLng += point[1];
+            });
+            centerLat /= polygon.length;
+            centerLng /= polygon.length;
+            
+            return {
+                lat: centerLat,
+                lng: centerLng,
+                polygon: polygon,
+                accuracy: accuracy,
+                totalCorrect: game.correct_guesses,
+                totalAttempts: game.total_questions,
+                color: getHeatmapColor(accuracy, 'personal'),
+                opacity: accuracy < 0.8 ? 0.7 : 0.4, // Más opaco para zonas que necesitan práctica
+                name: `Partida ${index + 1}`,
+                gameDate: game.created_at
+            };
+        } else {
+            // Fallback a coordenadas simuladas si no hay polígono
+            const baseCoords = [
+                [38.8794, -6.9706], [38.8850, -6.9650], [38.8750, -6.9800],
+                [38.8700, -6.9600], [38.8900, -6.9500], [38.8650, -6.9750]
+            ];
+            
+            const coordIndex = index % baseCoords.length;
+            const [baseLat, baseLng] = baseCoords[coordIndex];
+            const lat = baseLat + (Math.random() - 0.5) * 0.02;
+            const lng = baseLng + (Math.random() - 0.5) * 0.02;
+            
+            return {
+                lat: lat,
+                lng: lng,
+                accuracy: accuracy,
+                totalCorrect: game.correct_guesses,
+                totalAttempts: game.total_questions,
+                color: getHeatmapColor(accuracy, 'personal'),
+                opacity: accuracy < 0.8 ? 0.7 : 0.4,
+                name: `Partida ${index + 1}`,
+                gameDate: game.created_at
+            };
+        }
+    });
   }
   
   /**

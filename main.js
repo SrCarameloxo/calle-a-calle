@@ -1342,6 +1342,7 @@ async function saveFailedStreet(streetData) {
                 correct_guesses: gameData.correct_guesses,
                 total_questions: gameData.total_questions,
                 zone_polygon: zonePolygon,
+                game_mode: currentGameMode || 'classic',
                 created_at: new Date().toISOString()
             };
             localStorage.setItem(gameKey, JSON.stringify(gamePolygonData));
@@ -1424,11 +1425,12 @@ async function saveFailedStreet(streetData) {
         
         // Combinar y ordenar todos los datos
         const allStats = [
-            ...(dbStats || []),
+            ...(dbStats || []).map(game => ({ ...game, game_mode: 'classic' })), // DB games default to classic
             ...localStats.map(game => ({
                 correct_guesses: game.correct_guesses,
                 total_questions: game.total_questions,
-                created_at: game.created_at
+                created_at: game.created_at,
+                game_mode: game.game_mode || 'classic'
             }))
         ].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
         
@@ -1583,11 +1585,12 @@ async function saveFailedStreet(streetData) {
         
         // Combinar y ordenar todos los datos
         const allStats = [
-            ...(dbStats || []),
+            ...(dbStats || []).map(game => ({ ...game, game_mode: 'classic' })), // DB games default to classic
             ...localStats.map(game => ({
                 correct_guesses: game.correct_guesses,
                 total_questions: game.total_questions,
-                created_at: game.created_at
+                created_at: game.created_at,
+                game_mode: game.game_mode || 'classic'
             }))
         ].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
         
@@ -1628,23 +1631,26 @@ async function saveFailedStreet(streetData) {
         ...game,
         accuracy_percentage: game.total_questions > 0 ? Math.round((game.correct_guesses / game.total_questions) * 100) : 0,
         duration_seconds: 0, // Por ahora no tenemos esta columna
-        max_streak: 0, // Por ahora no tenemos esta columna
-        game_mode: 'classic' // Por ahora no tenemos esta columna
+        max_streak: 0 // Por ahora no tenemos esta columna
     }));
     
-    const bestGame = gamesWithAccuracy.reduce((best, game) => 
-        game.accuracy_percentage > best.accuracy_percentage ? game : best, gamesWithAccuracy[0] || {accuracy_percentage: 0});
     const totalPlayTime = 0; // No tenemos duración por ahora
     
-    // Estadísticas por modo (solo clásico por ahora)
-    const modeBreakdown = {
-        'classic': {
-            count: totalGames,
-            accuracy: averageAccuracy,
-            totalCorrect: totalCorrect,
-            totalPlayed: totalPlayed
+    // Estadísticas por modo
+    const modeBreakdown = {};
+    ['classic', 'revancha', 'instinto'].forEach(mode => {
+        const modeGames = gamesWithAccuracy.filter(game => (game.game_mode || 'classic') === mode);
+        if (modeGames.length > 0) {
+            const modeCorrect = modeGames.reduce((sum, game) => sum + game.correct_guesses, 0);
+            const modePlayed = modeGames.reduce((sum, game) => sum + game.total_questions, 0);
+            modeBreakdown[mode] = {
+                count: modeGames.length,
+                accuracy: modePlayed > 0 ? Math.round((modeCorrect / modePlayed) * 100) : 0,
+                totalCorrect: modeCorrect,
+                totalPlayed: modePlayed
+            };
         }
-    };
+    });
     
     const modeNames = {
         'classic': '🎯 Clásico',
@@ -1660,7 +1666,7 @@ async function saveFailedStreet(streetData) {
             <!-- Resumen general -->
             <div class="stats-section">
                 <h3 class="stats-section-title">🏆 Resumen General</h3>
-                <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div class="grid grid-cols-3 gap-4">
                     <div class="text-center">
                         <div class="text-3xl font-bold text-blue-400">${totalGames}</div>
                         <div class="text-sm text-gray-400">Partidas totales</div>
@@ -1672,10 +1678,6 @@ async function saveFailedStreet(streetData) {
                     <div class="text-center">
                         <div class="text-3xl font-bold text-purple-400">${totalCorrect}</div>
                         <div class="text-sm text-gray-400">Total aciertos</div>
-                    </div>
-                    <div class="text-center">
-                        <div class="text-3xl font-bold text-yellow-400">${bestGame.accuracy_percentage || 0}%</div>
-                        <div class="text-sm text-gray-400">Mejor partida</div>
                     </div>
                 </div>
             </div>
@@ -2078,7 +2080,9 @@ async function saveFailedStreet(streetData) {
   }
 
   function processLocalGameData(games) {
-    return games.map((game, index) => {
+    // Ordenar para que las más recientes se rendericen al final (encima)
+    const sortedGames = games.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+    return sortedGames.map((game, index) => {
         const accuracy = game.correct_guesses / game.total_questions;
         
         if (game.zone_polygon && Array.isArray(game.zone_polygon) && game.zone_polygon.length >= 3) {
@@ -2100,7 +2104,7 @@ async function saveFailedStreet(streetData) {
                 totalCorrect: game.correct_guesses,
                 totalAttempts: game.total_questions,
                 color: getHeatmapColor(accuracy, 'personal'),
-                opacity: accuracy < 0.8 ? 0.7 : 0.4, // Más opaco para zonas que necesitan práctica
+                opacity: Math.max(0.5, 1 - (index * 0.1)), // Más recientes más opacas
                 name: `Partida ${index + 1}`,
                 gameDate: game.created_at
             };
@@ -2123,7 +2127,7 @@ async function saveFailedStreet(streetData) {
                 totalCorrect: game.correct_guesses,
                 totalAttempts: game.total_questions,
                 color: getHeatmapColor(accuracy, 'personal'),
-                opacity: accuracy < 0.8 ? 0.7 : 0.4,
+                opacity: Math.max(0.5, 1 - (index * 0.1)), // Más recientes más opacas
                 name: `Partida ${index + 1}`,
                 gameDate: game.created_at
             };

@@ -1321,27 +1321,22 @@ async function saveFailedStreet(streetData) {
         const { data: { session } } = await supabaseClient.auth.getSession();
         if (!session || total === 0) return;
 
-        // Preparar datos extendidos para las estadísticas
-        // Preparar datos de la zona para análisis de mapa de calor futuro
-        const zoneCenterPoint = zonePoints.length > 0 ? {
-            lat: zonePoints.reduce((sum, p) => sum + p.lat, 0) / zonePoints.length,
-            lng: zonePoints.reduce((sum, p) => sum + p.lng, 0) / zonePoints.length
-        } : null;
-
+        // Por ahora solo guardamos los datos básicos que ya funcionan
         const gameData = {
             user_id: session.user.id,
             correct_guesses: correct,
-            total_questions: total,
-            accuracy_percentage: Math.round((correct / total) * 100),
-            game_mode: currentGameMode || 'classic',
-            zone_bounds: zonePoints.length > 0 ? JSON.stringify(zonePoints) : null,
-            zone_center_lat: zoneCenterPoint?.lat || null,
-            zone_center_lng: zoneCenterPoint?.lng || null,
-            zone_name: getCurrentZoneName() || null,
-            duration_seconds: Math.floor((Date.now() - gameStartTime) / 1000),
-            max_streak: maxStreak || 0,
-            created_at: new Date().toISOString()
+            total_questions: total
         };
+        
+        // Cuando se actualice la base de datos, se podrán añadir más campos:
+        // accuracy_percentage: Math.round((correct / total) * 100),
+        // game_mode: currentGameMode || 'classic',
+        // zone_bounds: zonePoints.length > 0 ? JSON.stringify(zonePoints) : null,
+        // zone_center_lat: zoneCenterPoint?.lat || null,
+        // zone_center_lng: zoneCenterPoint?.lng || null,
+        // zone_name: getCurrentZoneName() || null,
+        // duration_seconds: Math.floor((Date.now() - gameStartTime) / 1000),
+        // max_streak: maxStreak || 0
 
         await supabaseClient.from('game_stats').insert(gameData);
         console.log('Estadísticas guardadas correctamente');
@@ -1368,7 +1363,7 @@ async function saveFailedStreet(streetData) {
         if (!session) return;
         
         const { data: stats, error } = await supabaseClient.from('game_stats')
-            .select('correct_guesses, total_questions, accuracy_percentage, max_streak, game_mode, created_at')
+            .select('correct_guesses, total_questions, created_at')
             .eq('user_id', session.user.id)
             .order('created_at', { ascending: false })
             .limit(50);
@@ -1386,26 +1381,31 @@ async function saveFailedStreet(streetData) {
             return;
         }
         
-        // Calcular estadísticas generales
+        // Calcular estadísticas generales usando solo las columnas existentes
         const totalCorrect = stats.reduce((sum, game) => sum + game.correct_guesses, 0);
         const totalPlayed = stats.reduce((sum, game) => sum + game.total_questions, 0);
         const totalGames = stats.length;
-        const averageAccuracy = Math.round(stats.reduce((sum, game) => sum + (game.accuracy_percentage || 0), 0) / totalGames);
-        const bestStreak = Math.max(...stats.map(game => game.max_streak || 0));
-        const recentGames = stats.slice(0, 5);
         
-        // Estadísticas por modo de juego
-        const modeStats = stats.reduce((acc, game) => {
-            const mode = game.game_mode || 'classic';
-            if (!acc[mode]) acc[mode] = { games: 0, accuracy: 0 };
-            acc[mode].games++;
-            acc[mode].accuracy += game.accuracy_percentage || 0;
-            return acc;
-        }, {});
+        // Calcular precisión por partida y promedio
+        const gamesWithAccuracy = stats.map(game => ({
+            ...game,
+            accuracy_percentage: game.total_questions > 0 ? Math.round((game.correct_guesses / game.total_questions) * 100) : 0
+        }));
         
-        Object.keys(modeStats).forEach(mode => {
-            modeStats[mode].accuracy = Math.round(modeStats[mode].accuracy / modeStats[mode].games);
-        });
+        const averageAccuracy = totalPlayed > 0 ? Math.round((totalCorrect / totalPlayed) * 100) : 0;
+        const bestGame = gamesWithAccuracy.reduce((best, game) => 
+            game.accuracy_percentage > best.accuracy_percentage ? game : best, gamesWithAccuracy[0] || {accuracy_percentage: 0});
+        const recentGames = gamesWithAccuracy.slice(0, 5);
+        
+        // Estadísticas por modo de juego (solo modo clásico por ahora, ya que no tenemos la columna game_mode)
+        const modeStats = {
+            'classic': {
+                games: totalGames,
+                accuracy: averageAccuracy,
+                totalCorrect: totalCorrect,
+                totalPlayed: totalPlayed
+            }
+        };
         
         // Racha de días jugados
         const playDates = [...new Set(stats.map(game => new Date(game.created_at).toDateString()))];
@@ -1427,16 +1427,16 @@ async function saveFailedStreet(streetData) {
                         <div class="text-xs text-gray-400 uppercase tracking-wide">Partidas</div>
                     </div>
                     <div class="bg-gray-800/50 rounded-lg p-3">
-                        <div class="text-2xl font-bold text-yellow-400">${bestStreak}</div>
-                        <div class="text-xs text-gray-400 uppercase tracking-wide">Mejor racha</div>
+                        <div class="text-2xl font-bold text-yellow-400">${bestGame.accuracy_percentage}%</div>
+                        <div class="text-xs text-gray-400 uppercase tracking-wide">Mejor partida</div>
                     </div>
                     <div class="bg-gray-800/50 rounded-lg p-3">
                         <div class="text-2xl font-bold text-purple-400">${streakDays}</div>
                         <div class="text-xs text-gray-400 uppercase tracking-wide">Días jugados</div>
                     </div>
                     <div class="bg-gray-800/50 rounded-lg p-3">
-                        <div class="text-2xl font-bold text-orange-400">${Object.keys(modeStats).length}</div>
-                        <div class="text-xs text-gray-400 uppercase tracking-wide">Modos</div>
+                        <div class="text-2xl font-bold text-orange-400">${totalCorrect}</div>
+                        <div class="text-xs text-gray-400 uppercase tracking-wide">Aciertos</div>
                     </div>
                 </div>
                 
@@ -1513,7 +1513,7 @@ async function saveFailedStreet(streetData) {
         if (!session) return;
         
         const { data: stats, error } = await supabaseClient.from('game_stats')
-            .select('*')
+            .select('correct_guesses, total_questions, created_at')
             .eq('user_id', session.user.id)
             .order('created_at', { ascending: false });
             
@@ -1543,25 +1543,34 @@ async function saveFailedStreet(streetData) {
         `;
     }
     
-    // Calcular estadísticas avanzadas
+    // Calcular estadísticas avanzadas usando solo columnas existentes
     const totalGames = stats.length;
     const totalCorrect = stats.reduce((sum, game) => sum + game.correct_guesses, 0);
     const totalPlayed = stats.reduce((sum, game) => sum + game.total_questions, 0);
-    const averageAccuracy = Math.round((totalCorrect / totalPlayed) * 100);
-    const bestGame = stats.reduce((best, game) => 
-        (game.accuracy_percentage || 0) > (best.accuracy_percentage || 0) ? game : best, stats[0]);
-    const totalPlayTime = stats.reduce((sum, game) => sum + (game.duration_seconds || 0), 0);
+    const averageAccuracy = totalPlayed > 0 ? Math.round((totalCorrect / totalPlayed) * 100) : 0;
     
-    // Estadísticas por modo
-    const modeBreakdown = stats.reduce((acc, game) => {
-        const mode = game.game_mode || 'classic';
-        if (!acc[mode]) acc[mode] = { count: 0, accuracy: 0, totalCorrect: 0, totalPlayed: 0 };
-        acc[mode].count++;
-        acc[mode].totalCorrect += game.correct_guesses;
-        acc[mode].totalPlayed += game.total_questions;
-        acc[mode].accuracy = Math.round((acc[mode].totalCorrect / acc[mode].totalPlayed) * 100);
-        return acc;
-    }, {});
+    // Añadir accuracy_percentage calculado a cada juego
+    const gamesWithAccuracy = stats.map(game => ({
+        ...game,
+        accuracy_percentage: game.total_questions > 0 ? Math.round((game.correct_guesses / game.total_questions) * 100) : 0,
+        duration_seconds: 0, // Por ahora no tenemos esta columna
+        max_streak: 0, // Por ahora no tenemos esta columna
+        game_mode: 'classic' // Por ahora no tenemos esta columna
+    }));
+    
+    const bestGame = gamesWithAccuracy.reduce((best, game) => 
+        game.accuracy_percentage > best.accuracy_percentage ? game : best, gamesWithAccuracy[0] || {accuracy_percentage: 0});
+    const totalPlayTime = 0; // No tenemos duración por ahora
+    
+    // Estadísticas por modo (solo clásico por ahora)
+    const modeBreakdown = {
+        'classic': {
+            count: totalGames,
+            accuracy: averageAccuracy,
+            totalCorrect: totalCorrect,
+            totalPlayed: totalPlayed
+        }
+    };
     
     const modeNames = {
         'classic': '🎯 Clásico',
@@ -1570,7 +1579,7 @@ async function saveFailedStreet(streetData) {
     };
     
     // Historial de partidas (últimas 20)
-    const recentGames = stats.slice(0, 20);
+    const recentGames = gamesWithAccuracy.slice(0, 20);
     
     return `
         <div class="space-y-6">
@@ -1587,8 +1596,8 @@ async function saveFailedStreet(streetData) {
                         <div class="text-sm text-gray-400">Precisión media</div>
                     </div>
                     <div class="text-center">
-                        <div class="text-3xl font-bold text-purple-400">${Math.floor(totalPlayTime / 60)}</div>
-                        <div class="text-sm text-gray-400">Minutos jugados</div>
+                        <div class="text-3xl font-bold text-purple-400">${totalCorrect}</div>
+                        <div class="text-sm text-gray-400">Total aciertos</div>
                     </div>
                     <div class="text-center">
                         <div class="text-3xl font-bold text-yellow-400">${bestGame.accuracy_percentage || 0}%</div>
@@ -1636,11 +1645,8 @@ async function saveFailedStreet(streetData) {
                                             <span class="text-xs bg-gray-700 px-2 py-1 rounded">${timeAgo}</span>
                                         </div>
                                         <div class="text-sm text-gray-400">
-                                            ${game.correct_guesses}/${game.total_questions} calles • 
-                                            ${game.max_streak || 0} racha máxima • 
-                                            ${Math.floor((game.duration_seconds || 0) / 60)}min
+                                            ${game.correct_guesses}/${game.total_questions} calles acertadas
                                         </div>
-                                        ${game.zone_name ? `<div class="text-xs text-gray-500 mt-1">${game.zone_name}</div>` : ''}
                                     </div>
                                 </div>
                             </div>
@@ -1735,9 +1741,8 @@ async function saveFailedStreet(streetData) {
         if (!session) return null;
         
         const { data: stats } = await supabaseClient.from('game_stats')
-            .select('zone_center_lat, zone_center_lng, accuracy_percentage, zone_bounds')
-            .eq('user_id', session.user.id)
-            .not('zone_center_lat', 'is', null);
+            .select('correct_guesses, total_questions, created_at')
+            .eq('user_id', session.user.id);
             
         // Agrupar por proximidad geográfica y calcular precisión promedio
         return processZoneData(stats);
@@ -1751,12 +1756,16 @@ async function saveFailedStreet(streetData) {
     // TODO: Implementar clustering de zonas cercanas
     // TODO: Calcular precisión promedio por cluster
     // TODO: Asignar colores según precisión
-    return stats.map(stat => ({
-        lat: stat.zone_center_lat,
-        lng: stat.zone_center_lng,
-        accuracy: stat.accuracy_percentage,
-        color: getHeatmapColor(stat.accuracy_percentage)
-    }));
+    return stats.map(stat => {
+        const accuracy = stat.total_questions > 0 ? Math.round((stat.correct_guesses / stat.total_questions) * 100) : 0;
+        return {
+            accuracy: accuracy,
+            color: getHeatmapColor(accuracy),
+            // Por ahora sin coordenadas hasta tener las columnas
+            lat: null,
+            lng: null
+        };
+    });
   }
   
   function getHeatmapColor(accuracy) {

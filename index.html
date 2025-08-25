@@ -20,11 +20,61 @@
       <div class="p-8 text-white bg-gray-900 border-8 border-transparent rounded-2xl shadow-xl bg-opacity-80 backdrop-blur-sm">
         <h1 class="text-5xl font-bold text-center cursor-default">Calle a Calle</h1>
         <p class="mt-2 mb-8 text-center text-gray-300">Inicia sesión para empezar a jugar</p>
+        
+        <!-- Formulario de email/contraseña -->
+        <form id="email-auth-form" class="mb-6 space-y-4">
+          <div>
+            <input 
+              type="email" 
+              id="email-input" 
+              placeholder="Correo electrónico" 
+              required 
+              class="w-full p-3 text-gray-900 bg-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+          <div>
+            <input 
+              type="password" 
+              id="password-input" 
+              placeholder="Contraseña" 
+              required 
+              class="w-full p-3 text-gray-900 bg-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+          <div class="flex space-x-3">
+            <button 
+              type="submit" 
+              id="login-btn" 
+              class="flex-1 p-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition duration-300 font-semibold"
+            >
+              Iniciar Sesión
+            </button>
+            <button 
+              type="button" 
+              id="register-btn" 
+              class="flex-1 p-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition duration-300 font-semibold"
+            >
+              Registrarse
+            </button>
+          </div>
+        </form>
+
+        <!-- Separador -->
+        <div class="flex items-center mb-6">
+          <div class="flex-1 h-px bg-gray-600"></div>
+          <span class="px-3 text-gray-400 text-sm">o</span>
+          <div class="flex-1 h-px bg-gray-600"></div>
+        </div>
+
+        <!-- Botón de Google -->
         <div class="flex justify-center">
           <button id="google-login-btn" class="p-3 bg-white rounded-full shadow-lg login-btn hover:scale-105 transition transform duration-300">
             <img class="w-10 h-10" loading="lazy" src="https://ucarecdn.com/8f25a2ba-bdcf-4ff1-b596-088f330416ef/" alt="Google" />
           </button>
         </div>
+
+        <!-- Mensaje de error/estado -->
+        <div id="auth-message" class="mt-4 p-3 rounded-lg text-center hidden"></div>
       </div>
     </section>
   </div>

@@ -15,6 +15,12 @@ window.addEventListener('DOMContentLoaded', () => {
     gameScreen: document.getElementById('game-screen'),
     backgroundMapContainer: document.getElementById('background-map'),
     googleLoginBtn: document.getElementById('google-login-btn'),
+    emailAuthForm: document.getElementById('email-auth-form'),
+    emailInput: document.getElementById('email-input'),
+    passwordInput: document.getElementById('password-input'),
+    loginBtn: document.getElementById('login-btn'),
+    registerBtn: document.getElementById('register-btn'),
+    authMessage: document.getElementById('auth-message'),
     logoutBtn: document.getElementById('logout-btn'),
     userInfoDetails: document.getElementById('user-info-details'),
     adminPanelBtn: document.getElementById('admin-panel-btn'),
@@ -133,6 +139,88 @@ window.addEventListener('DOMContentLoaded', () => {
       options: { redirectTo: window.location.origin }
     }); 
   }
+
+  async function signInWithEmail() {
+    const email = uiElements.emailInput.value.trim();
+    const password = uiElements.passwordInput.value;
+
+    if (!email || !password) {
+      showAuthMessage('Por favor, completa todos los campos', 'error');
+      return;
+    }
+
+    showAuthMessage('Iniciando sesión...', 'loading');
+
+    try {
+      const { data, error } = await supabaseClient.auth.signInWithPassword({
+        email,
+        password
+      });
+
+      if (error) {
+        let errorMessage = 'Error al iniciar sesión';
+        if (error.message.includes('Invalid login credentials')) {
+          errorMessage = 'Email o contraseña incorrectos';
+        } else if (error.message.includes('Email not confirmed')) {
+          errorMessage = 'Por favor, confirma tu email antes de iniciar sesión';
+        }
+        showAuthMessage(errorMessage, 'error');
+      } else {
+        showAuthMessage('¡Inicio de sesión exitoso!', 'success');
+      }
+    } catch (error) {
+      showAuthMessage('Error de conexión', 'error');
+    }
+  }
+
+  async function signUpWithEmail() {
+    const email = uiElements.emailInput.value.trim();
+    const password = uiElements.passwordInput.value;
+
+    if (!email || !password) {
+      showAuthMessage('Por favor, completa todos los campos', 'error');
+      return;
+    }
+
+    if (password.length < 6) {
+      showAuthMessage('La contraseña debe tener al menos 6 caracteres', 'error');
+      return;
+    }
+
+    showAuthMessage('Creando cuenta...', 'loading');
+
+    try {
+      const { data, error } = await supabaseClient.auth.signUp({
+        email,
+        password
+      });
+
+      if (error) {
+        let errorMessage = 'Error al crear la cuenta';
+        if (error.message.includes('User already registered')) {
+          errorMessage = 'Este email ya está registrado';
+        }
+        showAuthMessage(errorMessage, 'error');
+      } else {
+        showAuthMessage('¡Cuenta creada! Revisa tu email para confirmarla', 'success');
+      }
+    } catch (error) {
+      showAuthMessage('Error de conexión', 'error');
+    }
+  }
+
+  function showAuthMessage(message, type) {
+    uiElements.authMessage.textContent = message;
+    uiElements.authMessage.className = `mt-4 p-3 rounded-lg text-center ${type}`;
+    uiElements.authMessage.classList.remove('hidden');
+    
+    if (type === 'success' || type === 'error') {
+      setTimeout(() => {
+        uiElements.authMessage.classList.add('hidden');
+      }, 5000);
+    }
+  }
+
   async function signOut() { await supabaseClient.auth.signOut(); }
   
   async function checkRevanchaAvailability() {
@@ -196,6 +284,11 @@ window.addEventListener('DOMContentLoaded', () => {
   async function handleAuthStateChange(event, session) {
     const user = session ? session.user : null;
     if (user) {
+      // Limpiar formulario de login
+      uiElements.emailInput.value = '';
+      uiElements.passwordInput.value = '';
+      uiElements.authMessage.classList.add('hidden');
+      
       const userName = user.user_metadata?.full_name || user.email.split('@')[0];
       const profileImageUrl = user.user_metadata?.avatar_url || '';
       uiElements.userInfoDetails.innerHTML = `<img src="${profileImageUrl}" alt="Avatar" class="w-16 h-16 mx-auto mb-3 rounded-full"><p class="font-semibold text-lg truncate">${userName}</p><p class="text-sm text-gray-400">${user.email}</p>`;
@@ -1252,5 +1345,15 @@ async function saveFailedStreet(streetData) {
   }
 
   uiElements.googleLoginBtn.addEventListener('click', signInWithGoogle);
+  
+  // Event listeners para autenticación por email
+  uiElements.emailAuthForm.addEventListener('submit', (e) => {
+    e.preventDefault();
+    signInWithEmail();
+  });
+  
+  uiElements.loginBtn.addEventListener('click', signInWithEmail);
+  uiElements.registerBtn.addEventListener('click', signUpWithEmail);
+  
   supabaseClient.auth.onAuthStateChange(handleAuthStateChange);
 });

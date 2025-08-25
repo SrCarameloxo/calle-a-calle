@@ -187,6 +187,131 @@ body { font-family: system-ui, sans-serif; background-color: #1a1a1a; }
     transform: translateY(-2px);
 }
 
+/* --- ESTILOS MAPA DE CALOR --- */
+.heatmap-control-btn {
+    flex: 1;
+    padding: 0.75rem;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    color: #e2e8f0;
+    transition: all 0.3s ease;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.25rem;
+    text-align: center;
+}
+
+.heatmap-control-btn:hover {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: rgba(59, 130, 246, 0.5);
+    transform: translateY(-1px);
+}
+
+.heatmap-control-btn.active {
+    background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+    border-color: #3b82f6;
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+}
+
+.heatmap-control-btn small {
+    font-size: 0.7rem;
+    opacity: 0.8;
+    font-weight: normal;
+}
+
+#heatmap-container {
+    position: relative;
+    background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+}
+
+/* Estilos para las zonas del mapa de calor */
+.heatmap-zone {
+    transition: all 0.8s cubic-bezier(0.4, 0.0, 0.2, 1) !important;
+    transform: scale(0);
+    opacity: 0;
+    filter: blur(0px);
+}
+
+/* Capas con diferentes niveles de difuminado */
+.heatmap-layer-0 { filter: blur(5px); }
+.heatmap-layer-1 { filter: blur(15px); }
+.heatmap-layer-2 { filter: blur(25px); }
+.heatmap-layer-3 { filter: blur(35px); }
+
+/* Tooltips mejorados */
+.leaflet-tooltip.heatmap-tooltip {
+    background: rgba(0, 0, 0, 0.95);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 8px;
+    color: white;
+    font-size: 0.875rem;
+    padding: 0.75rem;
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.4);
+    backdrop-filter: blur(10px);
+    font-weight: 500;
+}
+
+.leaflet-tooltip.heatmap-tooltip::before {
+    border-top-color: rgba(0, 0, 0, 0.95) !important;
+}
+
+/* Animaciones de pulso suave para zonas activas */
+@keyframes heatmap-gentle-pulse {
+    0%, 100% { 
+        transform: scale(1);
+        opacity: 0.6; 
+    }
+    50% { 
+        transform: scale(1.05);
+        opacity: 0.8; 
+    }
+}
+
+.heatmap-zone:hover {
+    animation: heatmap-gentle-pulse 2s ease-in-out infinite;
+    z-index: 1000;
+}
+
+/* Transiciones suaves entre colores */
+.heatmap-zone-transition-red-yellow {
+    background: radial-gradient(circle, 
+        rgba(239, 68, 68, 0.8) 0%, 
+        rgba(242, 113, 39, 0.6) 50%,
+        rgba(245, 158, 11, 0.4) 100%);
+}
+
+.heatmap-zone-transition-yellow-green {
+    background: radial-gradient(circle, 
+        rgba(245, 158, 11, 0.8) 0%, 
+        rgba(131, 172, 70, 0.6) 50%,
+        rgba(16, 185, 129, 0.4) 100%);
+}
+
+/* Efectos de entrada escalonada */
+@keyframes heatmap-zone-enter {
+    0% {
+        transform: scale(0) rotate(45deg);
+        opacity: 0;
+        filter: blur(10px);
+    }
+    60% {
+        transform: scale(1.1) rotate(0deg);
+        filter: blur(2px);
+    }
+    100% {
+        transform: scale(1) rotate(0deg);
+        opacity: var(--target-opacity);
+        filter: blur(var(--target-blur));
+    }
+}
+
+.heatmap-zone.entering {
+    animation: heatmap-zone-enter 0.8s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
 /* --- ESTILOS DE BOTONES DE JUEGO --- */
 button { cursor: pointer; }
 button.game-control-btn {

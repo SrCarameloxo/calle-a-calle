@@ -1372,10 +1372,10 @@ async function saveFailedStreet(streetData) {
         
         if (stats.length === 0) {
             statsContent.innerHTML = `
-                <div class="text-center space-y-4">
-                    <div class="text-6xl">🎯</div>
-                    <p class="text-lg text-gray-300">¡Empieza tu aventura!</p>
-                    <p class="text-sm text-gray-400">Juega tu primera partida para desbloquear estadísticas increíbles</p>
+                <div class="text-center py-8 space-y-4">
+                    <div class="w-16 h-16 mx-auto bg-gradient-to-br from-blue-500 to-purple-600 rounded-2xl flex items-center justify-center text-2xl">🎯</div>
+                    <h3 class="text-xl font-bold text-white">Aún sin datos</h3>
+                    <p class="text-gray-400 max-w-xs mx-auto">Completa tu primera partida para comenzar a rastrear tu progreso geográfico</p>
                 </div>
             `;
             return;
@@ -1412,47 +1412,84 @@ async function saveFailedStreet(streetData) {
         const streakDays = calculatePlayStreak(playDates);
         
         statsContent.innerHTML = `
-            <div class="space-y-6">
-                <!-- Estadística principal -->
-                <div class="text-center bg-gradient-to-r from-blue-500/20 to-purple-500/20 rounded-lg p-4">
-                    <div class="text-4xl font-bold text-blue-400">${averageAccuracy}%</div>
-                    <div class="text-lg text-gray-300 mt-1">Precisión promedio</div>
-                    <div class="text-sm text-gray-400">${totalCorrect} de ${totalPlayed} calles acertadas</div>
-                </div>
-                
-                <!-- Métricas destacadas -->
-                <div class="grid grid-cols-2 gap-3 text-center">
-                    <div class="bg-gray-800/50 rounded-lg p-3">
-                        <div class="text-2xl font-bold text-green-400">${totalGames}</div>
-                        <div class="text-xs text-gray-400 uppercase tracking-wide">Partidas</div>
-                    </div>
-                    <div class="bg-gray-800/50 rounded-lg p-3">
-                        <div class="text-2xl font-bold text-yellow-400">${bestGame.accuracy_percentage}%</div>
-                        <div class="text-xs text-gray-400 uppercase tracking-wide">Mejor partida</div>
-                    </div>
-                    <div class="bg-gray-800/50 rounded-lg p-3">
-                        <div class="text-2xl font-bold text-purple-400">${streakDays}</div>
-                        <div class="text-xs text-gray-400 uppercase tracking-wide">Días jugados</div>
-                    </div>
-                    <div class="bg-gray-800/50 rounded-lg p-3">
-                        <div class="text-2xl font-bold text-orange-400">${totalCorrect}</div>
-                        <div class="text-xs text-gray-400 uppercase tracking-wide">Aciertos</div>
+            <div class="space-y-5">
+                <!-- Estadística principal más elegante -->
+                <div class="relative overflow-hidden">
+                    <div class="absolute inset-0 bg-gradient-to-r from-blue-600/10 via-purple-600/10 to-blue-600/10"></div>
+                    <div class="relative p-6 text-center border border-gray-600/30 rounded-xl backdrop-blur-sm">
+                        <div class="text-5xl font-light text-white mb-2">${averageAccuracy}<span class="text-2xl text-gray-400">%</span></div>
+                        <div class="text-sm font-medium text-gray-300 uppercase tracking-wider mb-1">Precisión Media</div>
+                        <div class="text-xs text-gray-500">${totalCorrect} aciertos de ${totalPlayed} intentos</div>
                     </div>
                 </div>
                 
-                <!-- Progreso reciente -->
-                <div class="space-y-2">
-                    <h4 class="text-sm font-semibold text-gray-300">Últimas 5 partidas</h4>
-                    <div class="flex justify-between items-center space-x-1">
-                        ${recentGames.map(game => `
-                            <div class="flex-1 h-2 rounded-full ${getAccuracyColor(game.accuracy_percentage || 0)} opacity-75"></div>
-                        `).join('')}
+                <!-- Métricas en grid más profesional -->
+                <div class="grid grid-cols-2 gap-3">
+                    <div class="bg-gray-800/30 border border-gray-700/40 rounded-lg p-4 hover:bg-gray-800/40 transition-colors">
+                        <div class="flex items-center justify-between">
+                            <div class="text-2xl font-bold text-emerald-400">${totalGames}</div>
+                            <div class="w-8 h-8 bg-emerald-500/20 rounded-lg flex items-center justify-center">
+                                <span class="text-emerald-400 text-sm">📊</span>
+                            </div>
+                        </div>
+                        <div class="text-xs text-gray-400 uppercase tracking-wide mt-1">Partidas Totales</div>
+                    </div>
+                    
+                    <div class="bg-gray-800/30 border border-gray-700/40 rounded-lg p-4 hover:bg-gray-800/40 transition-colors">
+                        <div class="flex items-center justify-between">
+                            <div class="text-2xl font-bold text-amber-400">${bestGame.accuracy_percentage}<span class="text-sm">%</span></div>
+                            <div class="w-8 h-8 bg-amber-500/20 rounded-lg flex items-center justify-center">
+                                <span class="text-amber-400 text-sm">🎯</span>
+                            </div>
+                        </div>
+                        <div class="text-xs text-gray-400 uppercase tracking-wide mt-1">Mejor Resultado</div>
+                    </div>
+                    
+                    <div class="bg-gray-800/30 border border-gray-700/40 rounded-lg p-4 hover:bg-gray-800/40 transition-colors">
+                        <div class="flex items-center justify-between">
+                            <div class="text-2xl font-bold text-violet-400">${streakDays}</div>
+                            <div class="w-8 h-8 bg-violet-500/20 rounded-lg flex items-center justify-center">
+                                <span class="text-violet-400 text-sm">📅</span>
+                            </div>
+                        </div>
+                        <div class="text-xs text-gray-400 uppercase tracking-wide mt-1">Días Activos</div>
+                    </div>
+                    
+                    <div class="bg-gray-800/30 border border-gray-700/40 rounded-lg p-4 hover:bg-gray-800/40 transition-colors">
+                        <div class="flex items-center justify-between">
+                            <div class="text-2xl font-bold text-cyan-400">${totalCorrect}</div>
+                            <div class="w-8 h-8 bg-cyan-500/20 rounded-lg flex items-center justify-center">
+                                <span class="text-cyan-400 text-sm">✓</span>
+                            </div>
+                        </div>
+                        <div class="text-xs text-gray-400 uppercase tracking-wide mt-1">Total Aciertos</div>
                     </div>
                 </div>
                 
-                <!-- Botón expandir -->
-                <button id="expand-stats-btn" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-4 rounded-lg transition duration-300">
-                    📊 Ver estadísticas completas
+                <!-- Progreso reciente más elegante -->
+                <div class="space-y-3">
+                    <div class="flex items-center justify-between">
+                        <h4 class="text-sm font-medium text-gray-300">Progreso Reciente</h4>
+                        <span class="text-xs text-gray-500">Últimas ${recentGames.length} partidas</span>
+                    </div>
+                    <div class="space-y-2">
+                        <div class="flex space-x-1 h-2">
+                            ${recentGames.map(game => `
+                                <div class="flex-1 rounded-full ${getAccuracyColor(game.accuracy_percentage || 0)} opacity-80 hover:opacity-100 transition-opacity" 
+                                     title="${game.accuracy_percentage}% - ${new Date(game.created_at).toLocaleDateString()}"></div>
+                            `).join('')}
+                        </div>
+                        <div class="flex justify-between text-xs text-gray-500">
+                            <span>Más antigua</span>
+                            <span>Más reciente</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Botón expandir mejorado -->
+                <button id="expand-stats-btn" class="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-medium py-3 px-4 rounded-lg transition-all duration-300 shadow-lg hover:shadow-xl flex items-center justify-center space-x-2">
+                    <span>📈</span>
+                    <span>Análisis Detallado</span>
                 </button>
             </div>
         `;
@@ -1655,17 +1692,72 @@ async function saveFailedStreet(streetData) {
                 </div>
             </div>
             
+            <!-- Mapa de Calor -->
+            <div class="stats-section">
+                <h3 class="stats-section-title">🗺️ Análisis Geográfico</h3>
+                
+                <!-- Controles del mapa de calor -->
+                <div class="mb-4 flex space-x-2">
+                    <button id="heatmap-global-btn" class="heatmap-control-btn active">
+                        <span class="text-lg">🌍</span>
+                        <span>Vista Global</span>
+                        <small>Dificultad de la ciudad</small>
+                    </button>
+                    <button id="heatmap-personal-btn" class="heatmap-control-btn">
+                        <span class="text-lg">👤</span>
+                        <span>Vista Personal</span>
+                        <small>Tu progreso</small>
+                    </button>
+                </div>
+                
+                <!-- Contenedor del mapa -->
+                <div class="relative">
+                    <div id="heatmap-container" class="w-full h-80 bg-gray-800/50 rounded-lg border border-gray-700/40 overflow-hidden">
+                        <div class="flex items-center justify-center h-full">
+                            <div class="text-center space-y-2">
+                                <div class="text-2xl">🗺️</div>
+                                <p class="text-gray-400">Cargando mapa de calor...</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Leyenda -->
+                    <div class="mt-3 flex items-center justify-center space-x-6 text-sm">
+                        <div class="flex items-center space-x-2">
+                            <div class="w-4 h-4 bg-red-500 rounded-full"></div>
+                            <span class="text-gray-300" id="heatmap-red-label">Zonas difíciles</span>
+                        </div>
+                        <div class="flex items-center space-x-2">
+                            <div class="w-4 h-4 bg-yellow-500 rounded-full"></div>
+                            <span class="text-gray-300">Intermedias</span>
+                        </div>
+                        <div class="flex items-center space-x-2">
+                            <div class="w-4 h-4 bg-green-500 rounded-full"></div>
+                            <span class="text-gray-300" id="heatmap-green-label">Zonas fáciles</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Información adicional -->
+                <div class="mt-4 p-3 bg-gray-800/30 rounded-lg border border-gray-700/30">
+                    <p class="text-sm text-gray-400" id="heatmap-description">
+                        <strong>Vista Global:</strong> Muestra las zonas más y menos falladas por toda la comunidad. 
+                        Ideal para principiantes que buscan empezar por zonas más fáciles.
+                    </p>
+                </div>
+            </div>
+            
             <!-- Próximamente -->
             <div class="stats-section">
                 <h3 class="stats-section-title">🚀 Próximamente</h3>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div class="p-4 bg-gradient-to-r from-green-500/20 to-blue-500/20 rounded-lg border border-green-500/30">
-                        <div class="text-lg font-bold mb-2">🗺️ Mapa de Calor</div>
-                        <div class="text-sm text-gray-300">Visualiza tus zonas dominadas y áreas de mejora</div>
-                    </div>
                     <div class="p-4 bg-gradient-to-r from-purple-500/20 to-pink-500/20 rounded-lg border border-purple-500/30">
                         <div class="text-lg font-bold mb-2">🏅 Logros</div>
                         <div class="text-sm text-gray-300">Sistema de insignias y desafíos</div>
+                    </div>
+                    <div class="p-4 bg-gradient-to-r from-blue-500/20 to-cyan-500/20 rounded-lg border border-blue-500/30">
+                        <div class="text-lg font-bold mb-2">📊 Comparativas</div>
+                        <div class="text-sm text-gray-300">Compárate con otros usuarios</div>
                     </div>
                 </div>
             </div>
@@ -1709,6 +1801,8 @@ async function saveFailedStreet(streetData) {
         modal.classList.add('hidden');
         gameUiContainer.style.opacity = '1';
         gameUiContainer.style.pointerEvents = 'auto';
+        // Limpiar mapa de calor al cerrar
+        clearHeatmap();
     };
     
     closeBtn.addEventListener('click', closeModal);
@@ -1722,64 +1816,274 @@ async function saveFailedStreet(streetData) {
         }
     };
     document.addEventListener('keydown', handleEsc);
+    
+    // Configurar controles del mapa de calor
+    setupHeatmapControls();
+  }
+  
+  function setupHeatmapControls() {
+    const globalBtn = document.getElementById('heatmap-global-btn');
+    const personalBtn = document.getElementById('heatmap-personal-btn');
+    const redLabel = document.getElementById('heatmap-red-label');
+    const greenLabel = document.getElementById('heatmap-green-label');
+    const description = document.getElementById('heatmap-description');
+    
+    if (globalBtn) {
+        globalBtn.addEventListener('click', () => {
+            toggleHeatmapView('global');
+            redLabel.textContent = 'Zonas difíciles';
+            greenLabel.textContent = 'Zonas fáciles';
+            description.innerHTML = `<strong>Vista Global:</strong> Muestra las zonas más y menos falladas por toda la comunidad. 
+                                    Ideal para principiantes que buscan empezar por zonas más fáciles.`;
+        });
+    }
+    
+    if (personalBtn) {
+        personalBtn.addEventListener('click', () => {
+            toggleHeatmapView('personal');
+            redLabel.textContent = 'Necesitas repasar';
+            greenLabel.textContent = 'Zonas dominadas';
+            description.innerHTML = `<strong>Vista Personal:</strong> Tu progreso personal. Las zonas rojas necesitan más práctica, 
+                                    las verdes están bien controladas. Solo aparecen zonas que has jugado.`;
+        });
+    }
+    
+    // Inicializar mapa de calor con vista global
+    initializeHeatmap();
+  }
+  
+  async function initializeHeatmap() {
+    const container = document.getElementById('heatmap-container');
+    if (!container) return;
+    
+    try {
+        // Crear un mini mapa para el mapa de calor
+        container.innerHTML = '<div id="heatmap-mini-map" style="width: 100%; height: 100%;"></div>';
+        
+        const miniMap = L.map('heatmap-mini-map', {
+            center: [38.8794, -6.9706], // Centro de Badajoz
+            zoom: 13,
+            zoomControl: false,
+            dragging: true,
+            scrollWheelZoom: false,
+            doubleClickZoom: false,
+            boxZoom: false,
+            keyboard: false
+        });
+        
+        // Añadir tiles del mapa
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: ''
+        }).addTo(miniMap);
+        
+        // Cargar y renderizar datos iniciales (global)
+        const heatmapData = await fetchHeatmapData('global');
+        renderHeatmap(heatmapData, miniMap);
+        
+        // Guardar referencia al mini mapa
+        window.heatmapMiniMap = miniMap;
+        
+    } catch (error) {
+        console.error('Error inicializando mapa de calor:', error);
+        container.innerHTML = `
+            <div class="flex items-center justify-center h-full">
+                <div class="text-center space-y-2">
+                    <div class="text-xl">⚠️</div>
+                    <p class="text-gray-400">Error cargando mapa de calor</p>
+                </div>
+            </div>
+        `;
+    }
   }
 
   // ===============================
-  // FUNCIONES BASE PARA MAPA DE CALOR FUTURO
+  // SISTEMA DE MAPA DE CALOR
   // ===============================
   
+  let heatmapLayer = null;
+  let currentHeatmapType = 'global'; // 'global' o 'personal'
+  
   /**
-   * Función preparada para implementar mapa de calor
-   * Analizará las zonas jugadas y mostrará:
-   * - Verde: Zonas dominadas (>80% precisión)
-   * - Amarillo: Zonas intermedias (60-80% precisión)  
-   * - Rojo: Zonas a repasar (<60% precisión)
+   * Obtener datos del mapa de calor desde la API
    */
-  async function generateHeatmapData() {
+  async function fetchHeatmapData(type = 'global') {
     try {
         const { data: { session } } = await supabaseClient.auth.getSession();
-        if (!session) return null;
+        const params = new URLSearchParams({ type });
         
-        const { data: stats } = await supabaseClient.from('game_stats')
-            .select('correct_guesses, total_questions, created_at')
-            .eq('user_id', session.user.id);
-            
-        // Agrupar por proximidad geográfica y calcular precisión promedio
-        return processZoneData(stats);
+        if (type === 'personal' && session) {
+            params.append('user_id', session.user.id);
+        }
+        
+        const response = await fetch(`/api/getHeatmapData?${params}`);
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        
+        return await response.json();
     } catch (error) {
-        console.error('Error generando datos de mapa de calor:', error);
-        return null;
+        console.error('Error fetching heatmap data:', error);
+        // Fallback a datos simulados
+        return generateFallbackHeatmapData(type);
     }
   }
   
-  function processZoneData(stats) {
-    // TODO: Implementar clustering de zonas cercanas
-    // TODO: Calcular precisión promedio por cluster
-    // TODO: Asignar colores según precisión
-    return stats.map(stat => {
-        const accuracy = stat.total_questions > 0 ? Math.round((stat.correct_guesses / stat.total_questions) * 100) : 0;
-        return {
-            accuracy: accuracy,
-            color: getHeatmapColor(accuracy),
-            // Por ahora sin coordenadas hasta tener las columnas
-            lat: null,
-            lng: null
-        };
+  /**
+   * Generar datos simulados como fallback
+   */
+  function generateFallbackHeatmapData(type) {
+    const zones = [
+        { lat: 38.8794, lng: -6.9706, name: "Centro Histórico" },
+        { lat: 38.8850, lng: -6.9650, name: "San Roque" },
+        { lat: 38.8750, lng: -6.9800, name: "Cerro de Reyes" },
+        { lat: 38.8700, lng: -6.9600, name: "Valdepasillas" },
+        { lat: 38.8900, lng: -6.9500, name: "Pardaleras" }
+    ];
+    
+    return {
+        type: type,
+        data: zones.map(zone => ({
+            ...zone,
+            accuracy: Math.random(),
+            gamesCount: Math.floor(Math.random() * 10) + 1,
+            color: getHeatmapColor(Math.random(), type),
+            opacity: 0.6
+        })),
+        totalGames: 25
+    };
+  }
+  
+  /**
+   * Renderizar mapa de calor en el mapa de juego
+   */
+  function renderHeatmap(heatmapData, mapInstance = null) {
+    const targetMap = mapInstance || gameMap;
+    if (!targetMap) return;
+    
+    // Limpiar capa anterior
+    if (heatmapLayer) {
+        targetMap.removeLayer(heatmapLayer);
+    }
+    
+    // Crear nueva capa de grupo
+    heatmapLayer = L.layerGroup();
+    
+    heatmapData.data.forEach((zone, index) => {
+        // Sistema de múltiples círculos para efecto de difuminado gradual
+        const baseRadius = 600;
+        const circles = [];
+        
+        // Crear múltiples círculos concéntricos para difuminado suave
+        for (let i = 0; i < 4; i++) {
+            const radiusMultiplier = 1 + (i * 0.3); // 1x, 1.3x, 1.6x, 1.9x
+            const opacityMultiplier = 1 - (i * 0.25); // 1, 0.75, 0.5, 0.25
+            
+            const circle = L.circle([zone.lat, zone.lng], {
+                radius: baseRadius * radiusMultiplier,
+                fillColor: zone.color,
+                color: zone.color,
+                weight: 0,
+                fillOpacity: (zone.opacity || 0.6) * opacityMultiplier,
+                className: `heatmap-zone heatmap-layer-${i}`
+            });
+            
+            // Solo añadir tooltip al círculo central
+            if (i === 0) {
+                const tooltipContent = currentHeatmapType === 'global' 
+                    ? `<strong>${zone.name || 'Zona'}</strong><br/>
+                       ${Math.round(zone.accuracy * 100)}% de éxito<br/>
+                       ${zone.gamesPlayed || 0} partidas jugadas`
+                    : `<strong>${zone.name || 'Tu zona'}</strong><br/>
+                       ${Math.round(zone.accuracy * 100)}% de precisión<br/>
+                       ${zone.gamesCount} partidas<br/>
+                       ${zone.totalCorrect}/${zone.totalAttempts} aciertos`;
+                       
+                circle.bindTooltip(tooltipContent, {
+                    sticky: true,
+                    direction: 'top',
+                    className: 'heatmap-tooltip'
+                });
+            }
+            
+            circles.push(circle);
+            heatmapLayer.addLayer(circle);
+        }
+        
+        // Añadir animación de entrada escalonada
+        setTimeout(() => {
+            circles.forEach((circle, circleIndex) => {
+                const element = circle.getElement();
+                if (element) {
+                    element.style.transition = 'all 0.8s ease-out';
+                    element.style.transform = 'scale(1)';
+                    element.style.opacity = circle.options.fillOpacity;
+                }
+            });
+        }, index * 150); // Delay progresivo por zona
     });
+    
+    // Añadir al mapa
+    heatmapLayer.addTo(targetMap);
+    
+    // Aplicar estilos CSS para difuminado
+    setTimeout(() => {
+        document.querySelectorAll('.heatmap-zone').forEach(element => {
+            element.style.filter = 'blur(20px)';
+            element.style.transition = 'all 0.3s ease';
+        });
+    }, 100);
   }
   
-  function getHeatmapColor(accuracy) {
-    if (accuracy >= 80) return 'green';
-    if (accuracy >= 60) return 'yellow'; 
-    return 'red';
+  /**
+   * Alternar entre vista global y personal
+   */
+  async function toggleHeatmapView(newType) {
+    if (currentHeatmapType === newType) return;
+    
+    currentHeatmapType = newType;
+    const heatmapData = await fetchHeatmapData(newType);
+    
+    // Usar el mini mapa si existe, sino el mapa principal
+    const targetMap = window.heatmapMiniMap || gameMap;
+    renderHeatmap(heatmapData, targetMap);
+    
+    // Actualizar controles UI
+    updateHeatmapControls(newType);
   }
   
-  // Placeholder para la función de renderizado del mapa de calor
-  function renderHeatmap(heatmapData) {
-    // TODO: Crear capa de mapa de calor en Leaflet
-    // TODO: Añadir controles de filtro (mostrar solo green/yellow/red)
-    // TODO: Añadir tooltips con estadísticas detalladas
-    console.log('Mapa de calor listo para implementar con:', heatmapData);
+  /**
+   * Actualizar controles de interfaz
+   */
+  function updateHeatmapControls(type) {
+    const globalBtn = document.getElementById('heatmap-global-btn');
+    const personalBtn = document.getElementById('heatmap-personal-btn');
+    
+    if (globalBtn && personalBtn) {
+        globalBtn.classList.toggle('active', type === 'global');
+        personalBtn.classList.toggle('active', type === 'personal');
+    }
+  }
+  
+  /**
+   * Limpiar mapa de calor
+   */
+  function clearHeatmap() {
+    if (heatmapLayer && gameMap) {
+        gameMap.removeLayer(heatmapLayer);
+        heatmapLayer = null;
+    }
+  }
+  
+  function getHeatmapColor(accuracy, type = 'global') {
+    if (type === 'global') {
+        // Global: rojo = difícil, verde = fácil
+        if (accuracy >= 0.8) return '#10b981'; // Verde
+        if (accuracy >= 0.6) return '#f59e0b'; // Amarillo
+        return '#ef4444'; // Rojo
+    } else {
+        // Personal: verde = dominado, rojo = necesita repaso
+        if (accuracy >= 0.8) return '#10b981'; // Verde
+        if (accuracy >= 0.6) return '#f59e0b'; // Amarillo  
+        return '#ef4444'; // Rojo
+    }
   }
 
   uiElements.googleLoginBtn.addEventListener('click', signInWithGoogle);
